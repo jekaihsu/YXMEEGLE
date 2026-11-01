@@ -60,6 +60,8 @@ test('Lark assignment editor searches only its eligible node roster without SOP 
   assignment:task,people:[{open_id:'eligible',name:'同組王同仁',departments:['控制']}],
   nodeLabel:'控制',nodeKey:'control',busy:false,reason:'',mutate:async value=>{chosen.push(value);return true},onClose:()=>{}
  })));
+ assert.equal(document.querySelector('form'),null,'the editor is not mounted until 編輯 is pressed');
+ await click([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='編輯'));
  await click(document.querySelector(`[aria-label="task: ${task.title}"]`));await flush();
  assert.deepEqual(requests,[]);
  assert.match(document.querySelector('[role=listbox]').textContent,/同組王同仁/);
@@ -71,4 +73,24 @@ test('Lark assignment editor searches only its eligible node roster without SOP 
  await key('ArrowDown');await key('Enter');
  await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  assert.equal(chosen[0].patch.assignee_open_id,'eligible');
+});
+
+test('Lark task sheet is view-first with real title, known facts only and no source jargon',async()=>{
+ globalThis.fetch=async()=>response([]);
+ root=createRoot(document.getElementById('root'));
+ const task={...assignmentFixture().detail.tasks[0],assigned_by:null,done_at:null,deadline:null};
+ const render=(t,plan)=>act(async()=>root.render(React.createElement(ui.AssignmentTaskInspector,{assignment:t,people:[],plan,nodeLabel:'控制',nodeKey:'control',busy:false,reason:'',mutate:async()=>true,onClose:()=>{}})));
+ await render(task);
+ const sheet=document.querySelector('.task-drawer');
+ assert.equal(sheet.querySelector('h2').textContent,'控制點成果核對');
+ assert.deepEqual([...sheet.querySelectorAll('.task-drawer-trail>span')].map(s=>s.textContent),['控制']);
+ assert.deepEqual([...sheet.querySelectorAll('.task-drawer-facts dt')].map(d=>d.textContent),['負責人'],'empty deadline, assigner and completion time are not listed');
+ assert.equal(sheet.querySelector('details'),null,'no raw source record disclosure');
+ assert.doesNotMatch(sheet.textContent,/來源未提供|未完成|record |Lark 任務/);
+ assert.equal(sheet.querySelector('form'),null);
+ assert.match(sheet.textContent,/核對現場紀錄與座標。/);
+ await render({...task,deadline:'2026-10-20',done_at:'2026-10-21T10:00:00+08:00'});
+ assert.deepEqual([...document.querySelectorAll('.task-drawer-facts dt')].map(d=>d.textContent),['負責人','期限','完成時間']);
+ await render({...task,can:{edit_status:false,cancel:false,assign:false,claim:false,edit_details:false}});
+ assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='編輯'),false,'no edit entry without any edit right');
 });

@@ -66,7 +66,7 @@ export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disable
  </div>;
 }
 
-export function AssigneeTaskEditor({model,busy=false,onSave,projectId,nodeKey}:{model:TaskEditorModel;busy?:boolean;onSave:(draft:TaskDraft)=>Promise<boolean>;projectId?:string;nodeKey?:string}) {
+export function AssigneeTaskEditor({model,busy=false,onSave,onCancel,hideLocked=false,projectId,nodeKey}:{model:TaskEditorModel;busy?:boolean;onSave:(draft:TaskDraft)=>Promise<boolean>;onCancel?:()=>void;hideLocked?:boolean;projectId?:string;nodeKey?:string}) {
  const [draft,setDraft]=useState(model.draft),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
  const changed=draftChanged(model.draft,draft),dueChanged=draft.due!==model.draft.due;
  const blocked=busy || saving;
@@ -74,19 +74,20 @@ export function AssigneeTaskEditor({model,busy=false,onSave,projectId,nodeKey}:{
  const locked=model.readOnlyReason || (Object.values(model.fields).every(f=>!f.enabled)?model.fields.title.reason:'');
  const saveReason=locked || (denied?model.fields[denied].reason:!draft.title.trim() ? '請填寫任務名稱' : !changed ? '請先修改任務內容' : model.dueReason && dueChanged && !draft.reason.trim() ? '請填寫期限變更原因' : '');
  const update=(key:keyof TaskDraft,value:string)=>{setDraft(d=>({...d,[key]:value}));setMessage('')};
+ const shows=(key:keyof TaskEditorModel['fields'])=>!hideLocked||model.fields[key].enabled;
+ const showStatus=model.statuses.length>1&&shows('status');
  const readOnlyReason=locked;
  const field=(key:keyof TaskEditorModel['fields'])=>({disabled:blocked || !!locked || !model.fields[key].enabled,'aria-describedby':readOnlyReason ? 'task-editor-readonly' : !model.fields[key].enabled ? `task-editor-${key}-reason` : undefined});
  const reason=(key:keyof TaskEditorModel['fields'])=>!readOnlyReason && !model.fields[key].enabled && <small id={`task-editor-${key}-reason`}>{model.fields[key].reason}</small>;
  const submit=async()=>{if(blocked || saveReason)return;setSaving(true);setMessage('');try{const ok=await onSave(draft);setMessage(ok?'已儲存任務':'尚未儲存，請核對錯誤後重試')}finally{setSaving(false)}};
  return <form className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
   {readOnlyReason && <p className="nw-editor-wide" id="task-editor-readonly">{readOnlyReason}</p>}
-  <label>任務名稱<input aria-label="任務名稱" value={draft.title} maxLength={model.maxTitle} required {...field('title')} onChange={e=>update('title',e.target.value)}/>{reason('title')}</label>
-  <div>負責人<AssigneePicker projectId={projectId} nodeKey={nodeKey} title={model.draft.title} value={draft.assignee} people={model.people} disabled={field('assignee').disabled} onChange={id=>update('assignee',id)}/>{reason('assignee')}</div>
-  <label>期限<input aria-label="任務期限" type="date" value={draft.due} {...field('due')} onChange={e=>update('due',e.target.value)}/>{reason('due')}</label>
-  <label>任務狀態<FormSelect aria-label="任務狀態" value={draft.status} {...field('status')} onChange={e=>update('status',e.target.value)}>{model.statuses.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</FormSelect>{reason('status')}</label>
-
-  <label className="nw-editor-wide">備註<textarea aria-label="任務備註" rows={4} value={draft.notes} maxLength={model.maxNotes} {...field('notes')} onChange={e=>update('notes',e.target.value)}/>{reason('notes')}</label>
+  {shows('title')&&<label>任務名稱<input aria-label="任務名稱" value={draft.title} maxLength={model.maxTitle} required {...field('title')} onChange={e=>update('title',e.target.value)}/>{reason('title')}</label>}
+  {shows('assignee')&&<div>負責人<AssigneePicker projectId={projectId} nodeKey={nodeKey} title={model.draft.title} value={draft.assignee} people={model.people} disabled={field('assignee').disabled} onChange={id=>update('assignee',id)}/>{reason('assignee')}</div>}
+  {shows('due')&&<label>期限<input aria-label="任務期限" type="date" value={draft.due} {...field('due')} onChange={e=>update('due',e.target.value)}/>{reason('due')}</label>}
+  {showStatus&&<label>任務狀態<FormSelect aria-label="任務狀態" value={draft.status} {...field('status')} onChange={e=>update('status',e.target.value)}>{model.statuses.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</FormSelect>{reason('status')}</label>}
+  {shows('notes')&&<label className="nw-editor-wide">備註<textarea aria-label="任務備註" rows={4} value={draft.notes} maxLength={model.maxNotes} {...field('notes')} onChange={e=>update('notes',e.target.value)}/>{reason('notes')}</label>}
   {model.dueReason && dueChanged && <label className="nw-editor-wide">期限變更原因<input aria-label="期限變更原因" value={draft.reason} maxLength={1000} required disabled={blocked} onChange={e=>update('reason',e.target.value)}/></label>}
-  {!locked&&<div className="nw-editor-wide nw-editor-save"><Button type="submit" variant="primary" disabled={blocked || !!saveReason} disabledReason={blocked ? '正在儲存，請稍候' : saveReason}>{saving ? '儲存中…' : '儲存任務'}</Button>{message && <span role="status">{message}</span>}</div>}
+  {!locked&&<div className="nw-editor-wide nw-editor-save"><Button type="submit" variant="primary" disabled={blocked || !!saveReason} disabledReason={blocked ? '正在儲存，請稍候' : saveReason}>{saving ? '儲存中…' : '儲存任務'}</Button>{onCancel&&<Button type="button" variant="plain" disabled={saving} onClick={onCancel}>取消</Button>}{message && <span role="status">{message}</span>}</div>}
  </form>;
 }

@@ -95,5 +95,5 @@ await mount({node:'control',embedded:false});assert.equal(document.querySelector
  detailStatus=200;Date.now=realNow;
 }
 await mount({node:'control'});assert.match(document.querySelector('.pf-task-open small').textContent,/Lark 任務/,'rows name their source');
-await click(document.querySelector('.pf-task-open'));assert.match(document.querySelector('[role=dialog] [aria-label="任務位置"]').textContent,/Lark 任務/,'drawer names its source');await click(document.querySelector('[role=dialog] [aria-label="關閉"]'));
+await click(document.querySelector('.pf-task-open'));assert.doesNotMatch(document.querySelector('[role=dialog] [aria-label="任務位置"]').textContent,/Lark 任務/,'the drawer trail names the stage, not the source system');await click(document.querySelector('[role=dialog] [aria-label="關閉"]'));
 await act(async()=>root.unmount());console.log('Unified project flow rendered checks passed');

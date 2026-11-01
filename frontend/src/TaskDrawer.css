@@ -30,6 +30,7 @@
 .task-drawer-section-head h3{margin:0}
 .task-drawer-hint{font-size:13px;color:var(--label-2)}
 .task-drawer-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.task-drawer .assignment-edit{display:grid;gap:24px;min-width:0}
 .task-drawer-section-head{min-height:44px}
 .task-drawer .nw-task-editor{grid-template-columns:minmax(0,1fr);gap:16px;padding-block:0}
 .task-drawer .nw-editor-save{position:sticky;bottom:0;z-index:1;padding-block:12px;background:var(--surface)}

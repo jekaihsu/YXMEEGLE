@@ -166,6 +166,8 @@ await check('production seed is one task with collapsed evidence, unique item ID
  assert.deepEqual([...seed.querySelectorAll('[data-item-id]')].map(row=>row.dataset.itemId),progress.production.control.items.map(item=>item.item_id));
  await click(seed.querySelector('.pf-task-open'));
  assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/SOP-START|999/);
+ assert.equal(document.querySelector('select[aria-label="任務狀態"]'),null,'the editor opens only behind 編輯');
+ await click(button('編輯'));
  assert.ok(document.querySelector('select[aria-label="任務狀態"]'));
  await value(document.querySelector('select[aria-label="任務狀態"]'),'已完成');await click(button('儲存任務'));
  assert.equal(calls.findLast(call=>call.method==='PATCH').body.status,'已完成');

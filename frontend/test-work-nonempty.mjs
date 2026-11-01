@@ -42,6 +42,7 @@ for(const panel of ['assigned','delegated','local']){
   assert.match(document.querySelector('tbody').textContent,/QA 案件/);
   const open=[...document.querySelectorAll('tbody button')].find(button=>button.textContent=== (panel==='local'?'開啟任務':'開啟案件'));
   await act(async()=>open.click());
+  if(panel!=='local')await act(async()=>{[...document.querySelectorAll('.task-drawer button')].find(b=>b.textContent.trim()==='編輯').click();await tick()});
   await edit('任務名稱',`更新 ${panel}`);await edit('任務備註','已核對備註');await edit('任務負責人','u2');await edit('任務期限','2026-11-03');
   if(panel==='local')await edit('期限變更原因','配合現場');else await edit('任務狀態','待處理');
   await act(async()=>{document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await tick()});
