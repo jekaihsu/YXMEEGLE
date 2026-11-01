@@ -11,7 +11,7 @@ const React=await import('react');const {act}=React;const {createRoot}=await imp
 const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.task-list-context.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const tick=()=>new Promise(r=>setTimeout(r,15));
-const perNode={sales:2,pm:3,confirmation:3,field:3,control:3,mapping:2,report:2,pricing:2,settlement:1};
+const perNode={sales:5,pm:3,confirmation:3,field:3,control:3,mapping:2,report:2,pricing:2,settlement:1};
 const overdueIds=new Set(['sales-1','pm-1','field-1','control-1','report-1']);
 function localProject(){
  const base=projectFixture();
@@ -37,28 +37,30 @@ const click=async element=>{assert.ok(element,'requested control exists');await 
 const back=async()=>{await act(async()=>{history.back();await tick();await tick()})};
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
-assert.equal(pressed('全部'),'true');assert.equal(rows(),21,'the all-tasks link expands every stage group');
-assert.match(document.querySelector('.pf-task-open small').textContent,/本地流程/,'local rows name their source');
-await click(button('逾期'));assert.equal(rows(),5);
+assert.equal(pressed('全部'),'true');assert.equal(rows(),5,'legacy all-tasks links stay scoped to the selected stage');
+assert.ok(!document.querySelector('.pf-task-open small'),'rows omit the source sub-line');
+const openFilters=async()=>{const summary=document.querySelector('.st-filter-menu summary');if(!summary.parentElement.open){await click(summary);await act(async()=>{summary.parentElement.dispatchEvent(new Event('toggle'));await tick()})}};
+await openFilters();
+await openFilters();await click(button('逾期'));assert.equal(rows(),1);
 await click(document.querySelector('.pf-task-open'));
-assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'local drawer opens');assert.equal(rows(),5);
+assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'local drawer opens');assert.equal(rows(),1);
 await click(document.querySelector('[aria-label="關閉"]'));
 assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);
-assert.equal(rows(),5,'closing the drawer keeps the five overdue results');
+assert.equal(rows(),1,'closing the drawer keeps the overdue result');
 assert.equal(pressed('逾期'),'true');assert.equal(c.route.section,'all-tasks');
-await click(button('逾期'));assert.equal(rows(),21);
+await click(button('逾期'));assert.equal(rows(),5);
 
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
-await click(button('逾期'));assert.equal(rows(),5);assert.match(location.hash,/task_filters=overdue/);
+await openFilters();await click(button('逾期'));assert.equal(rows(),1);assert.match(location.hash,/task_filters=overdue/);
 await click(document.querySelector('.pf-task-open'));const opened=c.route.task;
 await click([...document.querySelectorAll('.task-drawer[data-kind="legacy"] button')].find(b=>b.textContent.trim()==='查看節點檔案'));
 assert.equal(c.route.tab,'files');assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),0);
 await back();
 assert.equal(c.route.task,opened);assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'history restores the drawer');
-assert.equal(rows(),5,'overdue filter survives Files and Back');assert.equal(pressed('逾期'),'true');
+assert.equal(rows(),1,'overdue filter survives Files and Back');await openFilters();assert.equal(pressed('逾期'),'true');
 await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});
-assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),5);
+assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),1);
 const row=[...document.querySelectorAll('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===opened).querySelector('.pf-task-open');
 assert.equal(document.activeElement,row,'focus returns to the reopened row');
 
@@ -82,7 +84,7 @@ await mount('view=project&project=p1&tab=flow&section=all-tasks&task_filters=ove
 await click(document.querySelector('[aria-label="關閉"]'));
 assert.equal(document.activeElement.id,'flow-tasks','a filtered-out task returns focus to the list');
 document.activeElement.blur();
-await click(button('逾期'));
+await openFilters();await click(button('逾期'));
 assert.equal(document.activeElement,document.body,'changing filters does not restore a stale opener');
 
 await act(async()=>root.unmount());console.log('Task list context checks passed');

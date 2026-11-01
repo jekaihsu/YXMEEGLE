@@ -16,7 +16,7 @@ const can={assign:true,edit_status:true,cancel:true,edit_details:true,claim:fals
 const mk=(id,over={})=>({id,record_id:id,revision:`rev-${id}-1`,title:`任務 ${id}`,detail:'',assignee:{open_id:'ou_wei',name:'合成 陳威廷'},assigned_by:null,department:'控制',deadline:'2026-10-25',status:'待處理',done_at:null,created_at:null,can:{...can},...over});
 let root,c,fixture,calls,mode,holdDetail,tasksByNode;
 const jsonResponse=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
-async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus,project,section}={}){
+async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus,project,section,stale=false}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
  const base=projectFixture();Object.assign(base.project,project||{});fixture=embeddedAssignmentFixture();mode={detailStatus};holdDetail=null;
  tasksByNode=tasks||{control:[mk('c1',{status:'已完成'}),mk('c2',{status:'已完成'}),mk('c3',{status:'已完成'}),mk('c4',{assignee:null}),mk('c5',{status:'進行中'})],field:[mk('f1',{assignee:null,deadline:'2026-10-10'})],pm:[]};
@@ -25,7 +25,7 @@ async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,f
   n.tasks={done:rows.filter(t=>t.status==='已完成').length,total:rows.length};n.departments=['控制'];
   n.derived_status=n.key==='control'?'進行中':['sales','pm','confirmation'].includes(n.key)?'已完成':'未開始';
  }
- fixture.list.summary.current_node='control';
+ fixture.list.summary.current_node='control';fixture.list.stale=stale;if(stale)fixture.list.writes_enabled=false;
  if(!assign)for(const rows of Object.values(fixture.list.node_details))rows.tasks.forEach(t=>t.can.assign=false);
  if(!embedded)fixture.list.node_details=undefined;
  calls=[];
@@ -65,66 +65,52 @@ async function openDrawer(id,label='指派'){await click([...rowOf(id).querySele
 const results=[];
 async function check(id,fn){try{await fn();results.push(['PASS',id])}catch(error){results.push(['FAIL',id,error.message.split('\n')[0]]);console.error(error)}}
 
-await check('Concept B defaults to action-first and stage selection never changes the current stage',async()=>{
+await check('flow has one stage selector and selecting a stage never changes current stage',async()=>{
  await mount({tab:'flow',node:'control'});
- assert.equal(button('行動優先').getAttribute('aria-pressed'),'true');
- assert.equal(document.querySelector('.pf-stage-workspace'),null);
- await click(button('階段導覽'));
+ assert.equal(button('行動優先'),undefined);assert.equal(button('階段導覽'),undefined);
  assert.equal(document.querySelectorAll('.pf-stage-nav .pf-node').length,9);
  await click(document.querySelector('.pf-stage-nav .pf-node[aria-label^="PM"]'));
- assert.equal(c.route.node,'pm');
- assert.equal(fixture.list.summary.current_node,'control');
+ assert.equal(c.route.node,'pm');assert.equal(fixture.list.summary.current_node,'control');
  assert.match(document.querySelector('.pf-stage-nav .pf-node[aria-label^="控制"] .pf-stage-marker').textContent,/目前階段/);
- assert.equal(document.querySelector('.pf-stage-nav .pf-node[aria-label^="PM"]').getAttribute('aria-current'),'step');
- assert.match(document.querySelector('#flow-tasks h3').textContent,/PM/);
- await click(button('行動優先'));
- assert.equal(c.route.node,'pm');assert.equal(writes().length,0);
+ assert.equal(writes().length,0);
 });
-await check('overview DOM places tasks before the selectable diagram, node facts and evidence',async()=>{
+await check('overview keeps tasks after summary and removes stepper, node panel, folds and stale banner',async()=>{
  await mount();
- const tasks=document.querySelector('#flow-tasks'),diagram=document.querySelector('.pf-diagram'),detail=document.querySelector('.pf-stage-detail'),evidence=document.querySelector('#flow-evidence');
- const precedes=(a,b)=>assert.ok(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
- precedes(document.querySelector('.cs-summary'),tasks);precedes(tasks,diagram);precedes(diagram,detail);precedes(detail,evidence);
- assert.equal(tasks.contains(evidence),false);
- await click(document.querySelector('.pf-node[aria-label^="PM"]'));
- assert.match(document.querySelector('#flow-tasks h3').textContent,/PM/);
+ assert.ok(document.querySelector('.cs-summary').compareDocumentPosition(document.querySelector('#flow-tasks'))&Node.DOCUMENT_POSITION_FOLLOWING);
+ for(const selector of ['.pf-diagram','.pf-stage-detail','#flow-evidence','.po-fold','.cs-stale','.cs-levels','.st-others'])assert.equal(document.querySelector(selector),null,selector);
+ assert.doesNotMatch(document.body.textContent,/資料為上次成功讀取|上次成功資料|讀取時間/);
 });
-await check('evidence starts folded and an evidence deep link opens it on either tab',async()=>{
- for(const tab of ['overview','flow']){
-  await mount({tab});assert.equal(document.querySelector('#flow-evidence').open,false);
-  await mount({tab,section:'evidence'});await act(async()=>{await tick(40)});
-  assert.equal(document.querySelector('#flow-evidence').open,true);
- }
+await check('flow retains evidence and delivery access while overview omits evidence',async()=>{
+ await mount({tab:'flow',section:'evidence'});assert.equal(document.querySelector('#flow-evidence').open,true);
+ assert.ok(document.querySelector('[aria-label="本階段交付與確認"]'));
+ await mount({tab:'overview',section:'evidence'});assert.equal(document.querySelector('#flow-evidence'),null);
 });
-await check('an evidence deep link also opens the folded evidence in 階段導覽',async()=>{
- await mount({tab:'flow'});await click(button('階段導覽'));assert.equal(document.querySelector('#flow-evidence').open,false);
- await act(async()=>{React.startTransition(()=>c.go({...c.route,section:'evidence'}));await tick(40)});
- assert.equal(document.querySelector('#flow-evidence').open,true);
+await check('T01 opening and switching tabs cause zero writes',async()=>{
+ await mount();assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
+ await act(async()=>{c.go({...c.route,tab:'flow'});await tick(40)});
+ await click(document.querySelector('.pf-node[aria-label^="PM"]'));assert.equal(writes().length,0);
 });
-await check('T01 opening, selecting nodes and switching tabs cause zero writes',async()=>{
- await mount();assert.ok(document.querySelector('.cs-summary'));
- assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
- await click(document.querySelector('.pf-node[aria-label^="PM"]'));await click(document.querySelector('.pf-node[aria-label^="控制"]'));
- await act(async()=>{React.startTransition(()=>c.go({...c.route,tab:'flow'}));await tick(40)});
- assert.equal(writes().length,0);assert.ok(calls.length>0);
+await check('T02 selected-stage overview keeps current stage and offers return',async()=>{
+ await mount({node:'pm'});assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
+ assert.match(document.querySelector('.cs-selected').textContent,/PM/);
+ await click(button('回到目前階段'));assert.equal(c.route.node,'control');
 });
-await check('T02 selecting another node keeps the current stage and offers the way back',async()=>{
- await mount();await click(document.querySelector('.pf-node[aria-label^="PM"]'));
- assert.match(document.querySelector('#flow-selected h2').textContent,/PM/);assert.match(document.querySelector('.nc-eyebrow').textContent,/目前選取的節點/);
- assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
- assert.match(document.querySelector('.nc-diff').textContent,/目前階段：控制/);
- await click(button('回到目前階段'));assert.equal(c.route.node,'control');assert.equal(document.querySelector('.nc-diff'),null);
+await check('T04/T05 task heading has one count and rows have value-only metadata',async()=>{
+ await mount({node:'control'});const card=document.querySelector('#flow-selected').textContent;
+ assert.match(card,/已完成 3 \/ 5 項/);assert.doesNotMatch(card,/60%|任務完成數|任務狀態：|執行人：|本地流程/);
+ assert.match(rowOf('c4').textContent,/待處理/);assert.match(rowOf('c4').textContent,/尚未指派/);assert.doesNotMatch(rowOf('c4').textContent,/受阻/);
+ assert.equal([...rowOf('c5').querySelectorAll('button')].some(b=>b.textContent.trim()==='改派'),false);
 });
-await check('T04/T05 the node card shows 3 / 5 and 60% while the unassigned task is both pending and unassigned',async()=>{
- await mount({node:'control'});
- const card=document.querySelector('#flow-selected').textContent;assert.match(card,/任務完成數：3 \/ 5 已完成/);assert.match(card,/60%/);
- assert.match(rowOf('c4').textContent,/任務狀態：待處理/);assert.match(rowOf('c4').textContent,/尚未指派/);assert.doesNotMatch(rowOf('c4').textContent,/受阻/);
- assert.match(document.querySelector('#flow-selected').textContent,/節點狀態：進行中/);
+await check('T07 denied assignment is hidden and sends no request',async()=>{
+ await mount({node:'control',assign:false});assert.equal([...rowOf('c4').querySelectorAll('button')].some(b=>b.textContent.trim()==='指派'),false);assert.equal(writes().length,0);
 });
-await check('T07 without the assign capability the reason is explained and no request can start',async()=>{
- await mount({node:'control',assign:false});
- const trigger=[...rowOf('c4').querySelectorAll('button')].find(b=>b.textContent.trim()==='指派');assert.ok(trigger.disabled);
- assert.match(rowOf('c4').textContent+document.querySelector('.disabled-action-reason,[role=tooltip]')?.textContent,/無指派權限/);assert.equal(writes().length,0);
+await check('filter controls appear above four tasks, and never for empty stages',async()=>{
+ for(const count of [0,4,5]){await mount({node:'control',tasks:{control:Array.from({length:count},(_,i)=>mk('n'+i))}});assert.equal(!!document.querySelector('.pf-filters'),count>4);if(count===0){assert.match(document.querySelector('#flow-tasks').textContent,/此階段尚無任務/);assert.equal(document.querySelector('.st-count'),null)}}
+});
+await check('stale reads omit prose banners and keep assignment writes disabled',async()=>{
+ await mount({node:'control',stale:true});assert.ok(!document.querySelector('.cs-stale'));
+ assert.doesNotMatch(document.body.textContent,/資料為上次成功讀取|上次成功資料，待更新/);
+ const assign=[...rowOf('c4').querySelectorAll('button')].find(b=>b.textContent==='指派');assert.ok(assign.disabled);await click(assign);assert.ok(!dialog());assert.equal(writes().length,0);
 });
 await check('T08 saving an executor sends one request, refreshes the list and returns focus',async()=>{
  await mount({node:'control'});await openDrawer('c4');
@@ -181,12 +167,12 @@ await check('T23 executor saved but deadline not saved is reported field by fiel
 });
 await check('T19 a deep link to a task in another stage selects it, states the stage difference and does not move the current stage',async()=>{
  await mount({node:'control',task:'f1'});await act(async()=>{await tick(60)});
- assert.equal(c.route.node,'field');assert.match(document.querySelector('#flow-selected h2').textContent,/外業/);
+ assert.equal(c.route.node,'field');assert.ok(rowOf('f1'));
  assert.match(document.querySelector('.st-note[role=status]').textContent,/不是目前階段「控制」/);assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
  await mount({node:'control',task:'zzz-missing'});await act(async()=>{await tick(60)});assert.match(document.body.textContent,/找不到此 Lark 任務/);
 });
 await check('T20 a late response for node A never overwrites the newer selection B',async()=>{
- await mount({embedded:false,node:'control'});await act(async()=>{await tick(60)});
+ await mount({tab:'flow',embedded:false,node:'control'});await act(async()=>{await tick(60)});
  let release;holdDetail={key:'pm',promise:new Promise(r=>release=r)};
  tasksByNode.pm=[mk('p1',{title:'PM 舊回應任務'})];fixture.list.nodes.find(n=>n.key==='pm').tasks={done:0,total:1};
  await click(document.querySelector('.pf-node[aria-label^="PM"]'));
@@ -197,13 +183,13 @@ await check('T20 a late response for node A never overwrites the newer selection
 });
 await check('T21 failure, zero tasks and an empty filter use three different messages',async()=>{
  await mount({embedded:false,node:'control',detailStatus:500});await act(async()=>{await tick(60)});
- assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用|讀取失敗/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/此節點尚無可顯示任務/);
+ assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用|讀取失敗/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/此階段尚無任務/);
  await mount({node:'pm'});await act(async()=>{await tick(40)});
- assert.match(document.querySelector('#flow-tasks').textContent,/此節點尚無可顯示任務/);
+ assert.match(document.querySelector('#flow-tasks').textContent,/此階段尚無任務/);
  await mount({node:'control',filters:'blocked'});await act(async()=>{await tick(40)});
  assert.match(document.querySelector('#flow-tasks').textContent,/沒有符合條件的任務/);assert.match(document.querySelector('#flow-tasks').textContent,/此來源未提供任務阻礙資訊/);
- assert.match(document.querySelector('.st-count').textContent,/符合條件 0 項 · 節點共 5 項/);
- await click(document.querySelector('.st-applied button'));assert.match(document.querySelector('.st-count').textContent,/符合條件 5 項/);
+ assert.match(document.querySelector('.st-count').textContent,/已完成 3 \/ 5 項/);
+ await click(document.querySelector('.st-applied button'));assert.match(document.querySelector('.st-count').textContent,/已完成 3 \/ 5 項/);
 });
 await check('T22 the drawer takes focus, keeps Tab inside and closes with Escape back to its trigger',async()=>{
  await mount({node:'control'});const trigger=[...rowOf('c4').querySelectorAll('button')].find(b=>b.textContent.trim()==='指派');trigger.focus();
@@ -213,22 +199,14 @@ await check('T22 the drawer takes focus, keeps Tab inside and closes with Escape
  await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick(20)});
  assert.equal(dialog(),null);await act(async()=>{await tick(30)});assert.ok(rowOf('c4').contains(document.activeElement));
 });
-await check('other stages are collapsed by default, expand on demand and are labelled read-only context',async()=>{
- await mount({node:'control'});
- const toggle=document.querySelector('.st-group[data-node=field] button');assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(document.querySelector('[data-assignment-task="f1"]'),null);
- await click(toggle);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.ok(document.querySelector('[data-assignment-task="f1"]'));
+await check('other stages use only the flow selector and case status is only in the header',async()=>{
+ await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
+ assert.equal(document.querySelector('.st-others'),null);assert.equal(document.querySelector('.cs-levels'),null);
+ assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態暫停中/);
+ assert.doesNotMatch(document.querySelector('.po-sidebar').textContent,/來源紀錄狀態|外業組別|指派主管/);
+ assert.match(document.querySelector('#flow-tasks .st-note').textContent,/案件暫停中/);
 });
 
-await check('P2 case status and source record status are labelled as different layers and never share a label',async()=>{
- await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
- const header=document.querySelector('.pds-case-status').textContent;
- assert.match(header,/案件狀態暫停中/);assert.match(document.querySelector('.pds-case-status').title,/案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作/);
- const labels=[...document.querySelectorAll('.po-sidebar dt')].map(d=>d.textContent);
- assert.ok(labels.includes('來源紀錄狀態'));assert.ok(!labels.includes('案件狀態'),'sidebar no longer calls the source status 案件狀態');
- const side=[...document.querySelectorAll('.po-sidebar dl>div')].find(d=>d.querySelector('dt').textContent==='來源紀錄狀態').textContent;
- assert.match(side,/待確認單/);assert.match(side,/不等於案件狀態/);
- assert.match(document.querySelector('#flow-selected').textContent,/節點狀態：/);assert.match(rowOf('c4').textContent,/任務狀態：/);
-});
 await act(async()=>root.unmount());
 for(const r of results)console.log(r.join(' '));
 if(results.some(r=>r[0]==='FAIL'))process.exit(1);

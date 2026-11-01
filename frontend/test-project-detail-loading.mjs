@@ -33,9 +33,10 @@ try{
  assignments.node_details=Object.fromEntries(assignments.nodes.map(n=>[n.key,{tasks:[],assignable_people:[]} ]));
  const start={project_id:project.id,code:project.code,eligible:false,can_start:false,already_started:true,seeds_pending:0,seeds_optional:false,blockers:[],warnings:[],nodes:[],chain_note:'',preview_hash:'h1',plan_rule_version:'v1'};
  await act(async()=>requests[0].resolve(new Response(JSON.stringify({project:{...workspace,scope:'project',project:{...project,source_kind:'lark'}},assignments:{status:200,body:assignments},tasks:{status:200,body:tasks},start:{status:200,body:start},progress:{status:200,body:progress}}),{headers:{'X-Read-Snapshot':'stale'}})));
- assert.match(document.body.textContent,/SOP 已啟動/,'aggregate status renders without a second request');
+ assert.doesNotMatch(document.body.textContent,/SOP 已啟動|需由有權限的人員準備 SOP/,'aggregate load avoids redundant setup prose');
  assert.ok(document.querySelector('.cs-summary'),'case summary renders from the aggregate');assert.ok(document.querySelector('.st-tasks'),'node task list renders from the aggregate');
- assert.match(document.body.textContent,/上次成功資料，待更新/,'background snapshot refresh is visibly labeled');
+ assert.doesNotMatch(document.body.textContent,/上次成功資料，待更新|資料為上次成功讀取/,'stale snapshot does not add a prose banner');
+ assert.match(document.body.textContent,/正在更新案件資料/,'background refresh retains its loading state');
  assert.equal(requests.filter(r=>['/sop-tasks','/node-assignments','/start-sop'].some(s=>r.url.endsWith(s))).length,0,'seeded status/task readers add no heavy requests');
  assert.equal(requests.filter(r=>r.url.endsWith('/progress')).length,1,'progress starts only after status/tasks have rendered');
 

@@ -1,7 +1,7 @@
 import {ProjectChatLauncher} from './assistant/ProjectChatLauncher';
 import {DetailsMenu} from './design/DetailsMenu';
 import {useEffect,useRef} from 'react';
-import {ChevronLeft,Link2,MoreHorizontal,Users} from 'lucide-react';
+import {ChevronLeft,Link2,MoreHorizontal} from 'lucide-react';
 import {PROJECT_TABS} from './projectRoutes';
 import {ProjectExecutionNotice} from './ProjectExecution';
 import {date,nameOf,type Ctx} from './appCommon';

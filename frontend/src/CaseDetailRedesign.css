@@ -12,4 +12,4 @@
 @media(max-width:640px){#flow-selected .pf-stage-detail>header{flex-wrap:wrap;gap:8px}}
 
 
-.st-meta .badge{border-radius:6px;background:var(--surface-2);color:var(--label-2)}.st-task-blocker{display:block;color:var(--label-2);margin-top:6px}.project-detail{padding-bottom:100px}.po-stage-scroll button{min-width:44px;min-height:44px}
+.st-meta .ds-badge{border-radius:6px;background:var(--surface-2);color:var(--label-2)}.st-task-blocker{display:block;color:var(--label-2);margin-top:6px}.project-detail{padding-bottom:100px}.po-stage-scroll button{min-width:44px;min-height:44px}

@@ -596,8 +596,7 @@ test('mixed node bulk assignment skips tasks outside node manager authority',asy
 
 for(const allowed of [{import:true,manage:true,work:true},{import:false,manage:false,work:false}])test(`unapplied checklist explains import without widening authority (${allowed.import})`,async()=>{
  await mount({tasks:[],extra:{checklist_revision:0,sop_enrollment:null,allowed_actions:allowed}});
- assert.match(document.querySelector('#sop-tasks').textContent,/預設清單尚未套用。實際 SOP 任務 0 項/);
- assert.match(document.querySelector('#sop-tasks').textContent,/具備此節點匯入與管理權限.*匯入預設任務/);
+ if(allowed.import){assert.match(document.querySelector('#sop-tasks').textContent,/預設清單尚未套用。實際 SOP 任務 0 項/);assert.match(document.querySelector('#sop-tasks').textContent,/匯入預設任務/)}else assert.doesNotMatch(document.querySelector('#sop-tasks').textContent,/預設清單尚未套用|具備此節點匯入與管理權限/);
  assert.equal(!!button('匯入預設任務'),allowed.import);
  assert.equal(calls.filter(c=>c.method!=='GET').length,0);
 });

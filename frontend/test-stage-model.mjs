@@ -79,12 +79,12 @@ test('T15 an unfinished dependency yields blocker navigation and never a start a
  assert.deepEqual(view.flags.blocker,{state:'blocked',reasons:['前置成果尚未交付']});
  const only={...ctx,currentIds:['field'],currentKnown:true,selectedId:'field'};
  const result=m.stageNextStep({ctx:only,list:undefined,userId:'ou_anna',today:TODAY,fresh:true});
- assert.equal(result.kind,'view');assert.equal(result.button,'查看前置任務');
+ assert.equal(result.kind,'view');assert.equal(result.button,'查看受阻原因');
 });
 test('T16 no executable candidate in the current stage says so and never recommends settlement',()=>{
  const s=scenario({current:'sales',tasks:{sales:[task('d',{status:'已完成'})],settlement:[task('z')]}});
  const result=step(s);
- assert.equal(result.kind,'none');assert.equal(result.title,'目前沒有你可執行的動作');assert.ok(result.reasons.length>0);
+ assert.equal(result.kind,'none');assert.match(result.title,/^等待.+處理$/);assert.ok(result.reasons.length>0);
 });
 test('T17 cross-stage execution needs an explicit allowance and names the target and reason',()=>{
  const s=scenario({current:'sales',tasks:{sales:[],pm:[task('p1')]}});
@@ -102,7 +102,7 @@ test('T18 approval only matters when the node is awaiting review with approve ca
 });
 test('stale or write-disabled data blocks executable recommendations',()=>{
  const s=scenario({current:'sales',tasks:{sales:[task('a',{assignee:null})]}});
- const result=step(s,{fresh:false});assert.equal(result.kind,'none');assert.match(result.reasons.join(' '),/過期/);
+ const result=step(s,{fresh:false});assert.equal(result.kind,'none');assert.match(result.reasons.join(' '),/來源核對/);
 });
 test('missing workflow and unknown current stage are stated, not invented',()=>{
  const empty=m.resolveStages({nodes:[],list:undefined});
@@ -125,4 +125,17 @@ test('other stages are grouped in workflow order and exclude the selected node',
  const s=scenario({current:'sales',tasks:{sales:[task('a')],pm:[task('p')],field:[task('f')]}});
  const g=m.groupTasks({ctx:s.ctx,filters:none,userId:'u',today:TODAY,loaded:()=>false});
  assert.equal(g.selected.node.key,'sales');assert.deepEqual(g.others.map(x=>x.node.key),['pm','field']);
+});
+
+test('started tasks ignore activation blockers but retain execution blockers',()=>{
+ const node={legacy:{tasks:[{id:'active',status:'in_progress',activation_blockers:['任務不在待啟用狀態'],execution_blockers:[]}]}};
+ assert.deepEqual(m.blockerOf({id:'active',source:'本地流程'},node),{state:'clear'});
+ node.legacy.tasks[0].execution_blockers=['缺少成果'];assert.deepEqual(m.blockerOf({id:'active',source:'本地流程'},node),{state:'blocked',reasons:['缺少成果']});
+});
+test('finished workflow has a completed next step with no action',()=>{
+ const s=scenario();const result=m.stageNextStep({ctx:{...s.ctx,finished:true},list:s.list,userId:'ou_anna',today:TODAY,fresh:true});assert.deepEqual(result,{kind:'none',title:'已完成',reasons:[]});
+});
+
+test('completed case has no CTA even if workflow details still contain unfinished tasks',()=>{
+ const s=scenario();const result=m.stageNextStep({caseStatus:'completed',ctx:s.ctx,list:s.list,userId:'ou_anna',today:TODAY,fresh:true});assert.deepEqual(result,{kind:'none',title:'已完成',reasons:[]});
 });

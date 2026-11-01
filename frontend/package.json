@@ -79,7 +79,8 @@
     "test:token-dashboard": "node test-token-dashboard-model.mjs && node test-token-dashboard.mjs",
     "test:assistant:elements": "node test-assistant-elements.mjs && node scripts/test-assistant-chart.mjs",
     "test:assistant:project": "node test-project-chat.mjs && node test-project-chat-layout.mjs",
-    "test:assistant:markdown": "node test-assistant-markdown.mjs"
+    "test:assistant:markdown": "node test-assistant-markdown.mjs",
+    "test:case-simplify-ui": "node scripts/verify-case-simplify.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.32",
