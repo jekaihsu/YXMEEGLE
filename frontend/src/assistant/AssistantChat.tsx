@@ -105,7 +105,7 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact}:A
      </ThreadPrimitive.Empty>
     </MessageLog>
     <ComposerPrimitive.Root data-slot="aui_composer-shell" className="assistant-composer">
-     <ComposerPrimitive.Input ref={input} aria-label="詢問 AI 助理" placeholder="輸入問題" maxLength={4000} disabled={!available} rows={2}/>
+     <ComposerPrimitive.Input ref={input} aria-label="詢問 AI 助理" placeholder="輸入問題" maxLength={4000} disabled={!available} rows={1}/>
      <div className="assistant-composer-bar">
       <ModelSelector catalog={catalog}/>
       <ThreadPrimitive.If running={false}><ComposerPrimitive.Send asChild disabled={!available}><Button variant="primary">送出</Button></ComposerPrimitive.Send></ThreadPrimitive.If>
