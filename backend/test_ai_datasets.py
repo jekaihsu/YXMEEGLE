@@ -100,3 +100,15 @@ def test_display_validation_and_caps():
     assert result_display({'r1':data},{**args,'mapping':{'x':'name','y':'name'}})[1]
     result,error=result_display({'r1':data},{**args,'kind':'table'})
     assert len(result['rows'])==50 and error is None
+
+
+def test_generic_queries_reuse_real_authorized_routes(app,client):
+    cookie='; '.join(f'{k}={v}' for k,v in client.cookies.items())
+    source=client.get('/api/daily-reports?limit=20').json()
+    data,error=asyncio.run(execute(app,cookie,'query_dataset',dict(id='daily_reports',params={},limit=20,offset=0)))
+    result=json.loads(data)
+    assert not error and result['total']==source['total']
+    assert [r['id'] for r in result['rows']]==[r['id'] for r in source['items']]
+    for ident,params in [('report_sales',{}),('node_detail',dict(case_id='p1',node_key='field'))]:
+        data,error=asyncio.run(execute(app,cookie,'query_dataset',dict(id=ident,params=params,limit=20,offset=0)))
+        assert error and json.loads(data)['code']=='ai_forbidden'

@@ -236,3 +236,5 @@ show_display 的 SSE tool done 事件附 displays。表格沿用 `{kind:"table",
 `python -m pytest backend/test_ai_*.py -q` 包含 registry 驗證、新資料集來源形狀投影、403/404、SSE discover/describe/query/bar，以及 history 分頁、續聊、刪除、actor/workspace、停用內容與保留期測試。
 
 `python -m pytest backend/test_ai_question_eval.py -q` 的 18 個繁體中文問題逐題走 scripted provider 的 list → describe → query → answer，涵蓋逾期案件、我的案件、案號搜尋、負責人、未完成工作、今天出勤、週排名、退回審核、業務 PM、週進度、車輛、儀器、聯繫、日報、派工、SOP、節點明細及合約項目。另有月營收及合約到期兩個明示不支援的檢查。這驗證工具與目錄合約，不測量真實模型的自然語言選擇準確率，也不聲稱連線至正式 Lark 資料。
+
+本分支驗證紀錄（2026-11-01）。一般 AI suite 為 322 passed、181 skipped。使用 `PATH=/opt/homebrew/bin:$PATH /tmp/ai-backend-venv/bin/python scripts/test_action_audit_postgres.py --ai` 後，SQLite 與 PostgreSQL 合計 501 passed、2 skipped；各資料庫 179 passed，其他單元測試 143 passed。兩個跳過項目都是 frontend parity 缺 esbuild，沒有修改前端安裝。離線 question eval 為 20 passed、18 skipped（未設定 PostgreSQL URL 的單獨執行）；PostgreSQL runner 已包含這些案例。正式供應商與正式 Lark 資料未連線驗證。

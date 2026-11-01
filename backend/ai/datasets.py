@@ -198,6 +198,22 @@ async def query(reader, ident, params, limit, offset):
         truncated=bool(raw.get('truncated') or offset+len(selected)<total),
         limitations=['金額與財務欄位不提供', '無來源時間時 as_of 為 null'])
     result['totals'] = {'rows':total}
+    if legacy:
+        while len(json.dumps(projected,ensure_ascii=False)) > 6000:
+            lists = []
+            def collect(value):
+                if isinstance(value, dict):
+                    for child in value.values():
+                        collect(child)
+                elif isinstance(value, list) and value:
+                    lists.append(value)
+            collect(projected)
+            if not lists:
+                projected = {'unavailable':'資料過長，無法完整列出','truncated':True}
+                break
+            max(lists,key=lambda v:len(json.dumps(v,ensure_ascii=False))).pop()
+            projected['truncated'] = True
+        result['truncated'] |= bool(projected.get('truncated'))
     meta = raw.get('meta', {})
     if meta.get('stale'):
         result['limitations'].append('來源快照已過期')
