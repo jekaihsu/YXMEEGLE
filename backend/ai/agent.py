@@ -36,6 +36,7 @@ class ChatRun:
     def __init__(self, app, body, data, user, spec, adapter, release):
         self.app, self.body, self.data, self.user = app, body, data, user
         self.spec, self.adapter, self.release = spec, adapter, release
+        self.conversation_generation = ledger.conversation_generation(app.state.sessions, data['wid'], user['id'], body.conversation_id)
         self.usage_id = str(uuid4())
         self.started = perf_counter()
         self.usage = Usage()
@@ -86,6 +87,7 @@ class ChatRun:
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
                       steps=self.steps, tool_calls=self.tool_calls, latency_ms=self.elapsed(),
                       first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code,
+                      conversation_generation=self.conversation_generation,
                       exchange=dict(question=self.body.messages[-1].content, answer=self.answer,
                           tools=self.tool_names, error_detail=self.error_detail)
                           if self.app.state.ai_store_content else None)
@@ -154,6 +156,7 @@ class ChatRun:
                     if self.user['role'] == 'manager':
                         cost = self.cost()
                         done['cost_usd'] = None if cost is None else cost / 1_000_000
+                    await self.finish()
                     yield sse(done)
                     return
                 if self.project_context or self.steps == 7:

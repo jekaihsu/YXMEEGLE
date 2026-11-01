@@ -62,3 +62,7 @@ Stat example.
 ```json
 {"kind":"stat","title":"資產使用","result_id":"r123","points":[{"label":"車1","value":4}],"truncated":false,"as_of":null,"limitations":[]}
 ```
+
+## Completion visibility
+
+The server finishes the ledger write before emitting SSE `done`. With content storage enabled and a successful write, the exchange is committed and queryable when the client receives `done`; clients may refresh history immediately. Disabled storage, retention, deletion, or a database write failure can leave no content. A deletion increments a server-side generation for this caller and conversation. Runs started before that deletion retain usage accounting but cannot restore content, including after cancellation. A newly started run may reuse the ID.

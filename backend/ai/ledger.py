@@ -57,6 +57,33 @@ class AiExchangeRow(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
 
+class AiConversationGeneration(Base):
+    __tablename__ = 'ai_conversation_generation'
+    workspace_id = Column(String(120), primary_key=True)
+    actor_id = Column(String(120), primary_key=True)
+    conversation_id = Column(String(120), primary_key=True)
+    generation = Column(Integer, nullable=False, default=0)
+
+
+def lock_generation(db, workspace_id, actor_id, conversation_id, *, deleted=False):
+    if db.get_bind().dialect.name == 'postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    table = AiConversationGeneration
+    statement = insert(table).values(workspace_id=workspace_id, actor_id=actor_id,
+        conversation_id=conversation_id, generation=1 if deleted else 0)
+    statement = statement.on_conflict_do_update(
+        index_elements=['workspace_id', 'actor_id', 'conversation_id'],
+        set_={'generation': table.generation + (1 if deleted else 0)})
+    return db.scalar(statement.returning(table.generation))
+
+
+def conversation_generation(sessions, workspace_id, actor_id, conversation_id):
+    with sessions.begin() as db:
+        return lock_generation(db, workspace_id, actor_id, conversation_id)
+
+
 def stores_content(cfg):
     value = str(cfg.get('AI_STORE_CONTENT', 'true')).strip().lower()
     if value not in ('true', '1', 'yes', 'on', 'false', '0', 'no', 'off'):
@@ -168,7 +195,7 @@ def today():
     return datetime.now(TAIPEI).date().isoformat()
 
 
-def record(sessions, *, exchange=None, **values):
+def record(sessions, *, exchange=None, conversation_generation=None, **values):
     created = datetime.now(timezone.utc)
     values = dict(created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values)
     values.setdefault('id', str(uuid4()))
@@ -186,6 +213,9 @@ def record(sessions, *, exchange=None, **values):
         return
     try:
         with sessions.begin() as db:
+            current = lock_generation(db, values['workspace_id'], values['actor_id'], values['conversation_id'])
+            if conversation_generation is not None and current != conversation_generation:
+                return
             if db.get(AiExchangeRow, values['id']) is None:
                 db.add(AiExchangeRow(usage_id=values['id'], workspace_id=values['workspace_id'],
                     actor_id=values['actor_id'], created_at=created,
@@ -326,7 +356,7 @@ def column_ddl(name, dialect):
 
 def ensure_schema(engine):
     """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
-    Base.metadata.create_all(engine, tables=[AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    Base.metadata.create_all(engine, tables=[AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
     for name in ADDED_USAGE_COLUMNS:
         with engine.begin() as connection:
             if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:
@@ -415,6 +445,7 @@ def conversation(sessions, workspace_id, actor_id, conversation_id, *, content_e
 
 def delete_conversation(sessions, workspace_id, actor_id, conversation_id):
     with sessions.begin() as db:
+        lock_generation(db, workspace_id, actor_id, conversation_id, deleted=True)
         ids = select(AiUsageRow.id).where(AiUsageRow.workspace_id == workspace_id,
             AiUsageRow.actor_id == actor_id, AiUsageRow.conversation_id == conversation_id)
         db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids),
