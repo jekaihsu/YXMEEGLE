@@ -174,7 +174,7 @@ class ChatRun:
                     try:
                         return await asyncio.wait_for(execute(self.app, self.cookie, call.name, call.args), timeout=15)
                     except TimeoutError:
-                        return json.dumps({'error': '查詢逾時，請稍後重試'}, ensure_ascii=False), True
+                        return json.dumps({'error': '查詢逾時，請稍後重試', 'retryable': True}, ensure_ascii=False), True
 
                 self.tool_calls += len(pending)
                 async def run_any(call):

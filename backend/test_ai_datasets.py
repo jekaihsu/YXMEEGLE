@@ -206,3 +206,45 @@ def test_opaque_contract_key_replaced_with_discoverable_case_id():
             return {'sections':{'contract_lines':{'rows':[dict(key='opaque-contract-key',label='測量',item_number='1',amount=999)]}}}
     result=asyncio.run(query(Reader(),'contract_detail',{'case_id':'p1'},20,0))
     assert result['rows']==[dict(line_number='1',name='測量')]
+
+
+def test_legacy_query_has_no_duplicate_summary(app, client):
+    cookie='; '.join(f'{k}={v}' for k,v in client.cookies.items())
+    text,error=asyncio.run(execute(app,cookie,'query_dataset',dict(id='search_cases',params={},limit=20,offset=0)))
+    assert not error and json.loads(text)['rows']
+    assert 'summary' not in json.loads(text) and len(text)<=6000
+
+
+def test_explicit_query_limit_still_obeys_budget():
+    class Reader:
+        async def get(self,path,**params):
+            return {'items':[dict(name='車'*240,category='車'*240,status='a'*240,owner='甲'*240,uses=i,idle_days=2) for i in range(20)],'total':40}
+    result=asyncio.run(query(Reader(),'report_assets',{},20,0))
+    assert len(json.dumps(result,ensure_ascii=False))<=6000
+    assert result['next_offset']==len(result['rows'])<20 and result['truncated']
+
+
+def test_default_report_week_is_applied():
+    from datetime import date,timedelta
+    from .ai.tools import today
+    class Reader:
+        async def get(self,path,**params):
+            self.params=params
+            return {'items':[], 'total':0}
+    reader=Reader()
+    result=asyncio.run(query(reader,'report_review',{},20,0))
+    current=date.fromisoformat(today())
+    assert result['applied_params']['week']==(current-timedelta(days=current.weekday()+7)).isoformat()
+    assert {k:v for k,v in result['applied_params'].items() if v != ''}==reader.params
+
+
+@pytest.mark.parametrize('failure',[500,'timeout'])
+def test_route_failures_remain_retryable(app, monkeypatch, failure):
+    import httpx
+    async def get(self,path,**params):
+        if failure=='timeout':
+            raise httpx.ReadTimeout('slow source')
+        return httpx.Response(failure,request=httpx.Request('GET','http://ai.internal'+path))
+    monkeypatch.setattr(httpx.AsyncClient,'get',get)
+    text,error=asyncio.run(execute(app,'','query_dataset',dict(id='report_sales',params={})))
+    assert error and json.loads(text)['retryable'] is True

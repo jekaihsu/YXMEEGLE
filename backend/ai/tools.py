@@ -537,7 +537,7 @@ async def execute_dataset(app, cookie, name, args):
     except (ValueError, TypeError, KeyError, ValidationError):
         return json.dumps(dict(error='工具參數錯誤'),ensure_ascii=False),True
     except Exception:
-        return json.dumps(dict(error='資料暫時無法讀取，請稍後重試'),ensure_ascii=False),True
+        return json.dumps(dict(error='資料暫時無法讀取，請稍後重試',retryable=True),ensure_ascii=False),True
 
 
 def result_display(results, args):
