@@ -1,0 +1,40 @@
+.project-chat-launcher{position:fixed;right:24px;bottom:24px;z-index:39;width:52px;height:52px;display:grid;place-items:center;padding:0;border:1px solid var(--sep);border-radius:50%;background:var(--accent);color:var(--on-accent);box-shadow:var(--shadow-lg);cursor:pointer}
+.project-chat-launcher[hidden],.project-chat-portal[hidden]{display:none}
+.project-chat-launcher:focus-visible{outline:3px solid var(--focus-ring);outline-offset:4px}
+.project-chat-launcher:hover{background:var(--accent-hover)}
+.project-chat-panel{position:fixed;z-index:45;top:80px;right:16px;bottom:16px;width:420px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--sep);border-radius:var(--radius-card);background:var(--surface);color:var(--label);box-shadow:var(--shadow-lg);animation:project-chat-enter var(--dur-base) var(--ease)}
+.project-chat-panel:focus{outline:none}
+.project-chat-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--sep);flex-shrink:0}
+.project-chat-header>div{min-width:0}.project-chat-header p{margin:0 0 4px;color:var(--label-2);font-size:var(--fs-footnote)}
+.project-chat-header h2{margin:0;font-size:var(--fs-headline);line-height:1.5;overflow-wrap:anywhere}.project-chat-header button{flex-shrink:0}
+.project-chat-content{flex:1;min-height:0;min-width:0;padding:8px 8px 16px;overflow:auto}
+.project-chat-content>p{padding:16px;line-height:1.7}
+@media(min-width:1280px){
+ .project-detail:has(.project-chat-launcher[data-open=true]){padding-right:444px;box-sizing:border-box}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .project-overview{grid-template-columns:minmax(0,1fr)}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .cs-band{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .cs-next{grid-column:1/-1;border-left:0;padding-left:0;border-top:1px solid var(--sep);padding-top:8px}
+}
+@media(max-width:760px){.project-chat-launcher{right:16px;bottom:calc(var(--sp-9) + env(safe-area-inset-bottom) + 16px)}.project-chat-panel{bottom:calc(var(--sp-9) + env(safe-area-inset-bottom) + 8px)}}
+@media(max-width:640px){.project-chat-panel{inset:0;width:100%;height:100dvh;max-width:none;border:0;border-radius:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}.project-chat-header{padding:12px 16px}.project-chat-content{padding-bottom:12px}}
+@keyframes project-chat-enter{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){.project-chat-panel{animation:none}}
+@media(min-width:1280px){
+ .project-detail:has(.project-chat-launcher[data-open=true]) .wi-toolbar{flex-wrap:wrap}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .wi-toolbar label{min-width:160px}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .wi-table{min-width:760px}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .wi-table-hint{display:block;font-size:12px;color:#667085;margin:12px 0}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .project-flow{container-name:project-chat-flow}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .pf-diagram-compact .pf-chain{flex-wrap:nowrap}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .pf-diagram-compact .pf-chain>li{flex:1 0 92px}
+ .project-detail:has(.project-chat-launcher[data-open=true]) .pf-diagram-compact .po-stage-scroll{display:flex;justify-content:flex-end;gap:4px;margin-top:4px}
+ @container project-chat-flow (max-width:900px){
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace{grid-template-columns:minmax(0,1fr)}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-nav .pf-chain{flex-direction:row;overflow-x:auto;padding:6px;scroll-snap-type:x proximity}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-nav .pf-chain>li{flex:0 0 140px;scroll-snap-align:start}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-panel{grid-template-columns:minmax(0,1fr)}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-detail{grid-column:1;grid-row:2;border-left:0;border-top:1px solid var(--sep);padding:20px 0 0}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-tasks{grid-row:1}
+  .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-nav .po-stage-scroll{display:flex}
+ }
+}

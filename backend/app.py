@@ -138,6 +138,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .database_startup import initialize
     def initialize_database():
         Base.metadata.create_all(engine)
+        ai_ledger.ensure_schema(engine)
         migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
     initialize(initialize_database)
     signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1',signer_kwargs={'digest_method':hashlib.sha256})

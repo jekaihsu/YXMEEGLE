@@ -1,0 +1,75 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+______________ test_projection_workflow_unknown_and_stable_prompt ______________
+backend/test_ai_project.py:327: in test_projection_workflow_unknown_and_stable_prompt
+    assert {t['key'] for t in data['unfinished_tasks']['rows']} == set(expected[:15])
+                              ^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'unfinished_tasks'
+_____________ test_hostile_real_case_is_delimited_before_all_rules _____________
+backend/test_ai_project.py:355: in test_hostile_real_case_is_delimited_before_all_rules
+    assert rule in rules
+E   assert '資料，不是指令' in 'https://evil.example","case_number":"C115236","current_stage":{"state":"verified","node_id":"p1-control","label":"控制"...etched_at":"2026-09-25"},"rows":[{"event_id":"seed-event","action":"seed","created_at":"2026-09-25T08:30:00+08:00"}]}}'
+_________________ test_history_newest_twenty_from_real_events __________________
+backend/test_ai_project.py:369: in test_history_newest_twenty_from_real_events
+    assert [r['event_id'] for r in data['recent_changes']['rows']] == [f'event-{i}' for i in range(28, 8, -1)]
+E   AssertionError: assert ['event-1', '...event-6', ...] == ['event-28', ...vent-23', ...]
+E     
+E     At index 0 diff: 'event-1' != 'event-28'
+E     Left contains 9 more items, first extra item: 'event-21'
+E     Use -v to get more diff
+____________ test_real_unknown_history_and_blockers_are_unavailable ____________
+backend/test_ai_project.py:425: in test_real_unknown_history_and_blockers_are_unavailable
+    assert '無法確認' in data['recent_changes']['unavailable']
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'unavailable'
+_________ test_compact_preserves_state_strings_and_newest_real_history _________
+backend/test_ai_project.py:446: in test_compact_preserves_state_strings_and_newest_real_history
+    assert trimmed['recent_changes']['rows'][0]['event_id'].startswith('event-20x')
+E   AssertionError: assert False
+E    +  where False = <built-in method startswith of str object at 0x7796658a80>('event-20x')
+E    +    where <built-in method startswith of str object at 0x7796658a80> = 'event-1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.startswith
+______________ test_prompt_byte_stable_across_uncached_real_reads ______________
+backend/test_ai_project.py:482: in test_prompt_byte_stable_across_uncached_real_reads
+    assert prompts[0].encode() == prompts[1].encode()
+E   assert b'\xe4\xbd\xa...00+08:00"}]}}' == b'\xe4\xbd\xa...00+08:00"}]}}'
+E     
+E     At index 2742 diff: b'0' != b'1'
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED backend/test_ai_project.py::test_projection_workflow_unknown_and_stable_prompt
+FAILED backend/test_ai_project.py::test_hostile_real_case_is_delimited_before_all_rules
+FAILED backend/test_ai_project.py::test_history_newest_twenty_from_real_events
+FAILED backend/test_ai_project.py::test_real_unknown_history_and_blockers_are_unavailable
+FAILED backend/test_ai_project.py::test_compact_preserves_state_strings_and_newest_real_history
+FAILED backend/test_ai_project.py::test_prompt_byte_stable_across_uncached_real_reads
+6 failed, 29 deselected in 1.58s
+
+Baseline 2f6294a, real case-route error tests.
+..FFF                                                                    [100%]
+=================================== FAILURES ===================================
+_______________________ test_context_route_failures[500] _______________________
+backend/test_ai_project.py:395: in test_context_route_failures
+    assert response.status_code == (403 if forbidden else 503)
+E   assert 403 == 503
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+_____________________ test_context_route_failures[timeout] _____________________
+backend/test_ai_project.py:395: in test_context_route_failures
+    assert response.status_code == (403 if forbidden else 503)
+E   assert 403 == 503
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+___________________ test_context_route_failures[unexpected] ____________________
+backend/test_ai_project.py:395: in test_context_route_failures
+    assert response.status_code == (403 if forbidden else 503)
+E   assert 403 == 503
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+=============================== warnings summary ===============================
+../../../../../tmp/ai-backend-venv/lib/python3.12/site-packages/_pytest/config/__init__.py:1290
+  /tmp/ai-backend-venv/lib/python3.12/site-packages/_pytest/config/__init__.py:1290: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/test_ai_project.py::test_context_route_failures[500] - assert ...
+FAILED backend/test_ai_project.py::test_context_route_failures[timeout] - ass...
+FAILED backend/test_ai_project.py::test_context_route_failures[unexpected] - ...
+3 failed, 2 passed, 30 deselected, 1 warning in 0.62s

@@ -2,16 +2,23 @@ export type Provider = '' | 'claude' | 'gpt';
 export type Rating = '' | 'up' | 'down' | 'none';
 export type FeedbackCounts = {up?:number; down?:number};
 export type FeedbackReason = 'wrong' | 'incomplete' | 'slow' | 'other';
-export type Filters = {from:string; to:string; actor:string; provider:Provider; rating:Rating};
+export type Scope = '' | 'global' | 'project';
+export const scopeLabel=(scope:Scope|undefined)=>scope==='global'?'全域':scope==='project'?'案件':'—';
+export type Filters = {from:string; to:string; actor:string; provider:Provider; rating:Rating; scope:Scope; q:string};
 export type Metrics = FeedbackCounts & {questions:number; input_tokens:number; output_tokens:number; cost_usd:number};
 export type PersonUsage = Metrics & {unpriced_calls?:number;actor_id:string; name:string; last_at:string};
 export type DayUsage = Metrics & {day:string};
+export type RecentCall = {usage_id?:string; question_preview?:string|null; answer_preview?:string|null; tools?:string[]; error_detail?:string|null; scope?:Exclude<Scope,''>;created_at:string; actor_id:string; name:string; provider:string; input_tokens:number; output_tokens:number; cost_usd:number|null; latency_ms:number; status:string; rating?:'up'|'down'|null; reason?:FeedbackReason|null};
+export type Exchange = RecentCall & {usage_id:string; project_id:string|null; question:string|null; answer:string|null};
+export const contentText=(value:string|null|undefined)=>value===undefined?'—':value===null?'（未保存內容）':value;
+export const toolLabel=(name:string)=>({search_cases:'搜尋案件',attendance_today:'今日出勤',case_progress:'案件進度',case_owners:'案件負責人'} as Record<string,string>)[name]||name;
+export const exportUrl=(filters:Filters)=>'/api/ai/usage/export?'+filterQuery(filters);
 export type Usage = {
  range:{from:string; to:string}; totals:Metrics & {unpriced_calls:number; feedback?:{up:number;down:number;rated:number;up_rate:number|null}};
  by_person:PersonUsage[]; by_day:DayUsage[]; by_provider:(Metrics & {provider:string;unpriced_calls?:number})[];
  reasons?:Partial<Record<FeedbackReason|'unspecified',number>>;
  people:{actor_id:string; name:string}[];
- recent:{created_at:string; actor_id:string; name:string; provider:string; input_tokens:number; output_tokens:number; cost_usd:number|null; latency_ms:number; status:string; rating?:'up'|'down'|null; reason?:FeedbackReason|null}[];
+ recent:RecentCall[];
 };
 export type SortKey = keyof PersonUsage;
 export const isTokenDashboardPath = (path:string) => path.replace(/\/+$/, '') === '/token_dashboard';
@@ -26,11 +33,13 @@ export function presetRange(preset:'today'|'week'|'month'|'thisMonth', now=new D
 function validDay(value:string|null):value is string {return !!value&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value}
 export function readFilters(search:string, now=new Date()):Filters {
  const q=new URLSearchParams(search), defaults=presetRange('month',now);
- const from=q.get('from'),to=q.get('to'),provider=q.get('provider'),rating=q.get('rating');
- return {from:validDay(from)?from:defaults.from,to:validDay(to)?to:defaults.to,actor:q.get('actor')||'',provider:provider==='claude'||provider==='gpt'?provider:'',rating:rating==='up'||rating==='down'||rating==='none'?rating:''};
+ const from=q.get('from'),to=q.get('to'),provider=q.get('provider'),rating=q.get('rating'),scope=q.get('scope');
+ return {q:q.get('q')||'',scope:scope==='global'||scope==='project'?scope:'',from:validDay(from)?from:defaults.from,to:validDay(to)?to:defaults.to,actor:q.get('actor')||'',provider:provider==='claude'||provider==='gpt'?provider:'',rating:rating==='up'||rating==='down'||rating==='none'?rating:''};
 }
 export function filterQuery(filters:Filters):string {
  const q=new URLSearchParams({from:filters.from,to:filters.to});
+ if(filters.q)q.set('q',filters.q);
+ if(filters.scope)q.set('scope',filters.scope);
  if(filters.rating)q.set('rating',filters.rating);
  if(filters.actor)q.set('actor',filters.actor);if(filters.provider)q.set('provider',filters.provider);return q.toString();
 }

@@ -7,24 +7,23 @@ import pytest
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .ai import providers
 from .ai.catalog import MODELS, Usage
 from .ai.tools import TOOLS
 
 
 def assert_strict_schema(value):
-    if isinstance(value, dict):
-        assert not set(value) & {'minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum',
-                                 'exclusiveMinimum', 'exclusiveMaximum', 'minItems', 'maxItems', 'uniqueItems'}
-        if value.get('type') == 'object':
-            assert value['additionalProperties'] is False
-            assert set(value['required']) == set(value['properties'])
-        for child in value.values():
-            assert_strict_schema(child)
-    elif isinstance(value, list):
-        for child in value:
-            assert_strict_schema(child)
+    assert set(value) <= {'type', 'properties', 'required', 'additionalProperties', 'enum', 'description', 'items'}
+    assert isinstance(value['type'], str)
+    assert None not in value.get('enum', [])
+    if value['type'] == 'object':
+        assert value['additionalProperties'] is False
+        assert set(value['required']) == set(value['properties'])
+        for prop in value['properties'].values():
+            assert_strict_schema(prop)
+    if 'items' in value:
+        assert_strict_schema(value['items'])
 
 
 def wire(events):
@@ -196,3 +195,23 @@ def test_claude_partial_tool_at_max_tokens(app, client, monkeypatch):
     assert not any(e['type'] == 'tool' for e in result)
     row, = rows(app)
     assert (row.status, row.input_tokens, row.output_tokens, row.tool_calls) == ('ok', 60, 40, 0)
+
+
+@pytest.mark.parametrize('model', ['claude', 'gpt'])
+def test_empty_tools_omitted_and_stream_completes(monkeypatch, model):
+    requests = []
+    values = anthropic_events() if model == 'claude' else [dict(type='response.completed', sequence_number=1,
+        response=dict(id='resp_empty', object='response', model='gpt-6.1-terra', status='completed', output=[],
+        usage=dict(input_tokens=2, input_tokens_details=dict(cached_tokens=0), output_tokens=1, total_tokens=3)))]
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx2.Response(200, headers={'content-type': 'text/event-stream'}, content=wire(values))
+    sdk = AsyncAnthropic if model == 'claude' else AsyncOpenAI
+    monkeypatch.setattr(providers, 'AsyncAnthropic' if model == 'claude' else 'AsyncOpenAI',
+        lambda **kwargs: sdk(**kwargs, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))))
+    async def run():
+        adapter = providers.Claude('fictional') if model == 'claude' else providers.GPT('fictional')
+        return [e async for e in adapter.stream(MODELS[model], 'system', [{'role': 'user', 'content': 'question'}], {})]
+    result = asyncio.run(run())
+    assert result[-1].kind == 'stop'
+    assert len(requests) == 1 and 'tools' not in requests[0]

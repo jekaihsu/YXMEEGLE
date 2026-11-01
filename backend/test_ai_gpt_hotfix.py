@@ -14,7 +14,7 @@ from .ai import providers
 from .ai.catalog import MODELS, Usage, prices, cost_micro_usd
 from .ai.tools import TOOLS
 from .test_ai_providers import wire
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 
 FIXTURES = {'tool-async-field': [{'type': 'response.created',
                        'response': {'id': 'resp_1',

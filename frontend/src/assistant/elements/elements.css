@@ -6,10 +6,10 @@
 .assistant-element-heading h3{font-size:var(--fs-callout);margin:0;font-weight:600;line-height:1.5}
 .assistant-element-heading p{font-size:var(--fs-footnote);color:var(--label-2);margin:var(--space-1) 0 0}
 .assistant-data-table{container-type:inline-size;container-name:assistant-data}
-.assistant-data-wide{display:none;overflow-x:auto}
+.assistant-data-wide{display:none;overflow:auto;max-height:22rem}
 .assistant-data-wide table{border-collapse:collapse;width:100%;font-size:var(--fs-footnote)}
 .assistant-data-wide th,.assistant-data-wide td{text-align:start;vertical-align:top;padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--sep);overflow-wrap:anywhere;min-width:4rem}
-.assistant-data-wide th{background:var(--surface-2);color:var(--label-2);font-weight:600}
+.assistant-data-wide th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--label-2);font-weight:600}
 .assistant-data-wide th button{font:inherit;color:inherit;border:0;background:transparent;cursor:pointer;text-align:inherit;padding:var(--space-2) 0;min-height:44px}
 .assistant-data-wide tbody tr:last-child td{border-bottom:0}
 .assistant-data-wide tbody tr:hover{background:var(--surface-2)}

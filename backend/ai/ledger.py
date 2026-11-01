@@ -1,10 +1,16 @@
-"""One metadata-only row per question, with SQL dashboard aggregations."""
-from datetime import datetime, timezone
+"""Question accounting and bounded, manager-readable exchanges."""
+from datetime import datetime, timezone, timedelta
+import json
+import re
+from threading import Lock, Thread
+from time import monotonic
 import logging
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, CheckConstraint, func, select, case, and_, delete
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, inspect
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.schema import CreateColumn
 from ..models import Base
 
 TAIPEI = ZoneInfo('Asia/Taipei')
@@ -21,6 +27,8 @@ class AiUsageRow(Base):
     actor_name = Column(String(240), nullable=False)
     conversation_id = Column(String(120), nullable=False)
     provider = Column(String(16), nullable=False)
+    scope = Column(String(16), nullable=False, default='global', server_default='global')
+    project_id = Column(String(200), nullable=True)
     model = Column(String(120), nullable=False)
     effort = Column(String(24), nullable=False)
     input_tokens = Column(BigInteger, nullable=False)
@@ -35,6 +43,85 @@ class AiUsageRow(Base):
     first_token_ms = Column(Integer, nullable=True)
     status = Column(String(16), nullable=False)
     error_code = Column(String(64), nullable=True)
+
+
+class AiExchangeRow(Base):
+    __tablename__ = 'ai_exchange'
+    usage_id = Column(String(36), primary_key=True)
+    workspace_id = Column(String(120), nullable=False)
+    actor_id = Column(String(120), nullable=False)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    tool_names = Column(Text, nullable=False)
+    error_detail = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+
+def stores_content(cfg):
+    value = str(cfg.get('AI_STORE_CONTENT', 'true')).strip().lower()
+    if value not in ('true', '1', 'yes', 'on', 'false', '0', 'no', 'off'):
+        logger.warning('Invalid AI_STORE_CONTENT; content storage disabled')
+    return value in ('true', '1', 'yes', 'on')
+
+
+def content_retention(cfg):
+    try:
+        days = int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90))
+        if days < 0:
+            raise ValueError
+        return days
+    except (TypeError, ValueError):
+        logger.warning('Invalid AI_CONTENT_RETENTION_DAYS; using 90 days')
+        return 90
+
+
+_SECRET = re.compile(
+    r'\bsk-[A-Za-z0-9_-]{16,}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'
+    r'|\bAIza[A-Za-z0-9_-]{20,}|\bghp_[A-Za-z0-9]+|\bxox[bapr]-[A-Za-z0-9-]+'
+    r'|(?i:bearer\s+[^\s,;]+|\b(?:password|token|secret)\s*=\s*(?:"[^"\n]*"|\'[^\'\n]*\'|[^\s,;&]+))'
+    r'|(?<!\d)09\d{2}[ -]?\d{3}[ -]?\d{3}(?!\d)|\b[A-Z][12]\d{8}\b'
+    r'|(?<!\d)(?:\d{4}[ -]){3}\d{4}(?!\d)|\d{13,}')
+
+
+def redact(text, limit):
+    text = re.sub(r'[\x00-\x08\x0b-\x1f\x7f-\x9f]', '', text)
+    return _SECRET.sub('[redacted]', text)[:limit]
+
+
+_cleanup_lock = Lock()
+_last_cleanup = None
+_cleanup_running = False
+
+
+def cleanup_content(sessions, retention_days):
+    global _last_cleanup, _cleanup_running
+    with _cleanup_lock:
+        if _cleanup_running or (_last_cleanup is not None and monotonic() - _last_cleanup < 3600):
+            return
+        _cleanup_running = True
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        while True:
+            with sessions.begin() as db:
+                ids = db.scalars(select(AiExchangeRow.usage_id).where(
+                    AiExchangeRow.created_at < cutoff).limit(500)).all()
+                if not ids:
+                    break
+                db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids)))
+        with _cleanup_lock:
+            _last_cleanup = monotonic()
+    finally:
+        with _cleanup_lock:
+            _cleanup_running = False
+
+
+def schedule_cleanup(sessions, retention_days):
+    def clean():
+        try:
+            cleanup_content(sessions, retention_days)
+        except Exception:
+            logger.error('ai_content_cleanup_failed')
+    Thread(target=clean, daemon=True).start()
 
 
 class AiFeedbackRow(Base):
@@ -81,7 +168,7 @@ def today():
     return datetime.now(TAIPEI).date().isoformat()
 
 
-def record(sessions, **values):
+def record(sessions, *, exchange=None, **values):
     created = datetime.now(timezone.utc)
     values = dict(created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values)
     values.setdefault('id', str(uuid4()))
@@ -90,10 +177,23 @@ def record(sessions, **values):
             with sessions.begin() as db:
                 if db.get(AiUsageRow, values['id']) is None:
                     db.add(AiUsageRow(**values))
-            return
+            break
         except Exception:
             if attempt == 1:
                 logger.error('ai_usage_write_failed')
+                return
+    if exchange is None:
+        return
+    try:
+        with sessions.begin() as db:
+            if db.get(AiExchangeRow, values['id']) is None:
+                db.add(AiExchangeRow(usage_id=values['id'], workspace_id=values['workspace_id'],
+                    actor_id=values['actor_id'], created_at=created,
+                    question=redact(exchange['question'], 4000), answer=redact(exchange['answer'], 20000),
+                    tool_names=json.dumps(exchange['tools'], ensure_ascii=False),
+                    error_detail=redact(exchange['error_detail'], 200) if exchange['error_detail'] else None))
+    except Exception:
+        logger.error('ai_exchange_write_failed')
 
 
 def daily_tokens(sessions, workspace_id, actor_id):
@@ -103,11 +203,20 @@ def daily_tokens(sessions, workspace_id, actor_id):
                                 AiUsageRow.day == today()))
 
 
-def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None):
+def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None, q=None, *, content_enabled=True, retention_days=90, export=False):
     row = AiUsageRow
     rating_row = AiFeedbackRow
     joined = row.__table__.outerjoin(rating_row, and_(row.id == rating_row.usage_id, row.actor_id == rating_row.actor_id))
+    joined = joined.outerjoin(AiExchangeRow, and_(row.id == AiExchangeRow.usage_id,
+        row.workspace_id == AiExchangeRow.workspace_id,
+        AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days)))
     filters = [row.workspace_id == workspace_id, row.day >= start, row.day <= end]
+    if q:
+        pattern = '%' + q[:200].replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+        filters.append(or_(AiExchangeRow.question.ilike(pattern, escape='\\'),
+                           AiExchangeRow.answer.ilike(pattern, escape='\\')) if content_enabled else row.id.is_(None))
+    if scope:
+        filters.append(row.scope == scope)
     if provider:
         filters.append(row.provider == provider)
     if rating:
@@ -140,6 +249,12 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         else:
             # SQLite SELECT alone does not start a snapshot with the legacy driver.
             db.connection().exec_driver_sql('BEGIN')
+        if export:
+            entries = [exchange_json(r, f, e if content_enabled else None)
+                       for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+                           .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(501))]
+            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
+            return dict(rows=[{k: entry[k] for k in keys} for entry in entries[:500]], truncated=len(entries) > 500)
         names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
         totals = public(db.execute(select(*metrics).select_from(joined).where(*filters)).mappings().one())
         up, down = totals.pop('up'), totals.pop('down')
@@ -156,17 +271,71 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         for person in groups['by_person']:
             person['name'] = names.get(person['actor_id'], person['actor_id'])
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
-        recent = [dict(created_at=iso(r.created_at), actor_id=r.actor_id, name=r.actor_name, provider=r.provider,
-                       input_tokens=r.input_tokens, output_tokens=r.output_tokens,
-                       cost_usd=None if r.cost_micro_usd is None else r.cost_micro_usd / 1_000_000,
-                       latency_ms=r.latency_ms, status=r.status,
-                       rating={1: 'up', -1: 'down'}.get(f.rating) if f else None, reason=f.reason if f else None)
-                  for r, f in db.execute(select(row, rating_row).select_from(joined).where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
+        entries = [exchange_json(r, f, e if content_enabled else None)
+                   for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+                       .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
+        recent = [{k: v for k, v in entry.items() if k not in ('question', 'answer', 'project_id')} for entry in entries]
         reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other', 'unspecified'), 0)
         reasons.update(dict(db.execute(select(func.coalesce(rating_row.reason, 'unspecified'), func.count()).select_from(joined)
             .where(*filters, rating_row.rating == -1).group_by(rating_row.reason)).all()))
     return dict(range={'from': start, 'to': end}, totals=totals, **groups, people=people, recent=recent, reasons=reasons)
 
 
+def exchange_json(row, feedback, exchange):
+    question = exchange.question if exchange else None
+    answer = exchange.answer if exchange else None
+    return dict(usage_id=row.id, created_at=iso(row.created_at), actor_id=row.actor_id, name=row.actor_name,
+        provider=row.provider, scope=row.scope, project_id=row.project_id, status=row.status,
+        rating={1: 'up', -1: 'down'}.get(feedback.rating) if feedback else None,
+        reason=feedback.reason if feedback else None, question=question, answer=answer,
+        question_preview=question[:120] if question is not None else None,
+        answer_preview=answer[:120] if answer is not None else None,
+        tools=json.loads(exchange.tool_names) if exchange else [], error_detail=exchange.error_detail if exchange else None,
+        latency_ms=row.latency_ms, input_tokens=row.input_tokens, output_tokens=row.output_tokens,
+        cost_usd=None if row.cost_micro_usd is None else row.cost_micro_usd / 1_000_000)
+
+
+def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retention_days=90):
+    with sessions() as db:
+        row = db.scalar(select(AiUsageRow).where(AiUsageRow.id == usage_id, AiUsageRow.workspace_id == workspace_id))
+        if row is None:
+            return None
+        feedback = db.get(AiFeedbackRow, (usage_id, row.actor_id))
+        content = db.scalar(select(AiExchangeRow).where(AiExchangeRow.usage_id == usage_id,
+            AiExchangeRow.workspace_id == workspace_id,
+            AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days))) if content_enabled else None
+        result = exchange_json(row, feedback, content)
+        result.pop('question_preview')
+        result.pop('answer_preview')
+        return result
+
+
 def iso(value):
-    return value.replace(tzinfo=timezone.utc).isoformat() if value.tzinfo is None else value.isoformat()
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
+
+
+ADDED_USAGE_COLUMNS = ('scope', 'project_id')
+
+
+def column_ddl(name, dialect):
+    column = AiUsageRow.__table__.c[name]
+    return 'ALTER TABLE ai_usage ADD COLUMN ' + str(CreateColumn(column).compile(dialect=dialect))
+
+
+def ensure_schema(engine):
+    """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
+    Base.metadata.create_all(engine, tables=[AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    for name in ADDED_USAGE_COLUMNS:
+        with engine.begin() as connection:
+            if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:
+                continue
+            try:
+                connection.exec_driver_sql(column_ddl(name, connection.dialect))
+            except DBAPIError:
+                if name not in {c['name'] for c in inspect(engine).get_columns('ai_usage')}:
+                    raise
+    for index in AiUsageRow.__table__.indexes:
+        index.create(engine, checkfirst=True)
+
