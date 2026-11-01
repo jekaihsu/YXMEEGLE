@@ -18,16 +18,17 @@ class EncodedSnapshot:
     compressed: bytes
     etag: str
     as_of: str | None = None
+    volatile: bool = False
 
     def __len__(self):
         return len(self.body) + len(self.compressed)
 
     @classmethod
-    def encode(cls, body, *, as_of=None):
+    def encode(cls, body, *, as_of=None, volatile=False):
         from .request_timing import measure
         with measure('snapshotcompress'):
             compressed = gzip.compress(body, compresslevel=1, mtime=0)
-        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"', as_of)
+        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"', as_of, volatile)
 
     def response(self, request, status):
         # Always reauthorize before conditional validation. Browser freshness must
@@ -81,7 +82,7 @@ class ReadSnapshots:
             return entry[1] if entry and self.clock()-entry[0] < self.stale else None
 
     def _store(self, key, value, revision):
-        if len(value) <= self.max_bytes:
+        if len(value) <= self.max_bytes and not getattr(value, 'volatile', False):
             self.entries[key] = (self.clock(), value, revision)
             self.entries.move_to_end(key)
             while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
