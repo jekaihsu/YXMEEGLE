@@ -17,8 +17,8 @@ class ReadDenied(Exception):
 
 
 class ReadValidation(Exception):
-    def __init__(self, detail):
-        self.detail = detail
+    def __init__(self, detail, field=None):
+        self.detail, self.field = detail, field
 
 
 class Reader:
@@ -32,6 +32,8 @@ class Reader:
         if response.status_code in (401, 403, 404):
             message = '你沒有權限查看出勤資料' if path == '/api/people/attendance' else '找不到或沒有權限查看這個案件'
             raise ReadDenied(message)
+        if response.status_code in (408, 409, 429):
+            response.raise_for_status()
         if 400 <= response.status_code < 500:
             try:
                 detail = response.json().get('detail', '查詢參數無效')
@@ -170,7 +172,7 @@ async def attendance(reader, args):
         if abs((target.toordinal() - target.weekday()) - (current.toordinal() - current.weekday())) > 182:
             raise ValueError()
     except (ValueError, TypeError):
-        raise ReadDenied('date 請使用有效 YYYY-MM-DD 或空字串（台北日期，限目前週前後26週）') from None
+        raise ReadValidation('請使用有效 YYYY-MM-DD 或空字串（台北日期，限目前週前後26週）', ['params', 'date']) from None
     return {'range': args['range'], 'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
 
 
@@ -521,8 +523,9 @@ async def execute_dataset(app, cookie, name, args):
             raise ValueError()
         if name == 'describe_dataset':
             return json.dumps(describe(args['id']),ensure_ascii=False), False
-        if type(args['limit']) is not int or not 1 <= args['limit'] <= 50 or type(args['offset']) is not int or not 0 <= args['offset'] <= 100000:
-            raise ValueError()
+        for field, low, high in (('limit',1,50),('offset',0,100000)):
+            if type(args[field]) is not int or not low <= args[field] <= high:
+                raise ReadValidation(f'必須為 {low} 至 {high} 的整數', [field])
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://ai.internal',
             headers={'cookie':cookie},timeout=15) as client:
             result = await query(Reader(client,str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED','false')).lower()=='true',
@@ -531,7 +534,10 @@ async def execute_dataset(app, cookie, name, args):
     except HTTPException as exc:
         return json.dumps(dict(error='參數錯誤',detail=exc.detail),ensure_ascii=False),True
     except ReadValidation as exc:
-        return json.dumps(dict(error='參數錯誤',detail=exc.detail),ensure_ascii=False),True
+        return json.dumps(dict(error='參數錯誤',detail=exc.detail, **({'field':exc.field} if exc.field else {})),ensure_ascii=False),True
+    except ValidationError as exc:
+        error = exc.errors(include_url=False, include_input=False)[0]
+        return json.dumps(dict(error='工具參數錯誤', field=['params', *error['loc']], detail=error['msg']),ensure_ascii=False),True
     except ReadDenied:
         return json.dumps(dict(error='找不到或沒有權限查看資料',code='ai_forbidden'),ensure_ascii=False),True
     except (ValueError, TypeError, KeyError, ValidationError):

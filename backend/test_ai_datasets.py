@@ -47,7 +47,7 @@ def test_projectors(ident):
  dict(id='report_assets',params={'from':'not-date'},limit=20,offset=0)])
 def test_validation(app,args):
     result,error=asyncio.run(execute(app,'','query_dataset',args))
-    assert error and json.loads(result)['error']=='工具參數錯誤'
+    assert error and json.loads(result)['error'] in ('工具參數錯誤', '參數錯誤')
 
 
 @pytest.mark.parametrize('status',[403,404])
@@ -247,4 +247,28 @@ def test_route_failures_remain_retryable(app, monkeypatch, failure):
         return httpx.Response(failure,request=httpx.Request('GET','http://ai.internal'+path))
     monkeypatch.setattr(httpx.AsyncClient,'get',get)
     text,error=asyncio.run(execute(app,'','query_dataset',dict(id='report_sales',params={})))
+    assert error and json.loads(text)['retryable'] is True
+
+
+@pytest.mark.parametrize('ident,params,field', [
+    ('attendance_today', {'range':'month'}, 'range'),
+    ('attendance_today', {'date':'2026-02-30'}, 'date'),
+    ('attendance_today', {'date':'2000-01-01'}, 'date'),
+    ('case_progress', {'case_id':'../bad'}, 'case_id'),
+    ('case_owners', {}, 'case_id'),
+    ('report_assets', {'from':'yesterday'}, 'from'),
+])
+def test_correctable_argument_fields(app, ident, params, field):
+    text, error = asyncio.run(execute(app, '', 'query_dataset', dict(id=ident,params=params)))
+    data = json.loads(text)
+    assert error and data['field'] == ['params', field] and data['detail']
+
+
+@pytest.mark.parametrize('status', [408,409,429])
+def test_transient_client_status_is_retryable(app, monkeypatch, status):
+    import httpx
+    async def get(self,path,**kwargs):
+        return httpx.Response(status,json={'detail':'temporary'},request=httpx.Request('GET','http://ai.internal'+path))
+    monkeypatch.setattr(httpx.AsyncClient, 'get', get)
+    text,error = asyncio.run(execute(app,'','query_dataset',dict(id='report_sales',params={})))
     assert error and json.loads(text)['retryable'] is True

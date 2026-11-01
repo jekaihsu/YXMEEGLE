@@ -194,8 +194,11 @@ async def query(reader, ident, params, limit, offset):
     args = d.params.model_validate(params).model_dump()
     for key, value in args.items():
         if value and key in ('date','week','from','to','date_from','date_to'):
-            if date.fromisoformat(value).isoformat() != value:
-                raise ValueError('invalid date')
+            try:
+                if date.fromisoformat(value).isoformat() != value:
+                    raise ValueError()
+            except ValueError:
+                raise t.ReadValidation('請使用有效 YYYY-MM-DD 日期', ['params', key]) from None
     if ident.startswith('report_'):
         from ..reports.routes import parameters as report_parameters
         args = report_parameters('review/rows' if ident == 'report_review' else ident.removeprefix('report_'), {**args, 'limit':limit, 'offset':offset})
@@ -207,8 +210,11 @@ async def query(reader, ident, params, limit, offset):
     applied = dict(args, limit=limit, offset=offset)
     for k, v in args.items():
         if v and (k in ('date','week','from','to','date_from','date_to')):
-            if date.fromisoformat(v).isoformat() != v:
-                raise ValueError('invalid date')
+            try:
+                if date.fromisoformat(v).isoformat() != v:
+                    raise ValueError()
+            except ValueError:
+                raise t.ReadValidation('請使用有效 YYYY-MM-DD 日期', ['params', k]) from None
     if ident == 'search_cases':
         args['offset'] = offset
     elif ident.startswith('report_') or ident == 'daily_reports':
