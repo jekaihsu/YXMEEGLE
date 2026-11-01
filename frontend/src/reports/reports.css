@@ -101,3 +101,7 @@
 .reports-filters :is(input,.ds-select>.ds-picker>button),.reports-sort>button{box-sizing:border-box;width:100%;height:40px;min-height:40px;padding:0 12px;border-radius:var(--radius-control);font:inherit}
 .reports-filters .ds-picker>button{white-space:nowrap}
 .reports-sort>button{width:auto}
+
+@media(max-width:700px),(pointer:coarse){
+.reports-filters :is(input,.ds-select>.ds-picker>button),.reports-sort>button{height:44px;min-height:44px}
+}
