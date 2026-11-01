@@ -156,7 +156,7 @@ def test_portfolio_cached_response_does_not_repeat_bulk_projection(tmp_path, mon
     with scaled_client(tmp_path, 6, **ON) as (app, client):
         calls = []
         monkeypatch.setattr(app.state.home_panels, 'assignment_unavailable', lambda *_: False)
-        monkeypatch.setattr(app.state.home_panels, 'portfolio_statuses', lambda *_: calls.append(1) or {})
+        monkeypatch.setattr(app.state.home_panels, 'portfolio_overlay', lambda *_: calls.append(1) or ({}, False))
         first = client.get('/api/projects?view=portfolio')
         assert first.status_code == 200
         assert first.json()['total'] == 6
@@ -166,6 +166,18 @@ def test_portfolio_cached_response_does_not_repeat_bulk_projection(tmp_path, mon
         assert second.json() == first.json()
         assert second.headers['x-read-snapshot'] == 'hit'
         assert calls == [1]
+
+
+def test_degraded_portfolio_is_not_pinned_in_the_snapshot_cache(tmp_path, monkeypatch):
+    with scaled_client(tmp_path, 3, **ON) as (app, client):
+        calls = []
+        monkeypatch.setattr(app.state.home_panels, 'assignment_unavailable', lambda *_: False)
+        monkeypatch.setattr(app.state.home_panels, 'portfolio_overlay', lambda *_: calls.append(1) or ({}, len(calls) == 1))
+        first = client.get('/api/projects?view=portfolio').json()
+        second = client.get('/api/projects?view=portfolio').json()
+        assert first['node_status_degraded'] is True
+        assert second['node_status_degraded'] is False and calls == [1, 1]
+        assert client.get('/api/projects?view=portfolio').headers['x-read-snapshot'] == 'hit'
 
 
 def test_background_revision_revalidates_last_good_without_blocking():
