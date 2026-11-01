@@ -203,7 +203,7 @@ def test_legacy_exchange_created_at_startup(ai_database_url, tmp_path):
         engine.dispose()
 
 
-def test_socket_end_does_not_wait_for_exchange_write(app, client, live_server, monkeypatch):
+def test_socket_done_waits_for_exchange_write(app, client, live_server, monkeypatch):
     import httpx
     import threading
     from .ai import ledger
@@ -217,10 +217,14 @@ def test_socket_end_does_not_wait_for_exchange_write(app, client, live_server, m
     app.state.ai_providers = {'claude': Fake()}
     try:
         with httpx.Client(base_url=live_server, cookies=dict(client.cookies.items()), timeout=2) as connection:
-            response = connection.post('/api/ai/chat', json=BODY)
-            assert events(response)[-1]['type'] == 'done'
-            assert entered.wait(2)
-            assert connection.get('/api/ai/models').status_code == 200
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(1) as pool:
+                pending = pool.submit(connection.post, '/api/ai/chat', json=BODY)
+                assert entered.wait(2)
+                assert not pending.done()
+                assert connection.get('/api/ai/models').status_code == 200
+                release.set()
+                assert events(pending.result(timeout=2))[-1]['type'] == 'done'
     finally:
         release.set()
 

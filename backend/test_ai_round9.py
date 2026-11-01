@@ -157,8 +157,10 @@ def test_cleanup_does_not_delay_feedback(app, client, live_server, monkeypatch):
     app.state.ai_providers = {'claude': Fake()}
     try:
         with httpx.Client(base_url=live_server, cookies=dict(client.cookies.items()), timeout=2) as connection:
-            uid = events(connection.post('/api/ai/chat', json=BODY))[0]['usage_id']
-            assert writing.wait(2)
+            with connection.stream('POST', '/api/ai/chat', json=BODY) as response:
+                first = next(line for line in response.iter_lines() if line.startswith('data: '))
+                uid = json.loads(first[6:])['usage_id']
+                assert writing.wait(2)
             with ThreadPoolExecutor(1) as pool:
                 pending = pool.submit(connection.post, '/api/ai/feedback', json=dict(usage_id=uid, rating='up'))
                 assert waiting.wait(2)
