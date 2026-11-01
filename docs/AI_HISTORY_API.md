@@ -42,6 +42,8 @@ HTTP 204, no body, including nonexistent and other-caller IDs. Deletes only call
 
 A `tool` SSE event with `status: "done"` may contain `displays`, an array of display objects. The title is the dataset's human title. Tables use `columns` and `rows`, with an optional `caption` containing the source time. Charts and stats use `points`; a stat has at most one point. Optional `series` on a point groups chart values. `as_of` is a source timestamp or null. `limitations` are source caveats. `truncated` includes source pagination and display caps. Bar and line cap at 24 points, pie at 12, table at 50.
 
+Table cells contain only strings, finite numbers, or null. Boolean source values render as `是` or `否`.
+
 Table example.
 ```json
 {"kind":"table","title":"資產使用","columns":[{"key":"name","label":"名稱"},{"key":"uses","label":"使用次數"}],"rows":[{"name":"車1","uses":4}],"truncated":false}

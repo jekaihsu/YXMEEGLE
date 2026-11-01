@@ -56,7 +56,7 @@ def test_search_real_route_sdk_sse(app, client, monkeypatch):
     source = client.get('/api/projects').json()['items'][0]
     displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query=source['code']))
     assert displays[0]['kind']=='table' and displays[0]['title']=='案件總覽'
-    assert displays[0]['rows']==projected['rows']
+    assert displays[0]['rows']==[{k: ('是' if v else '否') if type(v) is bool else v for k,v in row.items()} for row in projected['rows']]
     assert displays[0]['rows'][0]['name'] == source['name']
 
 
@@ -74,7 +74,7 @@ def test_progress_real_route_sdk_sse(app, client, monkeypatch):
     displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
     assert projected['as_of'] == source['as_of']
     assert displays[0]['kind']=='table' and displays[0]['title']=='案件進度'
-    assert displays[0]['rows']==projected['rows']
+    assert displays[0]['rows']==[{k: ('是' if v else '否') if type(v) is bool else v for k,v in row.items()} for row in projected['rows']]
 
 
 def test_display_caps_and_scalar_cells():

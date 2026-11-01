@@ -272,3 +272,23 @@ def test_transient_client_status_is_retryable(app, monkeypatch, status):
     monkeypatch.setattr(httpx.AsyncClient, 'get', get)
     text,error = asyncio.run(execute(app,'','query_dataset',dict(id='report_sales',params={})))
     assert error and json.loads(text)['retryable'] is True
+
+
+def test_search_boolean_display_cells(app, client, monkeypatch):
+    from .ai.tools import Reader
+    source = client.get('/api/workspace').json()
+    source['projects'].append(dict(id='closed',code='CLOSED',name='完成案件',nodes=[dict(key='field',status='completed')]))
+    async def get(self,path,**params):
+        assert path == '/api/workspace'
+        return source
+    monkeypatch.setattr(Reader,'get',get)
+    cookie = '; '.join(f'{k}={v}' for k,v in client.cookies.items())
+    text,error = asyncio.run(execute(app,cookie,'query_dataset',dict(id='search_cases',params={})))
+    data = json.loads(text)
+    assert not error
+    assert {row['overdue'] for row in data['rows']} == {True,False}
+    display,error = result_display({data['result_id']:data},dict(result_id=data['result_id'],kind='table',
+        columns=['name','overdue'],mapping={},max_rows=50))
+    assert error is None
+    assert {row['overdue'] for row in display['rows']} == {'是','否'}
+    assert all(type(v) in (str,int,float,type(None)) for row in display['rows'] for v in row.values())

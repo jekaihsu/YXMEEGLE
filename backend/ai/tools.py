@@ -343,6 +343,8 @@ async def execute(app, cookie, name, args):
 def display_table(title, columns, rows, data, **extra):
     keys = [key for key, _ in columns[:8]]
     def cell(value):
+        if type(value) is bool:
+            return '是' if value else '否'
         if isinstance(value, str):
             return value[:240]
         if value is None or type(value) in (bool, int) or (type(value) is float and math.isfinite(value)):
