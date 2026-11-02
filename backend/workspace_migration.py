@@ -53,7 +53,7 @@ def _migrate_one(sessions, model, business_model, upgrade, storage, wid, max_att
                 root = storage.save(db, business_model, wid, state)
                 if reindex:
                     # Full replacement is necessary even when entity rows are unchanged.
-                    index_tables.replace_projects(db,business_model,wid,state,[p['id'] for p in state.get('projects',[])])
+                    index_tables.rebuild(db,business_model,wid,state)
                 if 'version' in root:
                     root['version'] = version + 1          # the app serves data['version'] and checks it against row.version
                 if hook:

@@ -159,6 +159,13 @@ def save(db,model,wid,state):
     if archive is not None and db.get(model,(wid,'migration_archive','original')) is None:
         db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
     existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind!='migration_archive'))}
+    # Only first-time normalization can certify all summaries during a save.
+    # An already normalized empty workspace must not restore a missing marker.
+    new_workspace=False
+    if db.info.get('index_tables') and not existing:
+        workspaces=model.metadata.tables['workspaces']
+        previous_root=db.scalar(select(workspaces.c.data).where(workspaces.c.id==wid)) or {}
+        new_workspace=previous_root.get('storage_schema')!=2
     project_of=_project_resolver(desired,existing)
     changed_projects=_changed_projects(desired,existing,project_of)
     changed_projects|=_changed_skip_projects(db,model,wid,root)
@@ -195,8 +202,10 @@ def save(db,model,wid,state):
         if row.kind!='events': db.delete(row)
     if indexed:
         from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
-        index_tables.replace_projects(db,model,wid,state,dirty)
-        index_tables.replace_counters(db,model,wid,state)
+        if new_workspace: index_tables.rebuild(db,model,wid,state)
+        else:
+            index_tables.replace_projects(db,model,wid,state,dirty)
+            index_tables.replace_counters(db,model,wid,state)
     if 'report_case_bridges' in state:
         from .report_bridge import save_bridges
         save_bridges(db,wid,state)

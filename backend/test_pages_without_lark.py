@@ -10,6 +10,7 @@ import pytest
 from .live_read.client import LiveLarkClient
 from .live_read.token_cache import TenantTokenCache
 from . import storage
+from . import index_tables
 from .models import AuthRow, BusinessRow, PersonRow, ProjectIndex, TaskIndex, WorkspaceCounter, WorkspaceRow
 from .perf_fixture import build_scaled_workspace
 from .policy import upgrade
@@ -47,6 +48,7 @@ def slow_lark(tmp_path):
         for table in (BusinessRow, ProjectIndex, TaskIndex, WorkspaceCounter):
             db.query(table).filter(table.workspace_id == 'lark-company').delete()
         workspace.data = storage.save(db, BusinessRow, 'lark-company', state)
+        index_tables.rebuild(db, BusinessRow, 'lark-company', state)
         for person in db.query(PersonRow).filter(PersonRow.organization_id == 'lark-company'):
             person.data = {**person.data, 'directory_last_seen_at':
                            (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}

@@ -81,12 +81,33 @@ def replace_projects(db,model,wid,state,project_ids,*,rows=None):
     if tasks: db.execute(insert(ti),tasks)
 
 
-def replace_counters(db,model,wid,state,*,desired=None):
+def rebuild(db,model,wid,state):
+    """Reconcile every owned row and publish summary readiness in this transaction."""
+    pi,ti,_=tables(model)
+    db.execute(delete(ti).where(ti.c.workspace_id==wid))
+    db.execute(delete(pi).where(pi.c.workspace_id==wid))
+    replace_projects(db,model,wid,state,[p['id'] for p in state.get('projects',[])])
+    replace_counters(db,model,wid,state,summaries_rebuilt=True)
+
+
+def replace_counters(db,model,wid,state,*,desired=None,summaries_rebuilt=False):
     """Write only counters whose value or version differs; delete vanished ones."""
     *_,ci=tables(model)
     desired=counter_values(state) if desired is None else desired; version=state.get('version',0)
     existing={(r.key,r.subject_id):r for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
-    remove=[key for key in existing if key not in desired]
+    desired=dict(desired)
+    marker=('summary_version','')
+    if not summaries_rebuilt:
+        # Dirty-project maintenance cannot certify untouched summaries. In particular,
+        # never restore the marker removed by an older worker during a rolling deploy.
+        desired.pop(marker,None)
+        db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==marker[0],
+            ci.c.subject_id==marker[1],ci.c.value==SUMMARY_VERSION,
+            ci.c.source_version!=version).values(source_version=version))
+    # Preserve a correct marker without upserting it: an older worker could remove
+    # it after the SELECT above, and an upsert would falsely restore readiness.
+    remove=[key for key in existing if key not in desired
+            and (summaries_rebuilt or key!=marker or existing[key].value!=SUMMARY_VERSION)]
     for key in remove:
         db.execute(delete(ci).where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]))
     updates=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=version)
@@ -181,6 +202,9 @@ def reconcile(db,model,wid,state):
 
 
 def repair(db,model,wid,state,report):
-    """Rewrite only the projects and counters a report flagged."""
+    """Repair drift; a stale summary schema requires a complete rebuild."""
+    if any(d['key']=='summary_version' for d in report['counters']['drift']):
+        rebuild(db,model,wid,state)
+        return
     replace_projects(db,model,wid,state,report['dirty_projects'])
     replace_counters(db,model,wid,state)

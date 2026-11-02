@@ -41,7 +41,7 @@ def backfill_workspace(sessions,wid,*,batch=50,dry_run=False,retries=3):
             pi,ti,_=index_tables.tables(BusinessRow)
             known=set(ids); extra=[r for r in db.scalars(select(pi.c.project_id).where(pi.c.workspace_id==wid)) if r not in known]
             index_tables.replace_projects(db,BusinessRow,wid,state,extra)
-            index_tables.replace_counters(db,BusinessRow,wid,state)
+            index_tables.replace_counters(db,BusinessRow,wid,state,summaries_rebuilt=True)
         return counts
     raise RuntimeError(f'workspace {wid} kept changing during backfill; re-run')
 
