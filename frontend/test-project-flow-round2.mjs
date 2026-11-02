@@ -11,6 +11,7 @@ HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};g
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
 const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {AppShell} from './src/AppShell'; export {LocalNodeActions} from './src/LocalNodeActions'; export {invalidateSessionEpoch} from './src/api'; export {prefetchNodeAssignmentDetail} from './src/useNodeAssignments';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.project-flow-round2-bundle.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
+const sopExamples=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
 const tick=()=>new Promise(r=>setTimeout(r,15));
@@ -24,6 +25,9 @@ async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=
  calls=[];let releaseEvidence;hold=evidenceHold?new Promise(r=>releaseEvidence=r):null;globalThis.releaseEvidence=releaseEvidence;
  c={w:base.workspace,s:{user:{...base.user,role},mode:'lark',workspace_id:'flow-company',features:{node_assignment:enabled,dispatch_write:dispatch}},route:{view:'project',project:'p1',tab,node,task},busy:false,run:async()=>true,notify(){},registerDrafts(){},refresh:async()=>{},go(route,replace){history[replace?'replaceState':'pushState']({},'', '#'+new URLSearchParams(Object.entries(route).filter(([,v])=>v!==undefined)));c={...c,route};render()}};
  globalThis.fetch=async(url,init={})=>{calls.push({url,method:init.method||'GET',body:init.body?JSON.parse(init.body):null});
+  if(fixture.sop&&url.endsWith('/sop-tasks'))return response(fixture.sop);
+  if(fixture.sop&&url.endsWith('/sop-assignees'))return response({people:[{id:'ou_anna',name:'林安娜',case_roles:['pm']},{id:'ou_wei',name:'陳威廷',case_roles:[]}]});
+  if(fixture.sop&&url.endsWith('/sop-nodes/sales'))return response({});
   if(url.endsWith('/progress')){if(hold)await hold;return response(evidenceStatus===200?progress:{detail:'合成證據讀取失敗'},evidenceStatus)}
   if(url.endsWith('/node-assignments'))return response(nodeStatus===200?fixture.list:{detail:'合成節點來源失敗'},nodeStatus);
   if(url.includes('/node-assignments/nodes/')){
@@ -210,7 +214,7 @@ await check('common blockers appear once while unique task blockers stay in thei
 });
 await check('overflow keyboard Escape and modal cancellation return focus to the live summary',async()=>{
  await mount({enabled:false,node:'node_control'});const add=button('新增任務');add.focus();await click(add);assert.ok(document.querySelector('[role=dialog]'));await act(async()=>{document.querySelector('[role=dialog]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.activeElement,add,'autofocus modal restores its opener');
- await mount({node:'control'});await more();const remoteSummary=document.querySelector('.pf-more>summary');assert.ok(document.querySelector('.pf-more a[href*=people]'));assert.equal(button('指派負責人'),undefined);
+ await mount({node:'control'});await more();const remoteSummary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await act(async()=>{document.querySelector('.ne-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.ne-form'),null);assert.equal(document.activeElement,remoteSummary);
  await more();button('新增任務').focus();await click(button('新增任務'));await act(async()=>{document.querySelector('.ne-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.ne-form'),null);assert.equal(document.activeElement,remoteSummary);
 });
 await check('empty blocked stages explain the disabled action once inside the empty state',async()=>{
@@ -237,11 +241,44 @@ await check('local SOP node forms return focus to the overflow summary on Escape
  await act(async()=>{root.render(React.createElement(ui.LocalNodeActions,props));await tick()});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,summary);
  await more();button('退回節點').focus();await click(button('退回節點'));await act(async()=>{document.querySelector('.nw-local-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.nw-local-form'),null);assert.equal(document.activeElement,summary);
 });
-await check('flow consolidates claim and assign into one permission-aware people link',async()=>{
- await mount({node:'control',configure(base,f){f.list.can.control.claim=true;f.list.can.control.assign=true}});await more();
- assert.equal(document.querySelectorAll('.pf-node-actions a[href*=people]').length,1);assert.equal(button('認領節點'),undefined);assert.equal(button('指派負責人'),undefined);
+await check('Lark node assignment reaches the editor and revision-checked mutation',async()=>{
+ await mount({node:'control'});await more();
+ assert.equal(document.querySelector('.pf-node-actions a[href*=people]'),null);
+ const assign=button('指派負責人');assert.ok(assign.closest('.pf-more'));await click(assign);
+ const form=document.querySelector('.pf-node-actions form');assert.match(form.textContent,/選擇節點負責人/);
+ await click(form.querySelector('input[type=checkbox]'));await click(button('儲存指派'));
+ const write=calls.find(c=>c.url.endsWith('/nodes/control/assign'));
+ assert.equal(write.method,'POST');const {request_id,...payload}=write.body;assert.ok(request_id);
+ assert.deepEqual(payload,{owner_open_ids:['ou_wei'],expected_revision:'3f2a9c0d1b7e4a55'});
+ assert.equal(document.querySelector('.pf-node-actions form'),null);
+});
+await check('claim-only Lark users retain the primary revision-checked claim operation',async()=>{
+ await mount({node:'control',role:'member',configure(base,f){f.list.can.control={claim:true,assign:false,complete:false,approve:false,reject:false,create_task:false}}});
+ assert.equal(button('指派負責人'),undefined);const claim=button('認領節點');assert.ok(claim.classList.contains('primary'));
+ await click(claim);const write=calls.find(c=>c.url.endsWith('/nodes/control/claim'));
+ assert.equal(write.method,'POST');const {request_id,...payload}=write.body;assert.ok(request_id);
+ assert.deepEqual(payload,{expected_revision:'3f2a9c0d1b7e4a55'});
+});
+await check('Lark assignment retains source permission and stale-write guards',async()=>{
  await mount({node:'control',configure(base,f){f.list.writes_enabled=false;f.list.writes_disabled_reason='人員來源核對中'}});await more();
- const link=document.querySelector('.pf-node-actions a[href*=people]');assert.equal(link.getAttribute('aria-disabled'),'true');assert.match(document.getElementById(link.getAttribute('aria-describedby')).textContent,/人員來源核對中/);
+ const assign=button('指派負責人');assert.equal(assign.disabled,true);assert.match(document.getElementById(assign.getAttribute('aria-describedby')).textContent,/人員來源核對中/);
+ await act(async()=>assign.click());assert.equal(document.querySelector('.pf-node-actions form'),null);assert.equal(calls.some(c=>c.method!=='GET'),false);
+ await mount({node:'control',configure(base,f){f.list.can.control.assign=false;f.list.can.control.claim=false}});await more();
+ assert.equal(button('指派負責人'),undefined);assert.equal(button('認領節點'),undefined);
+});
+await check('local SOP assignment reaches its own editor and revision-checked node endpoint',async()=>{
+ await mount({node:'sales',configure(base,f){
+  base.project.code='';base.project.case_type='intake';base.project.source_kind='local';
+  f.sop=structuredClone(sopExamples.sop_tasks);f.sop.project_id='p1';f.sop.case={id:'p1',code:null,name:base.project.name};
+  f.sop.tasks[0].id='sop1';f.sop.tasks[0].project_id='p1';f.sop.tasks[0].participants={executor:'ou_anna'};f.sop.tasks[0].nodes=[{node_key:'sales',node_id:'node_sales',order:1}];
+  f.sop.local_nodes=base.project.nodes.map(n=>({id:n.id,key:n.key,revision:7,status:n.key==='sales'?'in_progress':'pending',owner_id:'ou_anna',completed_at:null,reason:null,disabled_reason:null,can:{assign:true,complete:true,reject:false,create_task:true}}));
+ }});await more();
+ const assign=button('指派負責人');assert.ok(assign.closest('.nw-local-actions .pf-more'));await click(assign);
+ assert.ok(document.querySelector('form[aria-label="指派節點負責人"]'));
+ await click(document.querySelector('.nw-local-form .ds-select button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(el=>el.textContent.includes('陳威廷')).click();await tick()});
+ await click(button('確認指派'));const write=calls.find(c=>c.url.endsWith('/sop-nodes/sales'));
+ assert.equal(write.method,'POST');assert.deepEqual(write.body,{action:'assign',expected_revision:7,owner_id:'ou_wei'});
+ assert.equal(document.querySelector('.nw-local-form'),null);
 });
 await check('populated paused overview and flow retain one causal pause reason',async()=>{
  for(const tab of ['overview','flow']){

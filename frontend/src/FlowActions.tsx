@@ -21,7 +21,7 @@ const ACTIONS:Record<ActionName,{label:string;confirm?:string}>={
  reject:{label:'退回節點'}};
 const ORDER=Object.keys(ACTIONS) as ActionName[];
 const REOPEN={label:'取消完成'};
-export function FlowNodeActions({detail,busy,error,reason,mutate,registry,peopleHref}:{detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;reason:string;mutate:(m:AssignmentMutation)=>Promise<boolean>;registry?:ActionRegistry;peopleHref?:string}){
+export function FlowNodeActions({detail,busy,error,reason,mutate,registry}:{detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;reason:string;mutate:(m:AssignmentMutation)=>Promise<boolean>;registry?:ActionRegistry}){
  const [form,setForm]=useState<'assign'|'task'|'reject'|'legacy_complete'|''>('');
  const [confirm,setConfirm]=useState<ActionName|''>('');
  const trigger=useRef<HTMLElement|null>(null);
@@ -30,15 +30,14 @@ export function FlowNodeActions({detail,busy,error,reason,mutate,registry,people
  const actions=registry || actionRegistry({can:detail.can,busy,reason:reason || detail.writes_disabled_reason || ''});
  const done=detail.node.derived_status==='已完成';
  const unfinished=detail.tasks.filter(t=>!['已完成','取消'].includes(t.status)).length;
- const peopleAction=actions.assign.enabled?'assign':actions.claim.enabled?'claim':actions.assign.visible?'assign':'claim';
- const visibleActions=ORDER.filter(name=>(!peopleHref||!['assign','claim'].includes(name)||name===peopleAction)&&actions[name].visible && !(name==='complete'&&(done||detail.node.derived_status==='略過')));
+ const visibleActions=ORDER.filter(name=>actions[name].visible && !(name==='complete'&&(done||detail.node.derived_status==='略過')));
  const legacyVisible=detail.can.legacy_complete===true && actions.legacy_complete.visible && !done && detail.node.derived_status!=='略過';
  const viewOnly=!visibleActions.length && !legacyVisible;
  if(viewOnly)return null;
  const label=(n:ActionName)=>n==='reject'&&done?REOPEN.label:ACTIONS[n].label;
  const run=(name:ActionName)=>name==='assign' ? setForm('assign') : name==='create_task' ? setForm('task') : name==='reject' ? setForm('reject') : ACTIONS[name].confirm ? setConfirm(name) : void save({action:name as 'claim',nodeKey:detail.node.key,expected_revision:detail.node.revision});
  const primary=visibleActions.find(n=>n==='approve')||visibleActions.find(n=>n==='complete')||visibleActions.find(n=>n==='create_task')||visibleActions.find(n=>n==='claim');
- const actionButton=(name:ActionName,close?:()=>void)=>peopleHref&&(name==='assign'||name==='claim')?<FlowPeopleLink key={name} href={peopleHref} allowed={actions[name].enabled} reason={actions[name].disabledReason}/>:<FlowAction key={name} primary={name===primary} allowed={actions[name].enabled} reason={actions[name].disabledReason} onClick={()=>{close?.();trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;run(name)}}>{label(name)}</FlowAction>;
+ const actionButton=(name:ActionName,close?:()=>void)=><FlowAction key={name} primary={name===primary} allowed={actions[name].enabled} reason={actions[name].disabledReason} onClick={()=>{close?.();trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;run(name)}}>{label(name)}</FlowAction>;
  return <DisabledActionReasons.Provider value={true}><div className="pf-node-actions" onKeyDown={e=>{if(e.key==='Escape'&&(form||confirm)&&!busy){e.preventDefault();closeForm()}}}><div className="nw-actions">{primary&&actionButton(primary)}{(visibleActions.some(n=>n!==primary)||legacyVisible)&&<DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作">{close=><div>{visibleActions.filter(n=>n!==primary).map(n=>actionButton(n,close))}{legacyVisible&&<FlowAction allowed={actions.legacy_complete.enabled} reason={actions.legacy_complete.disabledReason} onClick={()=>{close();trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setForm('legacy_complete')}}>直接標記完成</FlowAction>}</div>}</DetailsMenu>}</div>
   {confirm && <div className="pf-confirm" role="group" aria-label={`確認${ACTIONS[confirm].label}`}><p>{ACTIONS[confirm].confirm}</p>{confirm==='complete'&&unfinished>0&&<p role="status">尚有 {unfinished} 項任務未完成</p>}<div className="pf-actions"><button type="button" className="button compact" onClick={closeForm}>取消</button><button type="button" className="button primary compact" disabled={busy} onClick={()=>{const action=confirm;setConfirm('');void save({action:action as 'complete',nodeKey:detail.node.key,expected_revision:detail.node.revision})}}>確認{ACTIONS[confirm].label}</button></div></div>}
   {form==='assign' && <AssignForm detail={detail} busy={busy} error={error} onCancel={closeForm} onSubmit={ids=>save({action:'assign',nodeKey:detail.node.key,owner_open_ids:ids,expected_revision:detail.node.revision})}/>}
