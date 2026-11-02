@@ -67,7 +67,7 @@ test('quote with imported tasks offers open without a second start action',async
 });
 
 test('completed import refreshes the open detail and removes the start action',async()=>{
- await registerDetail({...x.quotes.items[0],quote_no:'115705',sop_counts:null});
+ const {calls}=await registerDetail({...x.quotes.items[0],quote_no:'115705',sop_counts:null});
  await click(button('開始 SOP'));
  await click(button('下一步'));
  await click(button('下一步'));
@@ -75,6 +75,8 @@ test('completed import refreshes the open detail and removes the start action',a
  await click(button('關閉'));
  assert.equal(Boolean(button('開始 SOP')),false);
  assert.match(document.querySelector('[role=dialog]').textContent,/0\/1/);
+ assert.equal(calls.filter(url=>url.endsWith('/sop-tasks')).length,2,'quote import refreshes its owned SOP resource exactly once');
+ assert.equal(calls.filter(url=>url.endsWith('/sop-assignees')).length,1,'quote import does not reread assignees');
 });
 
 test('stage dropdown filters rows and can restore all stages',async()=>{
