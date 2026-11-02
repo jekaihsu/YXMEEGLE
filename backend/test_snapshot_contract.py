@@ -113,9 +113,8 @@ def test_snapshot_delayed_old_revision_cannot_publish_or_return_as_current():
             new = pool.submit(cache.get, 'case', lambda: b'new', revision=2)
             assert newer_requested.wait(2)
             release.set()
-            with pytest.raises(HTTPException) as error:
-                pending.result(5)
-            assert error.value.status_code == 409
+            value, status = pending.result(5)
+            assert (value, status) in ((b'old', 'stale'), (b'new', 'hit'))
             assert new.result(5) == (b'new', 'miss')
         assert cache.get('case', lambda: b'wrong', revision=2) == (b'new', 'hit')
     finally:
@@ -155,24 +154,30 @@ def test_snapshot_source_age_and_partial_truth_are_preserved():
 
 
 def test_snapshot_force_still_checks_auth_and_redaction(tmp_path):
-    with scaled_client(tmp_path, 2, **ON) as (app, client):
+    def private(state):
+        state['delegations'] = [dict(id='private-delegation-marker', principal_id='ou_020', delegate_id='ou_030')]
+    with scaled_client(tmp_path, 2, mutate=private, **ON) as (app, client):
         with app.state.sessions() as db:
             root = db.scalars(select(WorkspaceRow)).first()
             pid = storage.load(db, BusinessRow, root)['projects'][0]['id']
         url = f'/api/projects/{pid}/first-screen'
-        assert client.get(url).status_code == 200
+        manager = client.get(url)
+        assert manager.status_code == 200
+        assert 'private-delegation-marker' in manager.text
         from .test_shell import switch
         switch(client, 'u-pm')
         forced = client.get(url, headers={'Cache-Control': 'no-cache'})
         assert forced.status_code == 200
-        ordinary = client.get(url)
-        assert forced.json() == ordinary.json()
+        assert 'private-delegation-marker' not in forced.text
+        ordinary = client.get(f'/api/projects/{pid}?overview=true')
+        assert 'private-delegation-marker' not in ordinary.text
+        assert forced.headers['etag'] != manager.headers['etag']
         client.cookies.clear()
         assert client.get(url, headers={'Cache-Control': 'no-cache',
             'If-None-Match': forced.headers['etag']}).status_code == 401
 
 
-def test_snapshot_other_app_write_while_builder_queued_returns_conflict(tmp_path, monkeypatch):
+def test_snapshot_other_app_write_while_builder_queued_rebuilds_once(tmp_path, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Event
     with scaled_client(tmp_path, 2, **ON) as (app, client):
@@ -204,7 +209,8 @@ def test_snapshot_other_app_write_while_builder_queued_returns_conflict(tmp_path
                     root.data = storage.save(db, BusinessRow, root.id, state)
             finally:
                 release.set()
-            assert pending.result(5).status_code == 409
-        assert not app.state.read_snapshots.entries
+            rebuilt = pending.result(5)
+            assert rebuilt.status_code == 200
+            assert rebuilt.json()['project']['project']['name'] == 'New worker generation'
         fresh = client.get(f'/api/projects/{pid}/first-screen')
         assert fresh.json()['project']['project']['name'] == 'New worker generation'

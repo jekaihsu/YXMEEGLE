@@ -181,21 +181,23 @@ def test_degraded_portfolio_is_not_pinned_in_the_snapshot_cache(tmp_path, monkey
         assert client.get('/api/projects?view=portfolio').headers['x-read-snapshot'] == 'hit'
 
 
-def test_initial_stale_paint_is_opt_in_and_revision_refresh_dedupes():
-    cache = ReadSnapshots()
+def test_same_revision_stale_paint_and_refresh_dedupes():
+    clock = [0]
+    cache = ReadSnapshots(clock=lambda: clock[0])
     entered, release = Event(), Event()
     try:
         assert cache.get('case', lambda: b'v1', revision=1) == (b'v1', 'miss')
+        clock[0] = 16
         def next_revision():
             entered.set()
             assert release.wait(2)
             return b'v2'
-        assert cache.get('case', next_revision, revision=2, allow_stale=True) == (b'v1', 'stale')
+        assert cache.get('case', next_revision, revision=1, force=False) == (b'v1', 'stale')
         assert entered.wait(2)
-        assert cache.get('case', next_revision, revision=2, allow_stale=True) == (b'v1', 'stale')
+        assert cache.get('case', next_revision, revision=1, force=False) == (b'v1', 'stale')
         release.set()
         cache.close()
-        assert cache.get('case', lambda: b'unexpected', revision=2) == (b'v2', 'hit')
+        assert cache.get('case', lambda: b'unexpected', revision=1) == (b'v2', 'hit')
     finally:
         release.set()
         cache.close()

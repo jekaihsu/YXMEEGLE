@@ -8,6 +8,10 @@ import json
 from datetime import datetime, timezone
 
 
+class SnapshotRevisionChanged(Exception):
+    """Retry one consistent capture when its workspace revision advances."""
+
+
 def explicit_refresh(request):
     directives = request.headers.get('cache-control', '').lower().split(',')
     return any(d.strip().split('=')[0] in ('no-cache', 'no-store', 'max-age')
@@ -17,13 +21,27 @@ def explicit_refresh(request):
 
 def source_metadata(source, *, revision, verified_at=None, complete=None):
     source = source if isinstance(source, dict) else {}
-    stale = source.get('stale') is True or source.get('status') == 'stale'
+    as_of = source.get('as_of') or source.get('fetched_at') or source.get('last_sync')
+    age = source.get('age_seconds')
+    if as_of:
+        try:
+            stamp = datetime.fromisoformat(as_of.replace('Z', '+00:00'))
+            if stamp.tzinfo is None:
+                from zoneinfo import ZoneInfo
+                stamp = stamp.replace(tzinfo=ZoneInfo('Asia/Taipei'))
+            age = max(0, (datetime.now(timezone.utc) - stamp).total_seconds())
+        except (ValueError, TypeError):
+            pass
+    ttl = source.get('ttl_seconds', 300)
+    stale = (source.get('stale') is True or source.get('status') == 'stale'
+             or (age is not None and ttl is not None and age >= ttl))
     return dict(as_of=source.get('as_of') or source.get('fetched_at') or source.get('last_sync'),
                 fetched_at=source.get('fetched_at'),
                 verified_at=source.get('verified_at') or verified_at,
                 changed_at=source.get('changed_at'), local_revision=revision,
                 completeness='complete' if complete is True else 'partial' if complete is False else 'unknown',
-                stale=stale)
+                stale=stale if age is not None or stale else None,
+                age_seconds=age, ttl_seconds=ttl, status=source.get('status'), last_error=source.get('last_error'))
 
 
 def attach_first_screen(result, state, generation, freshness):
@@ -32,6 +50,7 @@ def attach_first_screen(result, state, generation, freshness):
     # Disabled coordinator status can use a presentation date as workspace_as_of.
     # Only enabled source evidence or persisted ingestion evidence is trustworthy.
     source = ((freshness.get('datasets') or {}).get('sources') or {}) if freshness.get('enabled') else state.get('source_status', {})
+    source = dict(source, ttl_seconds=source.get('ttl_seconds', ((freshness.get('datasets') or {}).get('sources') or {}).get('ttl_seconds', 300)))
     project = source_metadata(source, revision=revision,
                               complete=source.get('complete'))
     resources = {'project': project}
@@ -46,12 +65,19 @@ def attach_first_screen(result, state, generation, freshness):
             complete=success and not (isinstance(body, dict) and body.get('complete') is False))
         part['snapshot'] = meta
         resources[name] = meta
-    identity = json.dumps([generation, resources, result], sort_keys=True, default=str).encode()
+    def stable(value):
+        if isinstance(value, dict):
+            return {k: stable(v) for k, v in value.items()
+                    if k not in ('verified_at', 'age_seconds', 'task_capabilities_checked_at')}
+        if isinstance(value, (list, tuple)):
+            return [stable(v) for v in value]
+        return value
+    identity = json.dumps(stable([generation, resources, result]), sort_keys=True, default=str).encode()
     snapshot_id = hashlib.sha256(identity).hexdigest()
     for meta in resources.values():
         meta['snapshot_id'] = snapshot_id
     result['snapshot'] = dict(snapshot_id=snapshot_id, as_of=project['as_of'],
         fetched_at=project['fetched_at'], verified_at=verified, changed_at=project['changed_at'],
-        local_revision=revision, completeness='partial', stale=any(r['stale'] for r in resources.values()),
+        local_revision=revision, completeness='partial', stale=True if any(r['stale'] is True for r in resources.values()) else (None if any(r['stale'] is None for r in resources.values()) else False),
         resources=resources)
     return result
