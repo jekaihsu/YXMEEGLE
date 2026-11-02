@@ -9,14 +9,14 @@ import ts from 'typescript';
 const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
- 'ProjectsList.tsx': 'd2c97b8ef41d35fcfbb462967052a432dad4a69d8b28bc83a7ae8d7b3df145fb',
+ 'ProjectsList.tsx': '232f052dfb9702867388d0e42b2dec9e4aec483ce02bbd3f27f9dfd96b643e78',
  'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
  // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': '1ccb29b07ceb1d4be923ad120a236209c786ec36e1b7f7adc98b942f8910071c',
+ 'AppShell.tsx': '8c1494ed7819f3c14f9e130dd1b79aeecc0e56f4a7caabb5c0d259d83ca35a4e',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
@@ -38,7 +38,7 @@ const legacy={
  "inputRecovery.ts": "ea9bc500bbebb5a28a1755e834a9c3e352dbe7694eecc8f2e6766dbcb9810287",
  "LarkPilotPanel.tsx": "56440e752c8deefd1cf4aab42e5a95aa24c02246cb59ead49452e37a2814fbf9",
  "StageFixture.tsx": "9dfb8e14c631b01a1acd9a1adc88c5d094164b94945dadc2553c998504f52df8",
- "P2Pages.tsx": "e43860fe8bd3e7b811b594e63a6949854ecf344903541c34351562261ae593e7",
+ "P2Pages.tsx": "a0846d38bf7fab4a96c0c5207e04e395038e8862f525ef9896d595fa75b627d4",
  "api.ts": "a63a733f181926716e31fde9dbc649da20d0ce978a2b70196d1d48b1a07b93f5",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
