@@ -6,7 +6,10 @@ export function useDialogFocus(onClose:()=>void, enabled=true){
  // Render precedes descendant autoFocus during commit. Also recapture on enable.
  const returnTarget=useRef<HTMLElement|null>(null);
  const wasEnabled=useRef(false);
- if(enabled&&!wasEnabled.current&&typeof document!=='undefined')returnTarget.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
+ if(enabled&&!wasEnabled.current&&typeof document!=='undefined'){
+  const active=document.activeElement;
+  returnTarget.current=typeof (active as HTMLElement|null)?.focus==='function'?active as HTMLElement:null;
+ }
  wasEnabled.current=enabled;
  const close=useRef(onClose); close.current=onClose;
  useEffect(()=>{
@@ -14,12 +17,12 @@ export function useDialogFocus(onClose:()=>void, enabled=true){
   const trigger=returnTarget.current;
   const previousOverflow=document.body.style.overflow;
   document.body.style.overflow='hidden';
-  const controls=()=>Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex="0"]')).filter(e=>e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden');
+  const controls=()=>Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex="0"]')).filter(e=>e.getClientRects().length>0&&panel.ownerDocument.defaultView?.getComputedStyle(e).visibility!=='hidden');
   const foremost=()=>Array.from(document.querySelectorAll('[role="dialog"]')).at(-1)===panel;
   (controls()[0]||panel).focus();
   const key=(e:KeyboardEvent)=>{
    if(!foremost())return;
-   if(e.key==='Escape'){if(e.target instanceof Element&&e.target.closest('[data-local-escape]'))return;e.preventDefault();e.stopPropagation();close.current();return;}
+   if(e.key==='Escape'){if((e.target as Element|null)?.closest?.('[data-local-escape]'))return;e.preventDefault();e.stopPropagation();close.current();return;}
    if(e.key!=='Tab')return;
    const items=controls(),first=items[0],last=items.at(-1);
    if(!first){e.preventDefault();panel.focus();return;}
