@@ -98,6 +98,9 @@ def project_state(project, day):
         state = '尚未開始'
     else:
         state = current if current in {'待審核', '暫停'} else '進行中'
+    if not any(key in by_key for key in NODE_ORDER):
+        state = {'pending': '尚未開始', 'in_progress': '進行中', 'engineering_complete': '進行中',
+                 'completed': '已完成', 'paused': '暫停'}.get(project.get('progress_status'), state)
     tasks = [t for n in project.get('nodes') or [] if isinstance(n, dict)
              for t in n.get('tasks') or [] if isinstance(t, dict)
              and t.get('status') not in ('completed', 'superseded', 'approved_skipped')]

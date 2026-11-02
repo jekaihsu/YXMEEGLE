@@ -14,7 +14,10 @@ def ready(db,model,row):
     """Index maintained (flag on) and complete for exactly this workspace version."""
     if not db.info.get('index_tables'): return False
     pi,_,ci=index_tables.tables(model)
-    total=db.execute(select(ci.c.value,ci.c.source_version).where(ci.c.workspace_id==row.id,ci.c.key=='projects_total',ci.c.subject_id=='')).first()
+    counters={r.key:r for r in db.execute(select(ci.c.key,ci.c.value,ci.c.source_version).where(
+        ci.c.workspace_id==row.id,ci.c.key.in_(['projects_total','summary_version']),ci.c.subject_id==''))}
+    schema=counters.get('summary_version'); total=counters.get('projects_total')
+    if schema is None or schema.value!=index_tables.SUMMARY_VERSION: return False
     if total is None or total.source_version!=row.version: return False
     return db.scalar(select(func.count()).select_from(pi).where(pi.c.workspace_id==row.id))==total.value
 

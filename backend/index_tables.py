@@ -9,6 +9,7 @@ from sqlalchemy import select, delete, insert
 
 CLOSED_TASK_STATUSES=('completed','approved_skipped')
 CHUNK=400
+SUMMARY_VERSION=1  # Bump when persisted project_summary payloads need rebuilding.
 
 
 def tables(model):
@@ -49,7 +50,8 @@ def project_rows(wid,state,project_ids=None,summaries=True):
 
 def counter_values(state):
     """{(key, subject_id): value}; time-dependent counts (overdue) are never stored."""
-    values={('projects_total',''):len(state.get('projects',[])),
+    values={('summary_version',''):SUMMARY_VERSION,
+            ('projects_total',''):len(state.get('projects',[])),
             ('approvals_pending',''):sum(a.get('status')=='pending' for a in state.get('approvals',[])),
             ('daily_unmatched',''):len(state.get('daily_unmatched',[]))}
     for p in state.get('projects',[]):

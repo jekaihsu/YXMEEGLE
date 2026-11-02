@@ -94,7 +94,8 @@ def _unavailable_card(ident, label, reason, filters, as_of):
     return result
 
 
-def _case(project, versions, people):
+def _case(project, versions, people, state):
+    from .operations import derive_progress_status
     status = project.get('execution_status')
     unfinished = ({'value': True, 'state': None,
                    'reason': 'Open local workbench execution state (operations.py:190-195).'}
@@ -116,7 +117,7 @@ def _case(project, versions, people):
             'pending_decision': _unknown('No manager-level pending-decision definition.'),
             'entry_point': {'route': _route(project['id']), 'kind': 'case', 'read_only': True},
             'details': {'row_keys': deepcopy(versions), 'pm_id': person.get('id') if person else None,
-                        'execution_status': status, 'progress_status': project.get('progress_status', status),
+                        'execution_status': status, 'progress_status': derive_progress_status(project, state),
                         'admission': admission_fields(project, project.get('execution_allowed') is True),
                         'mapping_state': 'receipt_missing',
                         'amounts': {'value': None, 'state': 'withheld', 'reason': 'G-AMT remains open.'},
@@ -196,7 +197,7 @@ def build_manager_overview(state, *, population, filters=None, period=None,
             continue
         if filters.get('execution_status') and project.get('execution_status') != filters['execution_status']:
             continue
-        case = _case(project, versions.get(pid, []) if available else None, people)
+        case = _case(project, versions.get(pid, []) if available else None, people, state)
         if not available:
             case['details']['row_keys_state'] = data_state('unknown')
             case['details']['row_keys_reason'] = 'The confirmation population is unavailable; row keys are unknown.'

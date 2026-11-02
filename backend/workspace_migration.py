@@ -7,7 +7,9 @@ with `UPDATE ... WHERE id=? AND version=?` and `version+1` (mirrored into `data[
 A CAS miss rolls the whole attempt back (entity rows included), re-reads and recomputes, a bounded number of times,
 then fails closed with `WorkspaceMigrationBusy` so the process refuses to start rather than overwrite.
 
-Rows that are already normalised are left untouched (no write, no version bump). PostgreSQL is UNTESTED.
+Rows with normalised storage and a current enabled index are left untouched (no write, no version bump).
+Stale index summaries are rebuilt in the same transaction, including when no project entity changed.
+Startup summary rollout is tested on SQLite and PostgreSQL; concurrent-writer tests use SQLite.
 """
 from copy import deepcopy
 
@@ -35,8 +37,10 @@ def _migrate_one(sessions, model, business_model, upgrade, storage, wid, max_att
         try:
             with sessions.begin() as db:
                 row = db.get(model, wid)
-                if row is None or not needs_migration(row.data):
-                    return False
+                if row is None: return False
+                from . import index_reads, index_tables
+                reindex=db.info.get('index_tables') and not index_reads.ready(db,business_model,row)
+                if not needs_migration(row.data) and not reindex: return False
                 version, data = row.version, row.data
                 if hook:
                     hook('after_read')                     # SQLite: no write lock is held yet, so a real writer can commit here
@@ -47,6 +51,9 @@ def _migrate_one(sessions, model, business_model, upgrade, storage, wid, max_att
                     state = upgrade(storage.load(db, business_model, row))
                 state['version'] = version + 1
                 root = storage.save(db, business_model, wid, state)
+                if reindex:
+                    # Full replacement is necessary even when entity rows are unchanged.
+                    index_tables.replace_projects(db,business_model,wid,state,[p['id'] for p in state.get('projects',[])])
                 if 'version' in root:
                     root['version'] = version + 1          # the app serves data['version'] and checks it against row.version
                 if hook:

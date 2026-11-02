@@ -166,6 +166,21 @@ def refresh_payment_status(ws,p,batch):
         batch['status']='needs_review'; batch['review_reason']='交付批次未綁定或版本已失效'; return
     batch['status']='paid' if verified==decimal(batch['amount']) and verified>0 else 'partially_paid' if verified>0 else 'approved'
 
+def derive_progress_status(p,ws,*,engineering=None):
+    """Pure presentation state from node progress and verified declared stop only."""
+    from .node_skip import valid_waiver
+    nodes=p.get('nodes',[])
+    if engineering is None:
+        technical=[n for n in nodes if n.get('key') in TECHNICAL]
+        engineering=bool(technical) and all(n.get('status')=='completed' or valid_waiver(ws,p,n) for n in technical)
+    settlement=next((n for n in nodes if n.get('key')=='settlement'),None)
+    if settlement and settlement.get('status')=='completed' and engineering: return 'completed'
+    if engineering: return 'engineering_complete'
+    if declared(p)=='中止': return 'paused'
+    if any(n.get('status') in ('in_progress','rework','completed') for n in nodes): return 'in_progress'
+    return 'pending'
+
+
 def refresh_project_state(p,ws):
     from .node_skip import refresh_skips, valid_waiver
     refresh_skips(ws,p)
@@ -195,14 +210,7 @@ def refresh_project_state(p,ws):
     financially_settled=financial_readiness(ws,p)['ready'] if ws.get('environment')=='production' else bool(p.get('payment_reconciliation',{}).get('confirmed'))
     if settlement and settlement['status']=='completed' and (not engineering or settlement_preconditions(p,ws) or not financially_settled or p.get('migration_review_required') or p.get('migration_conflicts') or p.get('migration_finance_reapproval_required')):
         invalidate(settlement,'工程交付或收付款尚未核實完成')
-    # Display progress is independent of the fail-closed execution gate below.
-    # A previous lifecycle pause carries no progress; started nodes still do.
-    prior_execution=p.get('execution_status')
-    if settlement and settlement['status']=='completed' and engineering: p['progress_status']='completed'
-    elif engineering: p['progress_status']='engineering_complete'
-    elif declared(p)=='中止': p['progress_status']='paused'
-    elif prior_execution in ('in_progress','engineering_complete','completed') or any(n['status'] in ('in_progress','rework','completed') for n in p['nodes']): p['progress_status']='in_progress'
-    else: p['progress_status']='pending'
+    p['progress_status']=derive_progress_status(p,ws,engineering=engineering)
     if settlement and settlement['status']=='completed' and engineering:
         p['execution_status']='completed'
     elif engineering: p['execution_status']='engineering_complete'
