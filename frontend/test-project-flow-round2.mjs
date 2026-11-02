@@ -237,7 +237,7 @@ await check('local SOP node forms return focus to the overflow summary on Escape
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
  const actions={assign:{visible:true,enabled:true,disabledReason:''},complete:{visible:false},reject:{visible:true,enabled:true,disabledReason:''}};
  for(const id of ['claim','create_task','approve','legacy_complete'])actions[id]={visible:false};
- const props={workbench:{local:{key:'control',revision:1,ownerId:'ou_anna'},actions},sop:{assignees:[{id:'ou_anna',name:'林安娜'}],current:()=>true},projectId:'p1'};
+ const props={workbench:{local:{key:'control',revision:1,ownerId:'ou_anna',can:{assign:true,reject:true,complete:false}},actions},sop:{assignees:[{id:'ou_anna',name:'林安娜'}],current:()=>true},projectId:'p1'};
  await act(async()=>{root.render(React.createElement(ui.LocalNodeActions,props));await tick()});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,summary);
  await more();button('退回節點').focus();await click(button('退回節點'));await act(async()=>{document.querySelector('.nw-local-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.nw-local-form'),null);assert.equal(document.activeElement,summary);
 });
