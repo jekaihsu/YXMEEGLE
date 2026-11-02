@@ -1,4 +1,4 @@
-"""Bounded encoded read snapshots with single-flight and stale-while-revalidate."""
+"""Bounded encoded read snapshots with single-flight and explicit initial stale paint."""
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar, copy_context
@@ -39,7 +39,7 @@ class EncodedSnapshot:
         if self.as_of:
             headers['X-Data-As-Of'] = self.as_of
         tags = request.headers.get('if-none-match', '').split(',')
-        if any(tag.strip().removeprefix('W/') in ('*', self.etag.removeprefix('W/')) for tag in tags):
+        if status != 'stale' and any(tag.strip().removeprefix('W/') in ('*', self.etag.removeprefix('W/')) for tag in tags):
             return Response(status_code=304, headers=headers)
         encodings = {}
         for entry in request.headers.get('accept-encoding', '').lower().split(','):
@@ -69,12 +69,15 @@ class ReadSnapshots:
         self.flights = {}
         self.lock = Lock()
         self.generation = 0
+        self.requested = {}
+        self.sequence = 0
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='read-snapshot')
 
     def invalidate(self):
         with self.lock:
             self.generation += 1
             self.entries.clear()
+            self.requested.clear()
 
     def peek(self, key):
         with self.lock:
@@ -86,14 +89,16 @@ class ReadSnapshots:
             self.entries[key] = (self.clock(), value, revision)
             self.entries.move_to_end(key)
             while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
-                self.entries.popitem(last=False)
+                evicted, _ = self.entries.popitem(last=False)
+                if not any(flight[1] == evicted for flight in self.flights):
+                    self.requested.pop(evicted, None)
 
     def retain(self, key, value, generation):
         with self.lock:
             if generation == self.generation and key not in self.entries:
                 self._store(key, value, None)
 
-    def _build(self, key, generation, build, revision):
+    def _build(self, key, generation, build, revision, ticket):
         from .request_timing import _current
         cpu = thread_time()
         try:
@@ -103,11 +108,18 @@ class ReadSnapshots:
             if timing:
                 timing.add("snapshotcpu", thread_time() - cpu)
         with self.lock:
-            if generation == self.generation:
-                self._store(key, value, revision)
+            if generation != self.generation or self.requested.get(key) != ticket:
+                from fastapi import HTTPException
+                raise HTTPException(409, "資料已更新，請重新讀取")
+            self._store(key, value, revision)
         return value
 
-    def get(self, key, build, *, revision=None):
+    def get(self, key, build, *, revision=None, force=False, allow_stale=False):
+        """Await the requested revision; stale is opt-in for an initial paint only.
+
+        Force skips a settled entry but joins an active build of the same revision.
+        A newer request/invalidation fences both publication and delayed responses.
+        """
         with self.lock:
             generation = self.generation
             flight_key = (generation, key, revision)
@@ -115,16 +127,21 @@ class ReadSnapshots:
             age = self.clock() - entry[0] if entry else float('inf')
             if entry and entry[2] != revision:
                 age = max(age, self.fresh)
-            if age < self.fresh:
+            if age < self.fresh and not force:
                 return entry[1], 'hit'
             flight = self.flights.get(flight_key)
             if flight is None:
-                flight = self.executor.submit(copy_context().run, self._build, key, generation, build, revision)
+                self.sequence += 1
+                ticket = self.sequence
+                self.requested[key] = ticket
+                flight = self.executor.submit(copy_context().run, self._build, key, generation, build, revision, ticket)
                 self.flights[flight_key] = flight
                 def done(future):
                     with self.lock:
                         self.flights.pop(flight_key, None)
-                    if future.exception():
+                        if key not in self.entries and self.requested.get(key) == ticket:
+                            self.requested.pop(key, None)
+                    if not future.cancelled() and future.exception():
                         logging.getLogger(__name__).warning('read_snapshot_refresh_failed', exc_info=future.exception())
                 # Register outside the lock: already-complete futures invoke callbacks inline.
                 register = True
@@ -132,7 +149,7 @@ class ReadSnapshots:
                 register = False
         if register:
             flight.add_done_callback(done)
-        if entry and age < self.stale:
+        if allow_stale and not force and entry and age < self.stale:
             return entry[1], 'stale'
         return flight.result(), 'miss'
 
