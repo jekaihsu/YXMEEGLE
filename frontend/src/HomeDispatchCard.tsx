@@ -20,7 +20,7 @@ export function HomeDispatchFrame({from,read}:{from:string;read:DispatchRead}) {
    <div className="home-dispatch-source" role={failed?'alert':'status'}>{loading?<Skeleton lines={3}/>:<>
     {read.loading&&<p>更新中</p>}
     <p>{failed?'派工資料讀取失敗。'+(display.counts?'已保留上次成功資料，數字為上次快照。':'目前無法核實預排，未以零代替。'):display.kind==='forbidden'?'沒有派工資料的檢視權限。':display.kind==='empty'?display.message:stale?'上次成功快照，資料待更新。':'依本週已載入預排，資格與出勤仍待核對。'}</p>
-    {board&&<><p>最後預排日期 · {board.source.latest_booking_date??'來源未提供'}{stale&&` · ${board.source.quality.age_seconds!==null?`${Math.floor(board.source.quality.age_seconds/60)} 分鐘前`:snapshotAge(board.source.fetched_at,now)}`}</p>{board.gaps.filter(g=>g.code!=='no_capability_source').map((gap,index)=><p key={index}>{gap.message}</p>)}</>}
+    {board&&<><p>資料時間 {board.source.fetched_at??'來源未提供'}</p><p>最後預排日期 · {board.source.latest_booking_date??'來源未提供'}{stale&&` · ${board.source.quality.age_seconds!==null?`${Math.floor(board.source.quality.age_seconds/60)} 分鐘前`:snapshotAge(board.source.fetched_at,now)}`}</p>{board.gaps.filter(g=>g.code!=='no_capability_source').map((gap,index)=><p key={index}>{gap.message}</p>)}</>}
    </>}</div>
    <Button disabled={read.loading} onClick={read.reload}>{read.loading?'讀取中…':failed?'重試':'重新讀取'}</Button>
   </div>

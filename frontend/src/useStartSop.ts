@@ -1,3 +1,4 @@
+import {SessionCache} from './sessionCache';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {PageData} from './pageData';
 import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
@@ -5,7 +6,7 @@ import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
 import {canConfirmSop, fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
-const cache=new Map<string,SopPreview>();
+const cache=new SessionCache<string,SopPreview>();
 export function prefetchStartSop(id:string,force:boolean|symbol=false,owner?:PageData){
  return readCase(owner,`start:${id}`,force,current=>fetchSop(id,current)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
