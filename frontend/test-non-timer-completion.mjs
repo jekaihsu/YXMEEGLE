@@ -22,9 +22,16 @@ function Board(){read=m.useDispatchBoardRead('2026-07-27');return React.createEl
 const idle=async(label)=>{const count=calls.length;await flush(()=>clock.advance(600000));assert.equal(calls.length,count,`${label}: no requests after ten minutes`)};
 try{
  for(const state of ['partial','stale','offline']){
-  await mount(null);const board=structuredClone(variants.loaded);board.window={from:'2026-07-27',to:'2026-08-02',tz:'Asia/Taipei'};board.source.quality.states=[state==='offline'?'read_failed':state];board.source.quality.reason='refreshing_last_good_snapshot';board.source.joins={projects:'unavailable'};
+  await mount(null);const board=structuredClone(variants.loaded);board.window={from:'2026-07-27',to:'2026-08-02',tz:'Asia/Taipei'};board.source.quality.states=[state==='offline'?'read_failed':state];board.source.quality.reason='refreshing_last_good_snapshot';board.source.joins={...board.source.joins,cases:'unavailable'};
   globalThis.fetch=async(url)=>{calls.push(url);return state==='offline'?json({detail:'offline'},503):json(board)};
-  await mount(React.createElement(Board));await idle(`dispatch ${state}`);const count=calls.length;await click('重試');assert.equal(calls.length,count+1);
+  const opened=calls.length;await mount(React.createElement(Board));assert.equal(calls.length,opened+1);
+  if(state!=='offline')assert.equal(read.data.source.joins.cases,'unavailable');
+  // Replay the eight passive observation gaps from staging NETWORK.md.
+  // No interaction: unavailable joins / refreshing-last-good must stay pinned.
+  for(const gap of [1562,1789,1719,1650,1967,1656,1593,1626]){
+   await flush(()=>clock.advance(gap));assert.equal(calls.length,opened+1,`dispatch ${state}: no passive burst GET`);
+  }
+  await idle(`dispatch ${state}`);const count=calls.length;await click('重試');assert.equal(calls.length,count+1);
  }
  await mount(null);
  const c={w:{...workspace,scope:'shell'},s:{user:a,mode:'lark',workspace_id:'test'},route:{view:'projects'},refresh:async()=>{},go(){},run(){}};

@@ -71,30 +71,25 @@ test('F4 cold HTTP 200 read_failed board is displayed',async()=>{
  try{await act(async()=>root.render(React.createElement(ui.DispatchBoard)));assert.equal(document.querySelector('.db-kpi strong').textContent,'6');assert.equal(document.body.textContent.includes('已保留上次成功資料。'),true)}
  finally{await act(async()=>root.unmount());dom.window.close()}
 });
-test('F7 polling ignores stable partial joins, continues pending joins, caps time and cancels switches',async()=>{
+test('F7 pending joins never repeat the staging passive eight-GET burst',async()=>{
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
  for(const name of ['window','document','Event','HTMLElement','Element','Node'])globalThis[name]=dom.window[name];
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
- const realSet=globalThis.setTimeout,realClear=globalThis.clearTimeout,realNow=Date.now;
- let now=100000,timers=new Map(),serial=0,calls=0,pending=false;
- Date.now=()=>now;
- globalThis.setTimeout=(fn,ms,...args)=>{if(ms===1500){const id=++serial;timers.set(id,fn);return id}return realSet(fn,ms,...args)};
- globalThis.clearTimeout=id=>{if(timers.has(id))timers.delete(id);else realClear(id)};
+ const {fakeClock}=await import('./fake-clock-fixture.mjs');const clock=fakeClock(window);
+ let calls=0,pending=false;
  globalThis.fetch=async url=>{calls++;const query=new URL(url,'http://localhost').searchParams;return new Response(JSON.stringify({...variants.loaded,window:{from:query.get('from'),to:query.get('to'),tz:'Asia/Taipei'},source:{...variants.loaded.source,joins:{people:pending?'unavailable':'ok',instruments:'ok',vehicles:'ok',cases:'partial'},quality:{states:['partial']}}}),{status:200})};
  const root=createRoot(document.getElementById('root'));ui.invalidateSessionEpoch();
  const click=async label=>act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label||b.getAttribute('aria-label')===label).click());
- const tick=async()=>{const [id,fn]=timers.entries().next().value;timers.delete(id);now+=1500;await act(async()=>fn())};
  try{
-  await act(async()=>root.render(React.createElement(ui.DispatchBoard)));
-  assert.equal(timers.size,0);
-  pending=true;await click('重新讀取');
-  for(let i=0;i<4;i++)await tick();
-  assert.equal(timers.size,1);
-  assert.equal(calls,6);
-  now+=30000;await tick();assert.equal(timers.size,0);
-  await click('上一週');assert.equal(timers.size,1);
-  pending=false;await click('下一週');assert.equal(timers.size,0);
-  pending=true;await click('重新讀取');assert.equal(timers.size,1);
-  ui.invalidateSessionEpoch();pending=false;await act(async()=>root.render(React.createElement(ui.DispatchBoard)));assert.equal(timers.size,0);
- }finally{await act(async()=>root.unmount());globalThis.setTimeout=realSet;globalThis.clearTimeout=realClear;Date.now=realNow;dom.window.close()}
+  await act(async()=>root.render(React.createElement(ui.DispatchBoard)));assert.equal(calls,1);
+  pending=true;await click('重新讀取');assert.equal(calls,2);
+  for(const gap of [1562,1789,1719,1650,1967,1656,1593,1626]){
+   await act(async()=>clock.advance(gap));assert.equal(calls,2,'no automatic GET at any staging burst observation');
+  }
+  await act(async()=>clock.advance(600000));assert.equal(calls,2);
+  await click('上一週');assert.equal(calls,3);
+  pending=false;await click('下一週');assert.equal(calls,4);
+  await act(async()=>clock.advance(600000));assert.equal(calls,4);
+  await click('重新讀取');assert.equal(calls,5);
+ }finally{await act(async()=>root.unmount());clock.restore();dom.window.close()}
 });

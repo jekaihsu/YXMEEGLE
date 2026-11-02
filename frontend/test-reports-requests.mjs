@@ -11,7 +11,7 @@ const pending=[];globalThis.fetch=(url,options)=>new Promise(resolve=>pending.pu
 function View({group}){const state=useReport('review',{group});return React.createElement('div',null,state.loading?'loading':state.error||state.data?.value)}
 const root=createRoot(document.getElementById('root'));const render=group=>act(async()=>root.render(React.createElement(View,{group})));const reply=(i,value)=>act(async()=>pending[i].resolve(new Response(JSON.stringify({value}),{status:200})));
 await render('一組');await render('二組');assert.equal(pending[0].options.signal.aborted,true);await reply(1,'current');await reply(0,'old');assert.equal(document.body.textContent,'current');
-await render('一組');await reply(2,'cached one');await render('二組');assert.equal(pending.length,3);assert.equal(document.body.textContent,'current');await render('三組');invalidateSessionEpoch();await reply(3,'wrong session');assert.equal(document.body.textContent,'loading');
+await render('一組');await reply(2,'cached one');await render('二組');assert.equal(pending.length,3);assert.equal(document.body.textContent,'current');await render('三組');await act(async()=>invalidateSessionEpoch());await reply(3,'wrong session');assert.equal(document.body.textContent,'loading');
 await act(async()=>root.unmount());assert.equal(pending[3].options.signal.aborted,true);
 console.log('Reports stale responses, session epoch and unmount cancellation passed.');
 
@@ -57,10 +57,19 @@ try{
   await act(async()=>warmingState.retry());assert.equal(pending.length,count+1,`${group}: explicit retry makes one request`);
   await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'ready'}))));
  }
+ await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'retained'})));
+ const known={value:'last successful',meta:{fetched_at:'2026-11-02T00:00:00Z'}};
+ await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify(known))));
+ await act(async()=>warmingState.retry());assert.deepEqual(warmingState.data,known,'refresh keeps last data while pending');
+ await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'offline'}),{status:503})));
+ assert.equal(warmingState.error,'offline');assert.equal(warmingState.data,undefined);assert.deepEqual(warmingState.previous,known,'Error retains previous data and its timestamp without masking failure in existing tabs');
+ const retainedCount=pending.length;await act(async()=>clock.advance(600000));assert.equal(pending.length,retainedCount);
+ await act(async()=>warmingState.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'recovered'}))));
+ assert.equal(warmingState.data.value,'recovered');assert.equal(warmingState.error,undefined);
  await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'deadline'})));
  const stalled=pending.at(-1);await act(async()=>clock.advance(30000));assert.equal(stalled.options.signal.aborted,true);
  await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'session'})));
- const old=pending.at(-1);invalidateSessionEpoch();assert.equal(old.options.signal.aborted,true);
+ const old=pending.at(-1);await act(async()=>invalidateSessionEpoch());assert.equal(old.options.signal.aborted,true);
  await act(async()=>warmingRoot.unmount());
 }finally{clock.restore()}
 console.log('Report warming/202/offline/partial: ten minutes = zero requests; explicit retry = one; deadline and session abort original fetch.');

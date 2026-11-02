@@ -7,6 +7,10 @@ import ts from 'typescript';
 // These whole-file digests freeze the audited legacy sites, including indirect
 // callbacks. Migrations remove entries; changed survivors require a fresh audit.
 const legacy={
+ // C: migrated dispatch retry site has no exemption. These surviving sites
+ // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
+ 'ProjectsList.tsx': 'd2c97b8ef41d35fcfbb462967052a432dad4a69d8b28bc83a7ae8d7b3df145fb',
+ 'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
@@ -25,7 +29,7 @@ const legacy={
  'design/index.tsx': '0d15d44f66c4d3d7828a09a27d27137b97d20fae59243a2cbf9bd161a8210578',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1ea9ce7f21dc6d857980f948500c32c4f01fe550df11a7734d6ff966710e91d4',
- 'reports/ProgressTab.tsx': '8bae1f3474fe711237a719126a3bc6f578811905c2fce899f116e6ec40cb0220',
+ 'reports/ProgressTab.tsx': '5279cd42916dda306ef7a9a5f7d76183a96558f37f98e4658d85099306c8376a',
  "UnifiedHome.tsx": "4d5cf0321336c4b5588f607c664632afe62b9a2a53ed2bb3af4b13dc409f1894",
  "AssigneePicker.tsx": "2f3f8a6e8081097da460588d7957851de7e4b7bc84091a76da4af69569b16489",
  "App.tsx": "5bc89a2fd0f97dc04834c71d1870ed9ba0302a2910ff93c9518a1b157644192a",
@@ -52,7 +56,7 @@ const legacy={
  "reloadGuard.ts": "1983950556280811e13d243bfcba34e97ce91814745e222e234e34f458750f0e",
  "assistant/ProjectChatLauncher.tsx": "df78000709295f98a73c8dc2f1f2a3dd078910e9cb830671fb0243e1151dcfde",
  "reports/ContactsTab.tsx": "9a7d005c955c51c0492c185a51c77e23237661c5dc582ead8717debdd3d800ff",
- "reports/useReport.ts": "940544793d277eee68475057c3094f4fce0c2a9db78a5630a2853678e8937c42"
+ "reports/useReport.ts": "5eb0692208f2e474609abc0a2e64ef2120ae08c928a6dc97aa917254220ab6c8"
 };
 export function triggers(source){
  const tree=ts.createSourceFile('source.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

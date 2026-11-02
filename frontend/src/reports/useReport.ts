@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {ApiError,getSessionEpoch,onSessionEpochChange} from '../api';
 import {query} from './reportsView';
 import type {FetchIntent} from '../pageData';
@@ -47,8 +47,10 @@ async function readReport<T>(url:string,signal:AbortSignal,current:()=>boolean,i
 }
 export function useReport<T>(endpoint:string,params:Query){
  const key=query(Object.fromEntries(Object.entries(params).sort(([a],[b])=>a.localeCompare(b))));const sequence=useRef(0);const [reload,setReload]=useState(0);
- const [state,setState]=useState<{key:string; data?:T; error?:string; warming?:boolean; loading:boolean}>({key:'',loading:true});
- useEffect(()=>{const controller=new AbortController();const seq=++sequence.current;const epoch=getSessionEpoch();const cacheKey=`${epoch}:${location.search}:${endpoint}?${key}`;const cached=cache.get(cacheKey);if(cached&&Date.now()-cached.at<60000&&reload===0){setState({key,data:cached.data as T,loading:false});return()=>controller.abort()} const current=()=>!controller.signal.aborted&&seq===sequence.current&&epoch===getSessionEpoch();setState({key,loading:true});
+ const epoch=useSyncExternalStore(onSessionEpochChange,getSessionEpoch,getSessionEpoch);
+ const resourceKey=`${epoch}:${location.search}:${endpoint}?${key}`;
+ const [state,setState]=useState<{key:string; data?:T; previous?:T; error?:string; warming?:boolean; loading:boolean}>({key:'',loading:true});
+ useEffect(()=>{const controller=new AbortController();const seq=++sequence.current;const cacheKey=resourceKey;const cached=cache.get(cacheKey);if(cached&&Date.now()-cached.at<60000&&reload===0){setState({key:resourceKey,data:cached.data as T,loading:false});return()=>controller.abort()} const current=()=>!controller.signal.aborted&&seq===sequence.current&&epoch===getSessionEpoch();setState(previous=>({key:resourceKey,data:previous.key===resourceKey?(previous.data??previous.previous):undefined,loading:true}));
  const load=async(signal:AbortSignal,active:()=>boolean)=>{if(new URLSearchParams(location.search).get('mock')==='1'){const {mockReport}=await import('./mock');return mockReport(endpoint,new URLSearchParams(key))}return readReport<T>(`/api/reports/${endpoint}?${key}`,signal,active,reload?{reason:'explicit_refresh',id:String(reload)}:{reason:'initial_open'})};
  let release:(()=>void)|undefined;
  const attempt=async()=>{
@@ -56,17 +58,17 @@ export function useReport<T>(endpoint:string,params:Query){
   try{
    const shared=shareReport(cacheKey,load,current);release=shared.release;
    const data=await shared.promise as T;
-   if(current()){if(cache.size>=256)cache.clear();cache.set(cacheKey,{at:Date.now(),data});setState({key,data,loading:false})}
+   if(current()){if(cache.size>=256)cache.clear();cache.set(cacheKey,{at:Date.now(),data});setState({key:resourceKey,data,loading:false})}
   }catch(e){
    if(!current())return;
-   setState({key,error:e instanceof ReportError&&e.warming?'報表資料尚未就緒，請按重試查看結果。':e instanceof Error?e.message:'暫時無法讀取報表',loading:false});
+   setState(previous=>({key:resourceKey,previous:previous.key===resourceKey?(previous.data??previous.previous):undefined,error:e instanceof ReportError&&e.warming?'報表資料尚未就緒，請按重試查看結果。':e instanceof Error?e.message:'暫時無法讀取報表',loading:false}));
   }finally{release?.();release=undefined}
  };
  void attempt();
  return()=>{controller.abort();release?.()};
 
- },[endpoint,key,reload]);
- return {...(state.key===key?state:{key,loading:true}),retry:()=>setReload(v=>v+1)};
+ },[endpoint,key,reload,resourceKey,epoch]);
+ return {...(state.key===resourceKey?state:{key:resourceKey,loading:true}),retry:()=>setReload(v=>v+1)};
 }
 
 export function useReportSearch(onApply:()=>void){
