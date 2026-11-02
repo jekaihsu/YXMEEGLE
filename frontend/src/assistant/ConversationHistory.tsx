@@ -54,14 +54,14 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   try{await work(controller.signal)}catch{if(!controller.signal.aborted){setActionError('操作未完成，請重試。');setRetry(()=>again)}}finally{if(!controller.signal.aborted)setBusy(false)}
  },[]);
  const open=(conversationId:string)=>void perform(async signal=>{
-  const detail=await openConversation(conversationId,signal);if(signal.aborted)return;
+  const detail=await openConversation(conversationId,signal,projectId);if(signal.aborted)return;
   if(detail.scope!==scope.scope||(projectId&&detail.project_id!==projectId))throw new Error('scope');
   onOpen(detail);setConfirm(undefined);if(overlay)close();
  },()=>open(conversationId));
  const remove=(conversationId:string)=>void perform(async signal=>{
   if(activeId===conversationId)await beforeDelete?.();
   if(signal.aborted)return;
-  await deleteConversation(conversationId,signal);if(signal.aborted)return;
+  await deleteConversation(conversationId,signal,projectId);if(signal.aborted)return;
   if(state.status==='ready'){const ids=state.page.items.map(item=>item.id),index=ids.indexOf(conversationId);focusAfterDelete.current=ids[index+1]||ids[index-1]||''}
   setState(previous=>previous.status==='ready'?{status:'ready',page:{...previous.page,items:previous.page.items.filter(item=>item.id!==conversationId)}}:previous);
   setConfirm(undefined);if(activeId===conversationId)onNew();setAttempt(n=>n+1);

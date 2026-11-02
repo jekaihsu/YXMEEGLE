@@ -1,10 +1,10 @@
 // Ported from assistant-ui thread.aui and message-pair (MIT). See elements/LICENSE.assistant-ui.
-import {createContext,useContext,useCallback,useEffect,useMemo,useRef,useState,type ReactNode,type MutableRefObject} from 'react';
+import {createContext,useContext,useSyncExternalStore,useCallback,useEffect,useMemo,useRef,useState,type ReactNode,type MutableRefObject} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
 import {useInputModality} from './useInputModality';
 import {ConversationHistory} from './ConversationHistory';
-import {historyMessages,type ConversationDetail} from './history';
+import {historyMessages,assistantScopeVersion,subscribeAssistantScope,denyAssistantScope,type ConversationDetail} from './history';
 import {assistantRemarkPlugins} from './markdown';
 import {Button} from '../design';
 import {api,ApiError} from '../api';
@@ -137,7 +137,13 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact,se
 export type AssistantChatProps={projectId?:string;projectLabel?:string;compact?:boolean;catalog?:ModelCatalog};
 const projectSuggestions=['進度如何？','卡在哪裡？','誰負責？','下一步是什麼？','最近有什麼變更？'];
 export function AssistantChat(props:AssistantChatProps){
- return <AssistantChatWorkspace key={props.projectId||'global'} {...props}/>;
+ return <AuthorizedWorkspace key={props.projectId||'global'} {...props}/>;
+}
+function AuthorizedWorkspace(props:AssistantChatProps){
+ const version=useSyncExternalStore(subscribeAssistantScope,()=>assistantScopeVersion(props.projectId));
+ const [openedVersion]=useState(version);
+ if(version!==openedVersion)return <div className="assistant-chat"><p role="alert">{errorText('ai_forbidden')}</p></div>;
+ return <AssistantChatWorkspace {...props}/>;
 }
 function AssistantChatWorkspace(props:AssistantChatProps){
  const [selected,setSelected]=useState<{id:string;detail?:ConversationDetail}>(()=>({id:crypto.randomUUID()}));
@@ -152,7 +158,7 @@ function AssistantChatWorkspace(props:AssistantChatProps){
   api<ModelCatalog>('/api/ai/models',{signal:controller.signal}).then(data=>{
    if(controller.signal.aborted)return;
    setCatalog(data);
-  }).catch(error=>{if(!controller.signal.aborted)setError(error instanceof ApiError&&(error.status===403&&error.code==='ai_forbidden')?'forbidden':'load')});
+  }).catch(error=>{if(!controller.signal.aborted){const denied=error instanceof ApiError&&error.status===403;if(denied)denyAssistantScope(props.projectId);setError(denied?'forbidden':'load')}});
   return()=>controller.abort();
  },[attempt,props.catalog]);
  if(!catalog)return <div className="assistant-chat">{error

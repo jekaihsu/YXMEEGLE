@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export {ConversationHistory} from './src/assistant/ConversationHistory';export * from './src/assistant/history';export {AssistantChat} from './src/assistant/AssistantChat';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ConversationHistory} from './src/assistant/ConversationHistory';export * from './src/assistant/history';export {invalidateSessionEpoch} from './src/api';export {AssistantChat} from './src/assistant/AssistantChat';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
 const file=new URL('./.history-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
 let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
@@ -129,5 +129,18 @@ try{
  assert.match(document.body.textContent,/案件進度/);
 }finally{clock.restore()}
 globalThis.fetch=server;
+mode='ready';deleted=false;await mount();
+await flush(()=>document.querySelector('.assistant-history-open').click());
+assert.match(document.body.textContent,/控制測量進行中/);
+await flush(()=>ui.invalidateSessionEpoch());
+assert.doesNotMatch(document.body.textContent,/控制測量進行中|案件進度/,'epoch discards transcript and history titles');
+assert.equal(document.querySelector('textarea'),null,'epoch discards composer and transient draft');
+assert.match(document.body.textContent,/沒有權限/);
+await mount();
+await flush(()=>document.querySelector('.assistant-history-open').click());
+globalThis.fetch=async(url,init)=>url.includes('/chat%2Fa')?json({code:'ai_forbidden'},403):server(url,init);
+await flush(()=>document.querySelector('.assistant-history-open').click());
+assert.doesNotMatch(document.body.textContent,/控制測量進行中|案件進度/,'denial discards every cache in scope');
+assert.match(document.body.textContent,/沒有權限/);
 await flush(()=>root.unmount());dom.window.close();
 console.log('History passed. List, project/cursor encoding, open, text seeding, reused UUID, continuation payload, completion refresh, 204 delete, inline cancel, empty, unavailable, error, retry, loading, pagination and stale-open cancellation.');

@@ -1,5 +1,6 @@
 import type {ChatModelAdapter,ThreadAssistantMessagePart,ToolCallMessagePart} from '@assistant-ui/react';
 import {getSessionEpoch} from '../api';
+import {assistantScopeVersion,denyAssistantScope} from './history';
 import {readEvents} from './stream';
 export type ModelId='claude'|'gpt';
 export const ERROR_TEXT:Record<string,string>={
@@ -16,7 +17,8 @@ export const ERROR_TEXT:Record<string,string>={
 export const errorText=(code:string)=>ERROR_TEXT[code]||ERROR_TEXT.ai_upstream;
 export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=()=>{},projectId?:string,onComplete:()=>void=()=>{}):ChatModelAdapter {
  return {async *run({messages,abortSignal,context}){
-  const epoch=getSessionEpoch();
+  const epoch=getSessionEpoch(),version=assistantScopeVersion(projectId);
+  const current=()=>epoch===getSessionEpoch()&&version===assistantScopeVersion(projectId)&&!abortSignal.aborted;
   const content:ThreadAssistantMessagePart[]=[];
   let usageId:string|undefined;
   let forbidden=false;
@@ -30,12 +32,14 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
    const recent=history.slice(-20).map(m=>({...m,content:m.role==='assistant'?m.content.slice(0,20000):m.content}));
    if(recent[0]?.role==='assistant')recent.shift();
    const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:context.config?.modelName==='gpt'?'gpt':'claude',conversation_id:conversation(),messages:recent,...(projectId?{project_id:projectId}:{})})});
+   if(!current())throw new DOMException('Assistant scope changed','AbortError');
    if(response.status===401){if(epoch===getSessionEpoch()&&!abortSignal.aborted)window.dispatchEvent(new Event('yx:session-expired'));throw new Error('session_expired')}
-   if(!response.ok){const data=await response.json().catch(()=>({}));forbidden=response.status===403&&data.code==='ai_forbidden';throw new Error(data.code||'ai_upstream')}
+   if(!response.ok){const data=await response.json().catch(()=>({}));forbidden=response.status===403;throw new Error(forbidden?'ai_forbidden':data.code||'ai_upstream')}
    if(!response.body)throw new Error('network');
    for await(const event of readEvents(response.body,abortSignal)){
+    if(!current())throw new DOMException('Assistant scope changed','AbortError');
     if(event.type==='start')usageId=event.usage_id;
-    if(event.type==='error'){errorDetail=event.detail;throw new Error(event.code)}
+    if(event.type==='error'){forbidden=event.code==='ai_forbidden';errorDetail=event.detail;throw new Error(event.code)}
     if(event.type==='done'){onComplete();yield {metadata:metadata(),content:[...content],status:{type:'complete',reason:'stop'}};return}
     if(event.type==='text'){
      const last=content.at(-1);
@@ -51,9 +55,9 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
    }
    throw new Error('network');
   }catch(error){
-   if(abortSignal.aborted)throw error;
+   if(!current())throw error;
    const code=error instanceof Error?error.message:'network';
-   if(forbidden)onForbidden();
+   if(forbidden){content.length=0;denyAssistantScope(projectId);onForbidden()}
    yield {metadata:metadata(),content:[...content],status:{type:'incomplete',reason:'error',error:errorText(code in ERROR_TEXT?code:error instanceof TypeError?'network':'ai_upstream')}};
   }
  }};
