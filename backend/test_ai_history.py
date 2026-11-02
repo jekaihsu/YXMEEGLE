@@ -245,3 +245,25 @@ def test_cleanup_grace_protects_recent_and_legacy_worker_rows(app, monkeypatch):
         assert db.get(ledger.AiConversationGeneration, idle) is None
         assert db.get(ledger.AiConversationGeneration, recent).active_runs == 0
         assert db.get(ledger.AiConversationGeneration, legacy).generation == 2
+
+
+def test_populated_history_api_bound_without_provider(app, client):
+    from .test_ai_history_queries import seed_turn
+    session = client.get('/api/session').json()
+    workspace = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    actor = session['user']['id']
+    class ForbiddenProvider:
+        def stream(self, *args, **kwargs):
+            raise AssertionError('history must never call a provider')
+    app.state.ai_providers = {'claude': ForbiddenProvider(), 'gpt': ForbiddenProvider()}
+    for i in range(101):
+        seed_turn(app.state.sessions, f'history-{i:03}', f'history-{i:03}', workspace=workspace, actor=actor)
+    response = client.get('/api/ai/conversations?limit=100')
+    assert response.status_code == 200
+    assert response.headers['cache-control'] == 'no-store'
+    page = response.json()
+    assert len(page['items']) == 100 and page['next_cursor']
+    rest = client.get('/api/ai/conversations', params={'limit':100, 'before':page['next_cursor']}).json()
+    assert len(rest['items']) == 1 and rest['next_cursor'] is None
+    assert client.get('/api/ai/conversations?limit=101').status_code == 422
+    assert client.get('/api/ai/conversations?limit=0').status_code == 422
