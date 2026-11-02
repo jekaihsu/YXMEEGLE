@@ -811,7 +811,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                             # A cold or failed Lark overlay must not be pinned for the snapshot window.
                             return EncodedSnapshot.encode(JSONResponse(result).body, volatile=bool(result.get('node_status_degraded')))
                     with phase(request, 'snapshot'):
-                        generation = read_snapshots.generation
+                        generation = read_snapshots.fence(data['wid'])
                         if snapshot:
                             body = read_snapshots.peek(('portfolio-version', key, snapshot))
                             require(body is not None, '案件清單已更新，請重新讀取。', 409)
@@ -820,7 +820,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                             body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
                     if page:
                         version_body = body
-                        read_snapshots.retain(('portfolio-version', key, body.etag), body, generation)
+                        read_snapshots.retain(('portfolio-version', key, body.etag), body, generation, workspace=data['wid'])
                         # Pages share the same authority-checked portfolio capture.
                         # Cache their wire bytes as well; no re-projection per page.
                         def build_page():
@@ -1967,9 +1967,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
         try:
             return first_screen_read(request, project_id, accept_stale=False)
         except SnapshotRevisionChanged:
-            return first_screen_read(request, project_id, accept_stale=True)
+            try:
+                return first_screen_read(request, project_id, accept_stale=True)
+            except SnapshotRevisionChanged:
+                # A retry may have joined another tab's strict capture. Bound the
+                # fallback and avoid sharing its creator's accept_stale policy.
+                return first_screen_read(request, project_id, accept_stale=True, shared=False)
 
-    def first_screen_read(request, project_id, *, accept_stale):
+    def first_screen_read(request, project_id, *, accept_stale, shared=True):
         from .snapshot_contract import SnapshotRevisionChanged
         from .read_snapshots import capture
         from .snapshot_contract import attach_first_screen, explicit_refresh
@@ -2045,7 +2050,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
             finally:
                 capture.reset(token)
         with phase(request, 'snapshot'):
-            body, status = read_snapshots.get(key, build, revision=version, force=explicit_refresh(request), allow_stale=False)
+            if shared:
+                body, status = read_snapshots.get(key, build, revision=version, force=explicit_refresh(request), allow_stale=False)
+            else:
+                body, status = build(), 'stale'
         current = verify_generation()
         if not current or status == 'stale':
             result = json.loads(body.body)
