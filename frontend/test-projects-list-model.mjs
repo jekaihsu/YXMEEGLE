@@ -46,3 +46,10 @@ assert.deepEqual(m.readPins(storage,m.pinStorageKey('w','other')),[]);assert.dee
 store.set(key,'broken');assert.deepEqual(m.readPins(storage,key),[]);store.set(key,'[1,"a",null]');assert.deepEqual(m.readPins(storage,key),['a']);
 assert.equal(m.writePins({setItem(){throw Error('quota')}},key,['a']),false);
 console.log('PASS projects list model. Current node, all-done, unstarted, unknown, skip, review, exclusive precedence, KPI reconciliation, combined filters and scoped pin persistence.');
+
+// LC/L6: KPI spans all non-completed SOP cases; exclusive sections hide
+// owned and pinned SOP rows in their higher-precedence sections.
+const lcRows=[owned,sop,imported],lcPins=new Set(['imported']);
+assert.equal(m.portfolioCounts(lcRows).sop,3);
+assert.equal(m.groupRows(lcRows,lcPins).find(g=>g.key==='sop').rows.length,1);
+assert.deepEqual(lcRows.map(r=>m.groupKey(r,lcPins)),['mine','sop','pinned']);
