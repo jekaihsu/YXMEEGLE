@@ -14,7 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from starlette.concurrency import run_in_threadpool
 
 from . import ledger
-from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun
+from .history_authorization import HistoryDenied, require_case, visible_cases
+from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun, sse
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
 from .project_context import ProjectContextCache, ContextUnavailable
@@ -78,10 +79,26 @@ class PendingRun:
 
 
 class ChatResponse(StreamingResponse):
-    def __init__(self, run):
+    def __init__(self, run, authorize):
         self.run = run
-        super().__init__(run.stream(), media_type='text/event-stream',
+        self.authorize = authorize
+        super().__init__(self.authorized_stream(), media_type='text/event-stream',
                          headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
+
+    async def authorized_stream(self):
+        stream = self.run.stream()
+        try:
+            async for event in stream:
+                try:
+                    await run_in_threadpool(self.authorize)
+                except HTTPException:
+                    await stream.aclose()
+                    self.run.status, self.run.error_code = 'error', 'ai_forbidden'
+                    yield sse(dict(type='error', code='ai_forbidden', message='找不到或沒有權限查看這個案件'))
+                    return
+                yield event
+        finally:
+            await stream.aclose()
 
     async def __call__(self, scope, receive, send):
         try:
@@ -118,7 +135,22 @@ def register(app, *, identity, sessions, cfg):
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
     def authenticated(request: Request):
-        return identity(request)
+        try:
+            return identity(request)
+        except HTTPException as exc:
+            if exc.status_code == 403:
+                raise HistoryDenied() from None
+            raise
+
+    @app.exception_handler(HistoryDenied)
+    async def history_denied(request, exc):
+        return JSONResponse({'code': 'ai_forbidden', 'message': exc.detail}, status_code=403,
+                            headers={'Cache-Control': 'no-store'})
+
+    def authorize_scopes(workspace_id, scopes):
+        projects = {project for scope, project in scopes if scope == 'project'}
+        if projects and not projects.issubset(visible_cases(sessions, workspace_id)):
+            raise HistoryDenied()
 
     @app.get('/api/ai/models')
     def get_models(auth=Depends(authenticated)):
@@ -134,7 +166,11 @@ def register(app, *, identity, sessions, cfg):
                            auth=Depends(authenticated)):
         data, user = auth
         try:
-            result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before, **history_options())
+            allowed = visible_cases(sessions, data['wid']) if scope == 'project' else None
+            if allowed is not None and project_id is not None and project_id not in allowed:
+                raise HistoryDenied()
+            result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before,
+                                          allowed_project_ids=allowed, **history_options())
         except ValueError:
             raise HTTPException(422, '分頁游標錯誤') from None
         return JSONResponse(result, headers={'Cache-Control': 'no-store'})
@@ -142,6 +178,8 @@ def register(app, *, identity, sessions, cfg):
     @app.get('/api/ai/conversations/{conversation_id}')
     def get_conversation(conversation_id: str, auth=Depends(authenticated)):
         data, user = auth
+        scopes = ledger.conversation_scopes(sessions, data['wid'], user['id'], conversation_id)
+        authorize_scopes(data['wid'], scopes)
         result = ledger.conversation(sessions, data['wid'], user['id'], conversation_id, **history_options())
         if result is None:
             raise HTTPException(404, '找不到對話')
@@ -156,9 +194,12 @@ def register(app, *, identity, sessions, cfg):
     @app.post('/api/ai/chat')
     async def chat(request: Request, body: ChatRequest, auth=Depends(authenticated)):
         data, user = auth
-        existing = await run_in_threadpool(ledger.conversation_scope, sessions, data['wid'], user['id'], body.conversation_id)
-        if existing is not None and existing != ('project' if body.project_id else 'global', body.project_id):
+        existing = await run_in_threadpool(ledger.conversation_scopes, sessions, data['wid'], user['id'], body.conversation_id)
+        await run_in_threadpool(authorize_scopes, data['wid'], existing)
+        if any(scope != ('project' if body.project_id else 'global', body.project_id) for scope in existing):
             raise HTTPException(422, '對話範圍不可變更')
+        if body.project_id is not None:
+            await run_in_threadpool(require_case, sessions, data['wid'], body.project_id)
         adapter = app.state.ai_providers.get(body.model)
         if adapter is None:
             return JSONResponse({'code': 'ai_unconfigured', 'message': '此模型尚未設定金鑰'}, status_code=503)
@@ -218,7 +259,14 @@ def register(app, *, identity, sessions, cfg):
 
         run.recorded = recorded
         run.cookie = request.headers.get('cookie', '')
-        return ChatResponse(run)
+        def authorize():
+            current_data, current_user = identity(request)
+            if (current_data['wid'], current_user['id']) != key:
+                raise HistoryDenied()
+            if body.project_id is not None:
+                require_case(sessions, current_data['wid'], body.project_id)
+
+        return ChatResponse(run, authorize)
 
     @app.post('/api/ai/feedback')
     async def feedback(body: FeedbackRequest, auth=Depends(authenticated)):

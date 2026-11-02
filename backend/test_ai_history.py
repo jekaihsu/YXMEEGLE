@@ -267,3 +267,77 @@ def test_populated_history_api_bound_without_provider(app, client):
     assert len(rest['items']) == 1 and rest['next_cursor'] is None
     assert client.get('/api/ai/conversations?limit=101').status_code == 422
     assert client.get('/api/ai/conversations?limit=0').status_code == 422
+
+
+def test_revoke_access_then_resume(app, client):
+    """Retained content and warm contexts never substitute for current authority."""
+    from .test_ai_project import project
+    from .test_ai_api import wid
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    from .test_ai_history_queries import seed_turn
+    pid = project(client)
+    actor = client.get('/api/session').json()['user']['id']
+    workspace = wid(app, client)
+    seed_turn(app.state.sessions, 'case-turn', 'case-chat', workspace=workspace, actor=actor,
+              scope='project', project=pid, question='Secret case title')
+    ask(app, client, 'global-chat')
+    assert client.get('/api/ai/conversations/case-chat').status_code == 200
+    with app.state.sessions.begin() as db:
+        root = db.get(WorkspaceRow, workspace)
+        state = storage.load(db, BusinessRow, root)
+        next(p for p in state['projects'] if p['id'] == pid)['planning_origin'] = 'local'
+        root.data = storage.save(db, BusinessRow, workspace, state)
+    page = client.get('/api/ai/conversations', params={'scope':'project'}).json()
+    assert page['items'] == []
+    denied_page = client.get('/api/ai/conversations', params={'scope':'project','project_id':pid})
+    assert denied_page.status_code == 403 and denied_page.json()['code'] == 'ai_forbidden'
+    response = client.get('/api/ai/conversations/case-chat')
+    assert response.status_code == 403
+    assert response.json()['code'] == 'ai_forbidden'
+    response = client.post('/api/ai/chat', json={**BODY, 'conversation_id':'case-chat', 'project_id':pid})
+    assert response.status_code == 403
+    assert response.json()['code'] == 'ai_forbidden'
+    assert client.get('/api/ai/conversations/global-chat').status_code == 200
+
+
+def test_inflight_case_revocation_blocks_later_events_and_keeps_usage(app, client):
+    from .test_ai_project import project
+    from .test_ai_api import wid
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    pid = project(client)
+    workspace = wid(app, client)
+
+    class Revoking(Fake):
+        async def stream(self, *args):
+            async for event in super().stream(*args):
+                if event.kind == 'text':
+                    with app.state.sessions.begin() as db:
+                        root = db.get(WorkspaceRow, workspace)
+                        state = storage.load(db, BusinessRow, root)
+                        next(p for p in state['projects'] if p['id'] == pid)['planning_origin'] = 'local'
+                        root.data = storage.save(db, BusinessRow, workspace, state)
+                yield event
+
+    app.state.ai_providers = {'claude': Revoking()}
+    result = events(client.post('/api/ai/chat', json={**BODY, 'project_id':pid}))
+    assert [e['type'] for e in result] == ['start', 'error']
+    assert result[-1]['code'] == 'ai_forbidden'
+    with app.state.sessions() as db:
+        row = db.get(AiUsageRow, result[0]['usage_id'])
+        assert row is not None and row.output_tokens > 0
+    assert client.get('/api/ai/conversations/' + BODY['conversation_id']).status_code == 403
+
+
+def test_mixed_scope_conversation_cannot_bypass_case_denial(app, client):
+    """Concurrent first turns/legacy data must not make an arbitrary scope authoritative."""
+    from .test_ai_history_queries import seed_turn
+    from .test_ai_api import wid
+    workspace = wid(app, client)
+    actor = client.get('/api/session').json()['user']['id']
+    seed_turn(app.state.sessions, 'mixed-global', 'mixed', workspace=workspace, actor=actor)
+    seed_turn(app.state.sessions, 'mixed-hidden', 'mixed', workspace=workspace, actor=actor,
+              scope='project', project='not-visible', question='Hidden secret')
+    response = client.get('/api/ai/conversations/mixed')
+    assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
+    response = client.post('/api/ai/chat', json={**BODY, 'conversation_id':'mixed'})
+    assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'

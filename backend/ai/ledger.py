@@ -403,12 +403,12 @@ def ensure_schema(engine):
         index.create(engine, checkfirst=True)
 
 
-def conversation_scope(sessions, workspace_id, actor_id, conversation_id):
+def conversation_scopes(sessions, workspace_id, actor_id, conversation_id):
     with sessions() as db:
-        row = db.execute(select(AiUsageRow.scope, AiUsageRow.project_id).where(
+        rows = db.execute(select(AiUsageRow.scope, AiUsageRow.project_id).where(
             AiUsageRow.workspace_id == workspace_id, AiUsageRow.actor_id == actor_id,
-            AiUsageRow.conversation_id == conversation_id).limit(1)).first()
-        return tuple(row) if row else None
+            AiUsageRow.conversation_id == conversation_id).distinct()).all()
+        return [tuple(row) for row in rows]
 
 
 def history_statement(workspace_id, actor_id, retention_days):
@@ -422,7 +422,7 @@ def conversation_title(question):
     return ' '.join(question.split())[:60]
 
 
-def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days):
+def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days, allowed_project_ids=None):
     import base64
     cursor = None
     if before:
@@ -438,6 +438,8 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
         return result
     u, e = AiUsageRow, AiExchangeRow
     stmt = history_statement(workspace_id, actor_id, retention_days).where(u.scope == scope)
+    if allowed_project_ids is not None:
+        stmt = stmt.where(or_(u.scope == 'global', u.project_id.in_(allowed_project_ids)))
     if project_id is not None:
         stmt = stmt.where(u.project_id == project_id)
     # Rank only retained, authorized exchanges so a deleted/expired first turn
