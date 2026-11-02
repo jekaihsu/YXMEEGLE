@@ -45,6 +45,12 @@ async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=
  root=createRoot(document.getElementById('root'));await act(async()=>{render();await tick()});
 }
 function response(body,status=200){return new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}})}
+async function schedule(){
+ await act(async()=>{c.go({...c.route,tab:'people'});await tick()});
+ const disclosure=document.querySelector('.people-manage');
+ if(disclosure)await act(async()=>{disclosure.open=true;disclosure.dispatchEvent(new Event('toggle'));await tick()});
+ await click(button('排班'));
+}
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 async function more(){const menu=document.querySelector('.pf-more');if(menu&&!menu.open)await act(async()=>{menu.open=true;menu.dispatchEvent(new Event('toggle'));await tick()})}
 const click=async element=>{assert.ok(element,'requested control exists');assert.equal(element.disabled,false,element.textContent);await act(async()=>{element.click();await tick()})};
@@ -99,7 +105,7 @@ await check('round2 one selected node for panel and local operations',async()=>{
 });
 await check('round2 dispatch independent of node writes',async()=>{
  await mount({node:'control',dispatch:true,configure(base,f){f.list.writes_enabled=false;f.list.writes_disabled_reason='節點封鎖';f.list.can.control.create_task=false}});
- assert.equal(button('排班').disabled,false);await click(button('排班'));assert.equal(fieldFor('父義務').value,'recObligation');
+ assert.ok(document.querySelector('a[href*=people]'));await schedule();assert.equal(fieldFor('父義務').value,'recObligation');
 });
 function fieldFor(label){return [...document.querySelectorAll('.dp-field')].find(l=>l.firstElementChild.textContent===label)?.querySelector('input,select')}
 await check('flow omits the source timestamp and duplicate node facts',async()=>{
@@ -193,8 +199,8 @@ await check('legacy direct completion stays enabled when ordinary SOP writes are
  assert.ok(document.querySelector('.assignment-edit textarea'));
 });
 await check('legacy overflow is secondary, closes on select, explains role blocks, and hides when empty',async()=>{
- await mount({enabled:false,node:'node_control'});assert.equal(document.querySelectorAll('.nw-actions>.button.primary').length,1);await more();assert.equal(document.querySelectorAll('.pf-more .primary').length,0);await click(button('指派負責人'));assert.equal(document.querySelector('.pf-more').open,false);assert.ok(document.querySelector('[role=dialog]'));await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
- await mount({enabled:false,node:'node_control',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else';base.project.nodes[4].owner_id='other'}});await more();const assign=button('指派負責人'),complete=button('完成節點');assert.equal(assign.disabled,true);assert.equal(complete.disabled,false);assert.match(document.getElementById(assign.getAttribute('aria-describedby')).textContent,/專案經理或主管/);assert.equal(complete.getAttribute('aria-describedby'),null);
+ await mount({enabled:false,node:'node_control'});assert.equal(document.querySelectorAll('.nw-actions>.button.primary').length,1);await more();assert.equal(document.querySelectorAll('.pf-more .primary').length,0);const link=document.querySelector('.pf-more a[href*=people]');assert.ok(link);assert.equal(link.getAttribute('aria-disabled'),null);assert.equal(document.querySelector('[role=dialog]'),null);
+ await mount({enabled:false,node:'node_control',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else';base.project.nodes[4].owner_id='other'}});await more();const assign=document.querySelector('.pf-more a[href*=people]'),complete=button('完成節點');assert.equal(assign.getAttribute('aria-disabled'),'true');assert.equal(complete.disabled,false);assert.match(document.getElementById(assign.getAttribute('aria-describedby')).textContent,/專案經理或主管/);assert.equal(complete.getAttribute('aria-describedby'),null);
  await mount({enabled:false,node:'node_pricing',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else'}});assert.equal(document.querySelector('.pf-more'),null);
 });
 await check('common blockers appear once while unique task blockers stay in their row',async()=>{
@@ -203,8 +209,8 @@ await check('common blockers appear once while unique task blockers stay in thei
  await mount({enabled:false,tab:'overview',node:'node_control',configure(base){base.project.status='paused'}});assert.equal(document.querySelector('.project-overview').textContent.split('案件暫停中，等待林安娜處理。').length-1,1);
 });
 await check('overflow keyboard Escape and modal cancellation return focus to the live summary',async()=>{
- await mount({enabled:false,node:'node_control'});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await act(async()=>{document.querySelector('[role=dialog]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.activeElement,summary);
- await mount({node:'control'});await more();const remoteSummary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,remoteSummary);
+ await mount({enabled:false,node:'node_control'});const add=button('新增任務');add.focus();await click(add);assert.ok(document.querySelector('[role=dialog]'));await act(async()=>{document.querySelector('[role=dialog]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.activeElement,add,'autofocus modal restores its opener');
+ await mount({node:'control'});await more();const remoteSummary=document.querySelector('.pf-more>summary');assert.ok(document.querySelector('.pf-more a[href*=people]'));assert.equal(button('指派負責人'),undefined);
  await more();button('新增任務').focus();await click(button('新增任務'));await act(async()=>{document.querySelector('.ne-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.ne-form'),null);assert.equal(document.activeElement,remoteSummary);
 });
 await check('empty blocked stages explain the disabled action once inside the empty state',async()=>{
@@ -230,5 +236,24 @@ await check('local SOP node forms return focus to the overflow summary on Escape
  const props={workbench:{local:{key:'control',revision:1,ownerId:'ou_anna'},actions},sop:{assignees:[{id:'ou_anna',name:'林安娜'}],current:()=>true},projectId:'p1'};
  await act(async()=>{root.render(React.createElement(ui.LocalNodeActions,props));await tick()});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,summary);
  await more();button('退回節點').focus();await click(button('退回節點'));await act(async()=>{document.querySelector('.nw-local-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.nw-local-form'),null);assert.equal(document.activeElement,summary);
+});
+await check('flow consolidates claim and assign into one permission-aware people link',async()=>{
+ await mount({node:'control',configure(base,f){f.list.can.control.claim=true;f.list.can.control.assign=true}});await more();
+ assert.equal(document.querySelectorAll('.pf-node-actions a[href*=people]').length,1);assert.equal(button('認領節點'),undefined);assert.equal(button('指派負責人'),undefined);
+ await mount({node:'control',configure(base,f){f.list.writes_enabled=false;f.list.writes_disabled_reason='人員來源核對中'}});await more();
+ const link=document.querySelector('.pf-node-actions a[href*=people]');assert.equal(link.getAttribute('aria-disabled'),'true');assert.match(document.getElementById(link.getAttribute('aria-describedby')).textContent,/人員來源核對中/);
+});
+await check('populated paused overview and flow retain one causal pause reason',async()=>{
+ for(const tab of ['overview','flow']){
+  await mount({enabled:false,tab,node:'node_control',configure(base){base.project.status='paused';base.project.nodes[4].tasks=[{id:'a',title:'暫停工作',status:'pending',owner_id:'ou_anna'}]}});
+  assert.match(document.querySelector('.st-blocker-banner>p').textContent,/案件暫停中/);
+  assert.equal(document.querySelector('.project-detail').textContent.split('案件暫停中，等待林安娜處理。').length-1,1);
+ }
+});
+await check('shared blockers disclose each secondary cause once',async()=>{
+ for(const tab of ['overview','flow'])for(const cause of ['來源案件狀態待核對；未確認前不自動啟用工作','接案尚未轉正式案件','來源標示結案；工作台待核對，不自動重新啟用工作']){
+  await mount({enabled:false,tab,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'a',title:'受阻工作',status:'pending',owner_id:'ou_anna',execution_blockers:['案件已暫停、結案或來源待核對',cause,'尚未排定開始日期']}]}});
+  const banner=document.querySelector('.st-blocker-banner');assert.equal(banner.firstElementChild.textContent,cause);assert.equal(banner.querySelector('details').open,false);assert.ok(banner.querySelector('summary svg'));assert.equal(banner.textContent.split(cause).length-1,1);assert.equal([...document.querySelectorAll('.flow-operations button.primary')].filter(b=>!b.closest('[hidden]')).length,0);
+ }
 });
 await act(async()=>root.unmount());assert.deepEqual(failures,[]);

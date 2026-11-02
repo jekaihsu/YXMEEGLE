@@ -137,3 +137,14 @@ export function stageNextStep({caseStatus,ctx,list,today,fresh,block,crossStageA
  const current=ctx.nodes.find(n=>n.key===ctx.currentIds[0]);
  return {kind:'none',title:current?.state==='待審核'?'等待核准':!current?.owners.length?'等待指派':`等待${current.owners.map(o=>o.name).join('、')}處理`,reasons};
 }
+
+// Causal priority: explicit source/lifecycle gates, execution ownership, generic case
+// summaries, task prerequisites, then scheduling. Unknown reasons retain server order.
+export function primaryBlockerReasons(reasons:string[]):string[] {
+ const rank=(reason:string)=> /來源案件狀態待核對|來源標示結案|案件暫停中/.test(reason)?0
+  : /接案尚未轉正式案件/.test(reason)?1
+  : /執行歸屬|Meegle|暫不可執行/.test(reason)?2
+  : /案件已暫停、結案或來源待核對/.test(reason)?3
+  : /尚未排定開始日期|尚未到排程日期|排程日期無效/.test(reason)?5:4;
+ return uniqueReasons(reasons).sort((a,b)=>rank(a)-rank(b));
+}

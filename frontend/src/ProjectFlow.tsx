@@ -8,7 +8,7 @@ import {withLocalChecklist,buildNodeWorkbench,localCase} from './nodeWorkbenchMo
 import {LocalNodeActions} from './LocalNodeActions';
 import {safeUrl,isProjectLead} from './appCommon';
 import {createPortal} from 'react-dom';
-import {lazy,Suspense,useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Button,Skeleton} from './design';
 import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
@@ -23,7 +23,7 @@ import {resolveStages} from './stageModel';
 import {SopTasks,type SopImportTarget} from './SopTasks';
 import {SopTools} from './SopTools';
 import {useSopTasks,canReadSop} from './useSopTasks';
-const FlowSchedule=lazy(()=>import('./FlowSchedule').then(m=>({default:m.FlowSchedule})));
+
 import {ProductionCard,ProductionPlanFacts} from './FlowEvidence';
 import {isProductionSeedTask,productionPlanFacts,productionPlanGaps} from './productionPlan';
 import {NodeWorkItems} from './NodeWorkItems';
@@ -93,9 +93,10 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
     {read.state.kind!=='ready' && !plan && selected.assignment?.evidence && <NodeWorkItems node={selected.assignment} projectId={p.id} onRetryEvidence={read.state.kind==='error' ? read.retry : undefined}/>}
     {!category && selected.gaps.filter(g=>g!==selected.quantity.reason).length>0 && <div className="pf-node-gaps"><h3>此節點待補</h3>{selected.gaps.filter(g=>g!==selected.quantity.reason).map((g,i)=><p key={i}>{g}</p>)}</div>}
    </div></details>;
- const nodeActions=workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null;
+ const peopleHref='#'+new URLSearchParams({view:'project',project:p.id,tab:'people',node:selected.key});
+ const nodeActions=workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id} peopleHref={peopleHref}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} peopleHref={peopleHref} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null;
  const nodeDetail=<div className="pf-stage-detail">
-   <header><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!nodeLoading&&category&&canWriteDispatch(c.s)&&<Suspense fallback={<Skeleton width="4rem"/>}><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/></Suspense>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
+   <header><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!nodeLoading&&category&&canWriteDispatch(c.s)&&<a className="pf-people-link" href={peopleHref}>排程與人員</a>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
    {(selected.assignment?.approver||selected.assignment?.legacy_completion)&&<dl className="pf-facts">{selected.assignment.approver&&<div><dt>核准人</dt><dd>{selected.assignment.approver.name}</dd></div>}{selected.assignment.legacy_completion&&<div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {isLegacy&&!workbench.local&&selected.taskRows.length>0&&legacyActions}

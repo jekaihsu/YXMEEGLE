@@ -147,3 +147,14 @@ test('shared blockers dedupe only common pending reasons and preserve unique cau
  const row=reasons=>({flags:{pending:true,blocker:{state:'blocked',reasons}}});
  assert.deepEqual(m.sharedBlockerReasons([row(['許可未齊','個別原因']),row(['許可未齊'])]),['許可未齊']);assert.deepEqual(m.sharedBlockerReasons([row(['許可未齊']),{flags:{pending:true,blocker:{state:'clear'}}}]),[]);
 });
+
+test('blocker banner primary follows causal priority for every known cause',()=>{
+ const generic='案件已暫停、結案或來源待核對',schedule='尚未排定開始日期';
+ for(const cause of ['來源案件狀態待核對；未確認前不自動啟用工作','來源標示結案；工作台待核對，不自動重新啟用工作','案件暫停中，等待PM處理。','接案尚未轉正式案件','本案執行歸屬尚未核定']){
+  assert.equal(m.primaryBlockerReasons([schedule,generic,cause,cause])[0],cause);
+  assert.equal(m.primaryBlockerReasons([schedule,generic,cause,cause]).length,3);
+ }
+ assert.deepEqual(m.primaryBlockerReasons([schedule,generic]),[generic,schedule]);
+ assert.deepEqual(m.primaryBlockerReasons([schedule,'指定前置成果尚未交付']),['指定前置成果尚未交付',schedule]);
+ assert.deepEqual(m.primaryBlockerReasons(['尚未到排程日期','排程日期無效']),['尚未到排程日期','排程日期無效']);
+});

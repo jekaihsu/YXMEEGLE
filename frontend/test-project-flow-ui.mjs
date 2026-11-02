@@ -45,6 +45,12 @@ async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=
  root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
 }
 function response(body,status=200){return new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}})}
+async function schedule(){
+ await act(async()=>{c.go({...c.route,tab:'people'});await tick()});
+ const disclosure=document.querySelector('.people-manage');
+ if(disclosure)await act(async()=>{disclosure.open=true;disclosure.dispatchEvent(new Event('toggle'));await tick()});
+ await click(button('排班'));
+}
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 const click=async element=>{assert.ok(element,'requested control exists');assert.equal(element.disabled,false,element.textContent);await act(async()=>{element.click();await tick()})};
 const value=async(el,v)=>act(async()=>{Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}));await tick()});
@@ -63,15 +69,15 @@ await act(async()=>{const menu=document.querySelector('.st-filter-menu');menu.op
 // Assignment now runs in the drawer; its transactions are covered by test-stage-workspace.mjs.
 await mount({node:'control'});await act(async()=>{const menu=document.querySelector('.pf-more');menu.open=true;menu.dispatchEvent(new Event('toggle'));await tick()});await click(button('新增任務'));assert.match(document.querySelector('.ne-form').textContent,/新增節點任務/);
 await click(button('建立任務'));assert.match(document.querySelector('.ne-form').textContent,/請填寫任務名稱/);
-await mount({node:'control',dispatch:true});await click(button('排班'));assert.match(document.querySelector('[role=dialog]').textContent,/新增排班/);
+await mount({node:'control',dispatch:true});await schedule();assert.match(document.querySelector('[role=dialog]').textContent,/新增排班/);
 const field=label=>[...document.querySelectorAll('.dp-field')].find(l=>l.firstElementChild.textContent===label)?.querySelector('input,select');
 assert.equal(field('專案編號').value,'p1');assert.equal(field('工程確認單').value,'recCase');assert.equal(field('部門').value,'控制');assert.equal(field('父義務').value,'recObligation');
 await value(field('負責人'),'ou_anna');await value(field('預定開始'),'2026-10-19T08:00');await value(field('預定結束'),'2026-10-19T12:00');
 await click(button('檢核並預覽'));await click(button('查看核准席位'));await click(button('發布排班'));
 assert.equal(calls.filter(r=>r.url.endsWith('/node-assignments')).length,2);assert.equal(calls.filter(r=>r.url.endsWith('/progress')).length,1);
-await click(button('關閉'));assert.match(document.querySelector('#flow-tasks').textContent,/已發布的新排班/);
+await click(button('關閉'));await act(async()=>{c.go({...c.route,tab:'flow'});await tick()});assert.match(document.querySelector('#flow-tasks').textContent,/已發布的新排班/);
 await mount({node:'control',assign:false});assert.equal(button('指派'),undefined);assert.equal(document.querySelector('.pf-task-picker'),null);
-await mount({node:'control',dispatch:true,parentProject:'YX-2026-042'});await click(button('排班'));assert.match(document.querySelector('[role=dialog]').textContent,/尚無可核實的父義務/);assert.equal(document.querySelector('.dp-dialog'),null);
+await mount({node:'control',dispatch:true,parentProject:'YX-2026-042'});await schedule();assert.match(document.querySelector('[role=dialog]').textContent,/尚無可核實的父義務/);assert.equal(document.querySelector('.dp-dialog'),null);
 for(const role of ['member','viewer']){await mount({node:'control',dispatch:true,role});assert.equal(button('排班'),undefined);assert.equal(calls.some(r=>r.url.includes('/dispatch/')),false)}
 for(const [tab,label] of [['overview','總覽'],['progress','工項與進度'],['flow','流程與任務'],['tasks','流程與任務']]){await mount({tab,node:'control',task:tab==='flow'?'recTask1':undefined});assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,label);if(tab==='flow')assert.match(document.querySelector('[role=dialog]').textContent,/控制點成果核對/)}
 evidenceStatus=500;await mount({node:'control'});assert.equal(document.querySelectorAll('.pf-node').length,9);assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.match(document.querySelector('#flow-evidence').textContent,/讀取失敗/);evidenceStatus=200;await click(button('重試工程證據'));assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);

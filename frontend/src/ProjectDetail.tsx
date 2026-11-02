@@ -1,4 +1,4 @@
-import {FlowAction} from './FlowActions';
+import {FlowPeopleLink,FlowAction} from './FlowActions';
 import {DetailsMenu} from './design/DetailsMenu';
 import {Select as FormSelect} from './design/Select';
 import {DetailRefreshProvider, useDetailRefresh} from './detailRefresh';
@@ -130,7 +130,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  const localActions=selected&&<div className="nw-actions">
  {localCanManage&&<Primary busy={c.busy} disabled={!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</Primary>}
  {localMore&&<DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作">{close=><div>
- <FlowAction allowed={!c.busy&&isProjectLead(c.s,p)&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':!isProjectLead(c.s,p)?'需由本案專案經理或主管指派':executionReason(p)} onClick={()=>{close();setModal('participants')}}>指派負責人</FlowAction>
+ <FlowPeopleLink href={'#'+new URLSearchParams({view:'project',project:p.id,tab:'people',node:selected.key})} allowed={!c.busy&&isProjectLead(c.s,p)&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':!isProjectLead(c.s,p)?'需由本案專案經理或主管指派':executionReason(p)}/>
  {!['pricing','settlement'].includes(selected.key)&&<FlowAction allowed={!c.busy&&selected.status!=='completed'&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':selected.status==='completed'?'節點已完成。':executionReason(p)} onClick={()=>{close();setModal('complete-node')}}>完成節點</FlowAction>}
  </div>}</DetailsMenu>}</div>;
 

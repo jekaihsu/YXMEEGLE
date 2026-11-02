@@ -3,10 +3,15 @@ import {useEffect, useRef} from 'react';
 /** Keep keyboard navigation inside the foremost modal and return to its trigger. */
 export function useDialogFocus(onClose:()=>void, enabled=true){
  const ref=useRef<HTMLElement>(null);
+ // Render precedes descendant autoFocus during commit. Also recapture on enable.
+ const returnTarget=useRef<HTMLElement|null>(null);
+ const wasEnabled=useRef(false);
+ if(enabled&&!wasEnabled.current&&typeof document!=='undefined')returnTarget.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
+ wasEnabled.current=enabled;
  const close=useRef(onClose); close.current=onClose;
  useEffect(()=>{
   const panel=ref.current;if(!enabled||!panel)return;
-  const trigger=document.activeElement as HTMLElement|null;
+  const trigger=returnTarget.current;
   const previousOverflow=document.body.style.overflow;
   document.body.style.overflow='hidden';
   const controls=()=>Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex="0"]')).filter(e=>e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden');

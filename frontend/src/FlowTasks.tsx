@@ -1,4 +1,5 @@
 import {useEffect,useState,type MutableRefObject,type ReactNode} from 'react';
+import {StageBlockerBanner} from './StageBlockerBanner';
 import {TriangleAlert} from 'lucide-react';
 import {Badge,Button,Skeleton} from './design';
 import {isProjectLead,nameOf,type Ctx} from './appCommon';
@@ -67,8 +68,10 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  const drawerTask=drawerDetail?.tasks.find(t=>t.id===assigning?.taskId);
  return <section id="flow-tasks" className="pf-tasks st-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>本階段任務</h3>{!!selected?.total&&<span className="st-count" role="status">{incomplete?`${selected.rows.length} 項已載入，來源未完整`:`已完成 ${selected.done} / ${selected.total} 項`}</span>}</header>
-  {!emptyActions&&!(caseReasonShown&&!executionAllowed(p,c.w))&&c.route.tab!=='overview'&&(!executionAllowed(p,c.w)||p.status==='paused')&&<p className="st-note" role="status">{p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:executionReason(p)}</p>}
-  {sharedReasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r))).map(reason=><p key={reason} className="st-note" role="status">{reason}</p>)}
+  <StageBlockerBanner reasons={[
+   ...((!emptyActions||!!selected?.rows.length)&&!(caseReasonShown&&!executionAllowed(p,c.w))&&caseReason?[p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:caseReason]:[]),
+   ...sharedReasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r)))
+  ]}/>
   {selected&&selected.loaded&&!incomplete&&selected.rows.length!==selected.total&&<p className="st-note" role="status">列表載入 {selected.rows.length} 項，與節點總數 {selected.total} 項不一致，請重新整理後再確認。</p>}
   {hasFilters&&<div className="pf-filters" role="group" aria-label="任務篩選"><Button aria-pressed={applied.length===0} onClick={clear}>全部</Button><Button aria-pressed={filters.mine} onClick={()=>filterRoute('mine')}>我的任務</Button><DetailsMenu className="st-filter-menu" label="篩選"><div>{STAGE_FILTERS.filter(k=>k!=='mine').map(key=><Button key={key} aria-pressed={filters[key]} onClick={()=>filterRoute(key)}>{STAGE_FILTER_LABELS[key]}</Button>)}</div></DetailsMenu></div>}
   {applied.length>0&&<p className="st-applied">已套用條件（需同時符合）：{applied.map(k=>STAGE_FILTER_LABELS[k]).join(' ＋ ')}<Button variant="plain" onClick={clear}>清除篩選</Button></p>}
