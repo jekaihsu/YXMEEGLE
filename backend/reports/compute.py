@@ -35,6 +35,15 @@ def links(value):
 
 
 def number(value):
+    # A lookup containing several cells is not a scalar. cell() joins these
+    # with commas for display; removing those commas would concatenate digits.
+    if isinstance(value, list):
+        return number(value[0]) if len(value) == 1 else None
+    if isinstance(value, dict):
+        for key in ('text', 'text_arr', 'name', 'value', 'record_ids'):
+            if value.get(key) is not None:
+                return number(value[key])
+        return None
     value = cell(value)
     if isinstance(value, bool) or value == '': return None
     try:
