@@ -1,3 +1,4 @@
+import {SessionCache} from './sessionCache';
 import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import type {PageData} from './pageData';
 import {refreshSources} from './refreshSources';
@@ -6,7 +7,7 @@ import {ApiError,getSessionEpoch,onSessionEpochChange} from './api';
 import {fetchProjectProgress, type ProjectProgress} from './projectProgressApi';
 const fresh=(data:ProjectProgress)=>['ready','fresh','partial'].includes(data.sources.source_status??'') && !!data.sources.source_synced_at;
 type State = {kind:'loading'}|{kind:'ready';data:ProjectProgress}|{kind:'error';message:string;status?:number;lastGoodAt?:string|null};
-const cache=new Map<string,ProjectProgress>();
+const cache=new SessionCache<string,ProjectProgress>();
 export function prefetchProjectProgress(id:string,force=false,signal?:AbortSignal,batch?:symbol,owner?:PageData){
  return readCase(owner,`progress:${id}`,batch||force,(current,_intent,ownedSignal)=>fetchProjectProgress(id,current,signal?AbortSignal.any([signal,ownedSignal]):ownedSignal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }

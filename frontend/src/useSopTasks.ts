@@ -1,3 +1,4 @@
+import {SessionCache} from './sessionCache';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import type {PageData} from './pageData';
@@ -7,7 +8,7 @@ import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type Import
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview; retrying?: boolean} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
-const cache = new Map<string,SopOverview>();
+const cache = new SessionCache<string,SopOverview>();
 export function seedSopTasks(id:string,workspace:string,data:SopOverview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol) {
  const resource=`${workspace}:${id}:tasks`;cache.set(caseKey(owner,resource),data);
  seedCase(owner,resource,data,current=>sopApi.overview(id,current),true,meta,batch);

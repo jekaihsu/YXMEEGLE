@@ -10,9 +10,9 @@ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});Object.as
 const pending=[];globalThis.fetch=(url,options)=>new Promise(resolve=>pending.push({url,options,resolve}));
 function View({group}){const state=useReport('review',{group});return React.createElement('div',null,state.loading?'loading':state.error||state.data?.value)}
 const root=createRoot(document.getElementById('root'));const render=group=>act(async()=>root.render(React.createElement(View,{group})));const reply=(i,value)=>act(async()=>pending[i].resolve(new Response(JSON.stringify({value}),{status:200})));
-await render('一組');await render('二組');assert.equal(pending[0].options.signal.aborted,true);await reply(1,'current');await reply(0,'old');assert.equal(document.body.textContent,'current');
-await render('一組');await reply(2,'cached one');await render('二組');assert.equal(pending.length,3);assert.equal(document.body.textContent,'current');await render('三組');await act(async()=>invalidateSessionEpoch());await reply(3,'wrong session');assert.equal(document.body.textContent,'loading');
-await act(async()=>root.unmount());assert.equal(pending[3].options.signal.aborted,true);
+await render('一組');await render('二組');assert.equal(pending[0].options.signal.aborted,false,'page owner retains pending query reads');await reply(1,'current');await reply(0,'old');assert.equal(document.body.textContent,'current');
+await render('一組');assert.equal(document.body.textContent,'old');await render('二組');assert.equal(pending.length,2);assert.equal(document.body.textContent,'current');await render('三組');await act(async()=>invalidateSessionEpoch());await reply(2,'wrong session');assert.equal(document.body.textContent,'loading');
+await act(async()=>root.unmount());assert.equal(pending[2].options.signal.aborted,true);
 console.log('Reports stale responses, session epoch and unmount cancellation passed.');
 
 const searchRoot=createRoot(document.getElementById('root'));
