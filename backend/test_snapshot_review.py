@@ -60,7 +60,7 @@ def test_continuous_supersession_returns_bounded_stale():
     def build():
         # Model a new version arriving on every capture, with no quiet period.
         with cache.lock:
-            cache.requested['case'] = 999
+            cache.requested['case'] = (2, cache.sequence + 1)
         return b'consistent'
     try:
         assert cache.get('case', build, revision=1) == (b'consistent', 'stale')
@@ -79,10 +79,13 @@ def result():
     return dict(project={}, **{n: dict(status=200, body={}) for n in ('tasks', 'assignments', 'start', 'progress')})
 
 
-def test_disabled_source_still_ages():
+def test_disabled_source_age_has_no_assumed_live_read_cadence():
     body = attach_first_screen(result(), dict(version=1, source_status=dict(last_sync='2020-01-01T00:00:00+00:00')),
                                (1,), dict(enabled=False, datasets=dict(sources=dict(ttl_seconds=300))))
-    assert body['snapshot']['stale'] is True
+    assert body['snapshot']['stale'] is None
+    project = body['snapshot']['resources']['project']
+    assert project['age_seconds'] > 300
+    assert project['ttl_seconds'] is None
 
 
 def test_identity_excludes_verification_clock():
@@ -155,7 +158,7 @@ def test_force_rebuilds_fresh_same_revision_and_keeps_etag(tmp_path, monkeypatch
 def test_other_workspace_post_does_not_interrupt_read(tmp_path, monkeypatch, route):
     from starlette.testclient import TestClient
     from .models import WorkspaceRow
-    with scaled_client(tmp_path, 2, **ON) as (app, client):
+    with scaled_client(tmp_path, 40, **ON) as (app, client):
         pid = client.get('/api/workspace').json()['projects'][0]['id']
         cookie = app.state.signer.loads(client.cookies.get('meegle_session'))
         with app.state.sessions.begin() as db:
@@ -175,7 +178,7 @@ def test_other_workspace_post_does_not_interrupt_read(tmp_path, monkeypatch, rou
             requested.set()
             return original(*args, **kwargs)
         monkeypatch.setattr(app.state.read_snapshots, 'get', get)
-        url = dict(case=f'/api/projects/{pid}/first-screen', shell='/api/workspace?scope=shell', portfolio='/api/projects?view=portfolio')[route]
+        url = dict(case=f'/api/projects/{pid}/first-screen', shell='/api/workspace?scope=shell', portfolio='/api/projects?view=portfolio&page=1')[route]
         with ThreadPoolExecutor(1) as pool, TestClient(app) as writer:
             writer.cookies.set('meegle_session', app.state.signer.dumps(dict(cookie, wid='demo-other')))
             pending = pool.submit(client.get, url)
@@ -185,7 +188,16 @@ def test_other_workspace_post_does_not_interrupt_read(tmp_path, monkeypatch, rou
                 assert writer.post('/api/demo/session', json={'user_id': 'u-pm'}).status_code == 200
             finally:
                 release.set()
-            assert pending.result(5).status_code == 200
+            response = pending.result(10)
+            assert response.status_code == 200
+            assert response.headers['x-read-snapshot'] == 'miss'
+            if route == 'case':
+                assert response.json()['snapshot']['stale'] is not True
+            if route == 'portfolio':
+                page2 = client.get('/api/projects', params={'view': 'portfolio', 'page': 2, 'snapshot': response.json()['snapshot']})
+                assert page2.status_code == 200
+                assert page2.json()['page'] == 2
+                assert len(page2.json()['items']) > 0
 
 
 @pytest.mark.parametrize('authority_change', [False, True])
@@ -251,3 +263,174 @@ def test_newer_cached_revision_keeps_its_age_when_an_older_reader_arrives():
         assert cache.get('case', lambda: b'v1', revision=1) == (b'v2', 'stale')
     finally:
         cache.close()
+
+
+def test_other_workspace_write_keeps_two_readers_on_one_flight():
+    cache = ReadSnapshots()
+    entered, release, joined = Event(), Event(), Event()
+    calls = []
+    key = ('case', 'X', 'same-session')
+    def build():
+        calls.append(1)
+        entered.set()
+        assert release.wait(5)
+        return b'current-X'
+    try:
+        with ThreadPoolExecutor(2) as pool:
+            first = pool.submit(cache.get, key, build, revision=1)
+            assert entered.wait(2)
+            with cache.lock:
+                flight = next(iter(cache.flights.values()))
+            original = flight.result
+            def wait(*a, **kw):
+                joined.set()
+                return original(*a, **kw)
+            flight.result = wait
+            cache.invalidate('Y')
+            second = pool.submit(cache.get, key, build, revision=1)
+            try:
+                assert joined.wait(2), 'second tab must join the original X flight'
+            finally:
+                release.set()
+            assert first.result(5) == (b'current-X', 'miss')
+            assert second.result(5) == (b'current-X', 'miss')
+        assert calls == [1]
+    finally:
+        release.set()
+        cache.close()
+
+
+def test_retry_joining_strict_flight_twice_has_bounded_fallback(tmp_path, monkeypatch):
+    from .snapshot_contract import SnapshotRevisionChanged
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        pid = client.get('/api/workspace').json()['projects'][0]['id']
+        calls = []
+        def strict_flight(*a, **kw):
+            calls.append(1)
+            # Both attempts can inherit the same strict creator's exception.
+            raise SnapshotRevisionChanged()
+        monkeypatch.setattr(app.state.read_snapshots, 'get', strict_flight)
+        response = client.get(f'/api/projects/{pid}/first-screen')
+        assert response.status_code == 200
+        assert response.headers['x-read-snapshot'] == 'stale'
+        assert response.json()['snapshot']['stale'] is True
+        assert calls == [1, 1]
+        assert not app.state.read_snapshots.entries
+
+
+def test_own_workspace_post_clears_own_cache(tmp_path):
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        pid = client.get('/api/workspace').json()['projects'][0]['id']
+        url = f'/api/projects/{pid}/first-screen'
+        assert client.get(url).headers['x-read-snapshot'] == 'miss'
+        assert client.get(url).headers['x-read-snapshot'] == 'hit'
+        assert client.post('/api/demo/session', json={'user_id': 'u-manager'}).status_code == 200
+        assert not app.state.read_snapshots.entries
+        assert client.get(url).headers['x-read-snapshot'] == 'miss'
+
+
+def test_two_tabs_retry_can_join_another_tabs_strict_build(tmp_path, monkeypatch):
+    """Real shared Future propagates a strict creator's revision exception twice."""
+    from inspect import getclosurevars
+    from starlette.testclient import TestClient
+    from . import snapshot_contract
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        pid = client.get('/api/workspace').json()['projects'][0]['id']
+        retry_ready, strict_entered, joined = Event(), Event(), Event()
+        captures, retries = [], []
+        attach = snapshot_contract.attach_first_screen
+        original_get = app.state.read_snapshots.get
+        def advance():
+            with app.state.sessions.begin() as db:
+                root = db.scalars(select(WorkspaceRow)).first()
+                state = storage.load(db, BusinessRow, root)
+                root.version += 1
+                state['version'] = root.version
+                root.data = storage.save(db, BusinessRow, root.id, state)
+        def ongoing(*a, **kw):
+            body = attach(*a, **kw)
+            captures.append(1)
+            if len(captures) == 2:
+                strict_entered.set()
+                assert joined.wait(5)
+            if len(captures) <= 2:
+                advance()
+            return body
+        def get(key, build, **kw):
+            if getclosurevars(build).nonlocals['accept_stale'] and not retries:
+                retries.append(1)
+                retry_ready.set()
+                assert strict_entered.wait(5)
+                with app.state.read_snapshots.lock:
+                    flight = next(iter(app.state.read_snapshots.flights.values()))
+                original_result = flight.result
+                def wait(*a, **kw):
+                    joined.set()
+                    return original_result(*a, **kw)
+                flight.result = wait
+            return original_get(key, build, **kw)
+        monkeypatch.setattr(snapshot_contract, 'attach_first_screen', ongoing)
+        monkeypatch.setattr(app.state.read_snapshots, 'get', get)
+        with ThreadPoolExecutor(2) as pool, TestClient(app) as tab2:
+            tab2.cookies.update(client.cookies)
+            first = pool.submit(client.get, f'/api/projects/{pid}/first-screen')
+            assert retry_ready.wait(5)
+            second = pool.submit(tab2.get, f'/api/projects/{pid}/first-screen')
+            a, b = first.result(15), second.result(15)
+        assert a.status_code == 200
+        assert b.status_code == 200
+        assert a.headers['x-read-snapshot'] == 'stale'
+        assert a.json()['snapshot']['stale'] is True
+        assert joined.is_set()
+
+
+def test_two_http_tabs_join_one_case_build_across_other_workspace_post(tmp_path, monkeypatch):
+    from starlette.testclient import TestClient
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        pid = client.get('/api/workspace').json()['projects'][0]['id']
+        cookie = app.state.signer.loads(client.cookies.get('meegle_session'))
+        with app.state.sessions.begin() as db:
+            root = db.get(WorkspaceRow, cookie['wid'])
+            state = storage.load(db, BusinessRow, root)
+            other = WorkspaceRow(id='demo-other', version=root.version, data={})
+            db.add(other)
+            other.data = storage.save(db, BusinessRow, other.id, state)
+        entered, release, waiting, joined = Event(), Event(), Event(), Event()
+        calls, waiters = [], []
+        submit = app.state.read_snapshots.executor.submit
+        def observe(*a, **kw):
+            calls.append(1)
+            flight = submit(*a, **kw)
+            result = flight.result
+            def wait(*a, **kw):
+                waiters.append(1)
+                waiting.set()
+                if len(waiters) == 2:
+                    joined.set()
+                return result(*a, **kw)
+            flight.result = wait
+            return flight
+        from . import snapshot_contract
+        attach = snapshot_contract.attach_first_screen
+        def blocked(*a, **kw):
+            entered.set()
+            assert release.wait(5)
+            return attach(*a, **kw)
+        monkeypatch.setattr(app.state.read_snapshots.executor, 'submit', observe)
+        monkeypatch.setattr(snapshot_contract, 'attach_first_screen', blocked)
+        with TestClient(app) as writer, TestClient(app) as tab2, ThreadPoolExecutor(2) as pool:
+            writer.cookies.set('meegle_session', app.state.signer.dumps(dict(cookie, wid='demo-other')))
+            tab2.cookies.update(client.cookies)
+            first = pool.submit(client.get, f'/api/projects/{pid}/first-screen')
+            assert entered.wait(2) and waiting.wait(2)
+            assert writer.post('/api/demo/session', json={'user_id': 'u-pm'}).status_code == 200
+            second = pool.submit(tab2.get, f'/api/projects/{pid}/first-screen')
+            try:
+                assert joined.wait(2)
+            finally:
+                release.set()
+            for response in (first.result(10), second.result(10)):
+                assert response.status_code == 200
+                assert response.headers['x-read-snapshot'] == 'miss'
+                assert response.json()['snapshot']['stale'] is not True
+        assert calls == [1]

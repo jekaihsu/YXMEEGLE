@@ -164,8 +164,6 @@ class DispatchReservationRow(Base):
     state=Column(String(20),nullable=False)
 
 BusinessRow,PersonRow=storage.models(Base)
-Index('ix_business_records_scope_parent_order', BusinessRow.workspace_id,
-      BusinessRow.kind, BusinessRow.parent_id, BusinessRow.ordinal)
 
 
 class ReportCaseBridge(Base):

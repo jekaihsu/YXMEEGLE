@@ -32,7 +32,8 @@ def source_metadata(source, *, revision, verified_at=None, complete=None):
             age = max(0, (datetime.now(timezone.utc) - stamp).total_seconds())
         except (ValueError, TypeError):
             pass
-    ttl = source.get('ttl_seconds', 300)
+    # No assumed producer cadence; future timestamps clamp to zero age.
+    ttl = source.get('ttl_seconds')
     stale = (source.get('stale') is True or source.get('status') == 'stale'
              or (age is not None and ttl is not None and age >= ttl))
     return dict(as_of=source.get('as_of') or source.get('fetched_at') or source.get('last_sync'),
@@ -40,7 +41,7 @@ def source_metadata(source, *, revision, verified_at=None, complete=None):
                 verified_at=source.get('verified_at') or verified_at,
                 changed_at=source.get('changed_at'), local_revision=revision,
                 completeness='complete' if complete is True else 'partial' if complete is False else 'unknown',
-                stale=stale if age is not None or stale else None,
+                stale=stale if (age is not None and ttl is not None) or stale else None,
                 age_seconds=age, ttl_seconds=ttl, status=source.get('status'), last_error=source.get('last_error'))
 
 
@@ -50,7 +51,10 @@ def attach_first_screen(result, state, generation, freshness):
     # Disabled coordinator status can use a presentation date as workspace_as_of.
     # Only enabled source evidence or persisted ingestion evidence is trustworthy.
     source = ((freshness.get('datasets') or {}).get('sources') or {}) if freshness.get('enabled') else state.get('source_status', {})
-    source = dict(source, ttl_seconds=source.get('ttl_seconds', ((freshness.get('datasets') or {}).get('sources') or {}).get('ttl_seconds', 300)))
+    # Live-read TTL describes polling freshness, not manual/batch ingestion.
+    # With live reads off we preserve ingestion age but cannot infer staleness
+    # without an explicit ingestion cadence. An explicit stale signal still wins.
+    source = dict(source, ttl_seconds=source.get('ttl_seconds') if freshness.get('enabled') else None)
     project = source_metadata(source, revision=revision,
                               complete=source.get('complete'))
     resources = {'project': project}
