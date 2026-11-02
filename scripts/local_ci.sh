@@ -38,6 +38,7 @@ printf '\n== Backend tests (Python %s) ==\n' "$python_version"
 printf '\n== Frontend install and checks (Node %s) ==\n' "$(node --version)"
 cd "$repo_root/frontend"
 npm ci
+npm run test:fetch-intent
 npm run test:session-epoch
 npm run test:api-response
 npm run test:perf
@@ -59,6 +60,11 @@ node test-manager-overview-view.mjs
 node test-p2-routes.mjs
 node test-pm-glance.mjs
 npm run build
+# Chrome and an isolated demo backend are required for the real-app gate.
+if [[ "${YXMEEGLE_BROWSER_TESTS:-0}" == "1" ]]; then
+  : "${YX_FETCH_INTENT_API_URL:?Set the isolated demo backend URL}"
+  npm run test:fetch-intent:browser
+fi
 npm run test:dev-tooling
 
 printf '\nLocal pre-push checks passed.\n'

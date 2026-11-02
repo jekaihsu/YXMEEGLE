@@ -72,9 +72,9 @@ def test_single_flight_stale_refresh_and_write_fence():
     try:
         assert cache.get('case', lambda: b'old') == (b'old', 'miss')
         clock[0] = 2
-        assert cache.get('case', build) == (b'old', 'stale')
+        assert cache.get('case', build, allow_stale=True) == (b'old', 'stale')
         assert entered.wait(2)
-        assert cache.get('case', build) == (b'old', 'stale')
+        assert cache.get('case', build, allow_stale=True) == (b'old', 'stale')
         cache.invalidate()
         release.set()
         # The invalidated background read cannot reinsert its pre-write data.
@@ -142,7 +142,8 @@ def test_first_screen_matches_individual_readers_and_invalidates(tmp_path):
             response = client.get(base + suffix)
             assert body[name]['status'] == response.status_code
             assert body[name]['body'] == response.json()
-        assert body['progress'] == {'status': 202, 'body': None}
+        assert body['progress']['status'] == 202 and body['progress']['body'] is None
+        assert body['progress']['snapshot']['completeness'] == 'partial'
         assert client.get(base + '/first-screen').headers['x-read-snapshot'] == 'hit'
         switch(client, 'u-pm')
         assert client.get(base + '/first-screen').headers['x-read-snapshot'] == 'miss'
@@ -180,7 +181,7 @@ def test_degraded_portfolio_is_not_pinned_in_the_snapshot_cache(tmp_path, monkey
         assert client.get('/api/projects?view=portfolio').headers['x-read-snapshot'] == 'hit'
 
 
-def test_background_revision_revalidates_last_good_without_blocking():
+def test_initial_stale_paint_is_opt_in_and_revision_refresh_dedupes():
     cache = ReadSnapshots()
     entered, release = Event(), Event()
     try:
@@ -189,9 +190,9 @@ def test_background_revision_revalidates_last_good_without_blocking():
             entered.set()
             assert release.wait(2)
             return b'v2'
-        assert cache.get('case', next_revision, revision=2) == (b'v1', 'stale')
+        assert cache.get('case', next_revision, revision=2, allow_stale=True) == (b'v1', 'stale')
         assert entered.wait(2)
-        assert cache.get('case', next_revision, revision=2) == (b'v1', 'stale')
+        assert cache.get('case', next_revision, revision=2, allow_stale=True) == (b'v1', 'stale')
         release.set()
         cache.close()
         assert cache.get('case', lambda: b'unexpected', revision=2) == (b'v2', 'hit')

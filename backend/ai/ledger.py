@@ -436,24 +436,28 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
     result = dict(history_available=content_enabled, items=[], next_cursor=None)
     if not content_enabled:
         return result
-    u = AiUsageRow
+    u, e = AiUsageRow, AiExchangeRow
     stmt = history_statement(workspace_id, actor_id, retention_days).where(u.scope == scope)
     if project_id is not None:
         stmt = stmt.where(u.project_id == project_id)
-    source = stmt.subquery()
-    grouped = select(source.c.conversation_id.label('id'), func.max(source.c.created_at).label('updated_at'),
-        func.count().label('turns')).group_by(source.c.conversation_id).subquery()
-    page = select(grouped).order_by(grouped.c.updated_at.desc(), grouped.c.id.desc())
+    # Rank only retained, authorized exchanges so a deleted/expired first turn
+    # cannot supply a title. One statement also keeps titles and counts consistent.
+    ranked = stmt.with_only_columns(
+        u.conversation_id.label('id'), u.scope, u.project_id, e.question,
+        func.max(u.created_at).over(partition_by=u.conversation_id).label('updated_at'),
+        func.count().over(partition_by=u.conversation_id).label('turns'),
+        func.row_number().over(partition_by=u.conversation_id,
+            order_by=(u.created_at, u.id)).label('rank'),
+    ).subquery()
+    page = select(ranked).where(ranked.c.rank == 1).order_by(ranked.c.updated_at.desc(), ranked.c.id.desc())
     if cursor:
-        page = page.where(or_(grouped.c.updated_at < cursor[0], and_(
-            grouped.c.updated_at == cursor[0], grouped.c.id < cursor[1])))
+        page = page.where(or_(ranked.c.updated_at < cursor[0], and_(
+            ranked.c.updated_at == cursor[0], ranked.c.id < cursor[1])))
     with sessions() as db:
         rows = db.execute(page.limit(limit + 1)).mappings().all()
         for row in rows[:limit]:
-            first = db.execute(stmt.where(u.conversation_id == row['id']).order_by(u.created_at, u.id).limit(1)).first()
-            usage, exchange = first
-            result['items'].append(dict(id=row['id'], title=conversation_title(exchange.question), scope=usage.scope,
-                project_id=usage.project_id, updated_at=iso(row['updated_at']), turns=row['turns']))
+            result['items'].append(dict(id=row['id'], title=conversation_title(row['question']), scope=row['scope'],
+                project_id=row['project_id'], updated_at=iso(row['updated_at']), turns=row['turns']))
     if len(rows) > limit:
         last = result['items'][-1]
         result['next_cursor'] = base64.urlsafe_b64encode(json.dumps([last['updated_at'], last['id']]).encode()).decode()
