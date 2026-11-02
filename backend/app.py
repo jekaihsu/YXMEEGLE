@@ -236,8 +236,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         finally:
             # Also fence ambiguous failures after a write may already have committed.
             if request.method not in ('GET', 'HEAD', 'OPTIONS'):
-                read_snapshots.invalidate()
-                progress_snapshots.invalidate()
+                wid = request.scope.get('snapshot_workspace')
+                if wid:
+                    read_snapshots.invalidate(wid)
+                    progress_snapshots.invalidate(wid)
 
     def snapshot_viewer(user):
         # Admission uses the fresh timestamp before this key is computed. A new
@@ -480,6 +482,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 data={**data,'access_mode':access}
         from .resource_gauge import mark_activity
         mark_activity(request.url.path, request.method)
+        request.scope['snapshot_workspace'] = data['wid']
         return data,user
 
     def user_access_token(db,data):
@@ -1962,6 +1965,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     @app.get('/api/projects/{project_id}/first-screen')
     def project_first_screen(request:Request, project_id:str):
+        from .snapshot_contract import SnapshotRevisionChanged
+        try:
+            return first_screen_read(request, project_id, accept_stale=False)
+        except SnapshotRevisionChanged:
+            return first_screen_read(request, project_id, accept_stale=True)
+
+    def first_screen_read(request, project_id, *, accept_stale):
+        from .snapshot_contract import SnapshotRevisionChanged
         from .read_snapshots import capture
         from .snapshot_contract import attach_first_screen, explicit_refresh
         require(shell_enabled, '尚未啟用單一案件讀取', 404)
@@ -1983,8 +1994,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 current = db.get(CaseState, (data['wid'], project_id))
                 policy = db.get(CasePolicy, (data['wid'], project_id))
                 actual = (root.version, (current.checklist_revision, current.identity_revision) if current else None,
-                          policy.revision if policy else None, snapshot_visibility(db, root, project_id))
-                require(actual == expected_generation, '資料已更新，請重新讀取', 409)
+                          policy.revision if policy else None, visibility_revision if root.version == version else snapshot_visibility(db, root, project_id))
+                # Authority changes must never serve the previous viewer's body.
+                require(actual[1:] == expected_generation[1:], '資料已更新，請重新讀取', 409)
+                if actual[0] != version:
+                    admitted_data, admitted_user = _identity(request)
+                    require(admitted_data == data and snapshot_viewer(admitted_user) == snapshot_viewer(user),
+                            '登入身分已變更，請重新整理後再操作', 409)
+                    if not accept_stale:
+                        raise SnapshotRevisionChanged()
+                return actual[0] == version
         readers = {r.path: r.endpoint for r in app.routes if 'GET' in (getattr(r, 'methods', None) or ())}
         def build():
             child = Request(dict(request.scope, state={}, phases={}, query_string=b''))
@@ -1993,13 +2012,13 @@ def create_app(overrides=None,*,dispatch_transport=None):
             fresh_data, fresh_user = fresh_identity
             require(fresh_data == data and snapshot_viewer(fresh_user) == snapshot_viewer(user),
                 '登入身分已變更，請重新整理後再操作', 409)
-            verify_generation()
             shared = dict(wid=data['wid'], project_id=project_id, identity=fresh_identity)
             token = capture.set(shared)
             try:
                 with sessions() as db:
                     shared['state'] = load(db, db.get(WorkspaceRow, data['wid']), project_ids=[project_id], case_sources='sop')
-                require(shared['state']['version'] == version, '資料已更新，請重新讀取', 409)
+                if shared['state']['version'] != version and not accept_stale:
+                    raise SnapshotRevisionChanged()
                 result = {'project': json.loads(project_detail(child, project_id, overview=True).body)}
                 for name, path in (
                     ('assignments', '/api/projects/{project_id}/node-assignments'),
@@ -2018,16 +2037,23 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     result['project'].pop(field, None)
                 # Older open tabs can also fall through to the deferred reader.
                 result['progress'] = {'status': 202, 'body': None}
-                attach_first_screen(result, shared['state'], expected_generation, app.state.live_read.status(data['wid']))
-                verify_generation()
+                attach_first_screen(result, shared['state'], (shared['state']['version'], *expected_generation[1:]), app.state.live_read.status(data['wid']))
+                current = verify_generation()
+                if not current:
+                    result['snapshot']['stale'] = True
                 from .request_timing import measure
                 with measure('snapshotencode'):
-                    return EncodedSnapshot.encode(JSONResponse(result).body, as_of=result['snapshot']['as_of'])
+                    return EncodedSnapshot.encode(JSONResponse(result).body, as_of=result['snapshot']['as_of'], identity=result['snapshot']['snapshot_id'], volatile=not current)
             finally:
                 capture.reset(token)
         with phase(request, 'snapshot'):
-            body, status = read_snapshots.get(key, build, revision=version, force=explicit_refresh(request))
-        verify_generation()
+            body, status = read_snapshots.get(key, build, revision=version, force=explicit_refresh(request), allow_stale=False)
+        current = verify_generation()
+        if not current or status == 'stale':
+            result = json.loads(body.body)
+            result['snapshot']['stale'] = True
+            body = EncodedSnapshot.encode(JSONResponse(result).body, as_of=body.as_of, volatile=True)
+            status = 'stale'
         return body.response(request, status)
 
     from .runtime_health import register as register_runtime_health

@@ -1,6 +1,8 @@
 """Populated history reads use bounded SQL and never need a provider."""
 from datetime import datetime, timedelta, timezone
 import json
+import os
+import uuid
 from time import perf_counter
 
 import pytest
@@ -10,9 +12,20 @@ from sqlalchemy.orm import sessionmaker
 from .ai import ledger
 
 
-@pytest.fixture
-def history_db(tmp_path, monkeypatch):
+@pytest.fixture(params=['sqlite', 'postgres'])
+def history_db(tmp_path, monkeypatch, request):
     engine = create_engine(f'sqlite:///{tmp_path}/history.db')
+    schema = None
+    if request.param == 'postgres':
+        url = os.environ.get('AI_TEST_POSTGRES_URL')
+        if not url:
+            pytest.skip('Set AI_TEST_POSTGRES_URL to a disposable PostgreSQL database')
+        engine.dispose()
+        schema = 'ej_' + uuid.uuid4().hex
+        admin = create_engine(url)
+        with admin.begin() as connection:
+            connection.exec_driver_sql(f'CREATE SCHEMA {schema}')
+        engine = create_engine(url, connect_args={'options': f'-csearch_path={schema}'})
     ledger.ensure_schema(engine)
     sessions = sessionmaker(bind=engine)
     # Any accidental provider request in a history read must fail, even with keys configured.
@@ -23,6 +36,10 @@ def history_db(tmp_path, monkeypatch):
     monkeypatch.setattr(httpx.AsyncClient, 'send', forbidden)
     yield sessions
     engine.dispose()
+    if schema:
+        with admin.begin() as connection:
+            connection.exec_driver_sql(f'DROP SCHEMA {schema} CASCADE')
+        admin.dispose()
 
 
 def seed_turn(sessions, ident, conversation, *, stamp=None, workspace='w', actor='a',
@@ -133,3 +150,37 @@ def test_no_content_executes_no_sql(history_db):
     result, statements, _ = capture(history_db, enabled=False)
     assert result == dict(history_available=False, items=[], next_cursor=None)
     assert statements == []
+
+
+def test_question_is_fetched_after_page_limit(history_db):
+    seed_turn(history_db, 'u', 'c')
+    _, statements, _ = capture(history_db)
+    sql = statements[0].lower()
+    # The window input must contain usage_id, not wide question text.
+    window_input = sql[sql.index('(select'):sql.index('row_number()')]
+    assert 'question' not in window_input
+    assert 'usage_id' in window_input
+
+
+def test_populated_postgres_page_plan(history_db):
+    engine = history_db.kw['bind']
+    if engine.dialect.name != 'postgresql':
+        pytest.skip('PostgreSQL EXPLAIN only')
+    stamp = datetime.now(timezone.utc) - timedelta(hours=1)
+    for i in range(120):
+        seed_turn(history_db, f'plan-{i}', f'plan-c{i:03}', stamp=stamp,
+                  question=f'Title {i} ' + 'long prompt ' * 1000)
+    recorded = []
+    def record(conn, cursor, sql, params, *args):
+        recorded.append((sql, params))
+    event.listen(engine, 'before_cursor_execute', record)
+    try:
+        page = read(history_db, limit=30)
+    finally:
+        event.remove(engine, 'before_cursor_execute', record)
+    assert len(page['items']) == 30 and page['next_cursor']
+    assert len(recorded) == 1
+    sql, params = recorded[0]
+    with engine.connect() as conn:
+        plan = conn.exec_driver_sql('EXPLAIN (ANALYZE, BUFFERS) ' + sql, params).scalars().all()
+    print('\nPostgreSQL populated history page plan:\n' + '\n'.join(plan))

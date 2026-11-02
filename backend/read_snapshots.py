@@ -24,11 +24,11 @@ class EncodedSnapshot:
         return len(self.body) + len(self.compressed)
 
     @classmethod
-    def encode(cls, body, *, as_of=None, volatile=False):
+    def encode(cls, body, *, as_of=None, volatile=False, identity=None):
         from .request_timing import measure
         with measure('snapshotcompress'):
             compressed = gzip.compress(body, compresslevel=1, mtime=0)
-        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"', as_of, volatile)
+        return cls(body, compressed, 'W/"' + (identity or hashlib.sha256(body).hexdigest()) + '"', as_of, volatile)
 
     def response(self, request, status):
         # Always reauthorize before conditional validation. Browser freshness must
@@ -73,11 +73,20 @@ class ReadSnapshots:
         self.sequence = 0
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='read-snapshot')
 
-    def invalidate(self):
+    def invalidate(self, workspace=None):
         with self.lock:
             self.generation += 1
-            self.entries.clear()
-            self.requested.clear()
+            # Workspace keys always carry wid in position 1; page keys nest it.
+            def affected(key):
+                if workspace is None:
+                    return True
+                return isinstance(key, tuple) and len(key) > 1 and (key[1] == workspace or affected(key[1]))
+            for key in list(self.entries):
+                if affected(key):
+                    self.entries.pop(key, None)
+            for key in list(self.requested):
+                if affected(key):
+                    self.requested.pop(key, None)
 
     def peek(self, key):
         with self.lock:
@@ -108,38 +117,50 @@ class ReadSnapshots:
             if timing:
                 timing.add("snapshotcpu", thread_time() - cpu)
         with self.lock:
-            if generation != self.generation or self.requested.get(key) != ticket:
-                from fastapi import HTTPException
-                raise HTTPException(409, "資料已更新，請重新讀取")
-            self._store(key, value, revision)
-        return value
+            if self.requested.get(key) == (revision, ticket):
+                self._store(key, value, revision)
+                return value, True
+        return value, False
 
-    def get(self, key, build, *, revision=None, force=False, allow_stale=False):
-        """Await the requested revision; stale is opt-in for an initial paint only.
+    def get(self, key, build, *, revision=None, force=False, allow_stale=True):
+        """Await a consistent revision; age-only staleness may rebuild in background.
 
-        Force skips a settled entry but joins an active build of the same revision.
-        A newer request/invalidation fences both publication and delayed responses.
+        A delayed older request joins the highest requested revision. Superseded
+        captures never publish, but may return as stale: waiting for every newer
+        flight would starve readers during sustained writes. No retries are needed
+        here; first-screen authority/generation checks belong to the caller.
         """
         with self.lock:
             generation = self.generation
             flight_key = (generation, key, revision)
             entry = self.entries.get(key)
             age = self.clock() - entry[0] if entry else float('inf')
-            if entry and entry[2] != revision:
+            same_revision = bool(entry and entry[2] == revision)
+            if entry and revision is not None and entry[2] is not None and entry[2] > revision:
+                return entry[1], 'hit' if age < self.fresh else 'stale'
+            if not same_revision:
                 age = max(age, self.fresh)
+            highest = self.requested.get(key)
+            if revision is not None and highest is not None and highest[0] is not None and highest[0] > revision:
+                newer_key = next((k for k in self.flights if k[1] == key and k[2] == highest[0]), None)
+                if newer_key is not None:
+                    revision = highest[0]
+                    flight_key = newer_key
+                    same_revision = False
+                    age = max(age, self.fresh)
             if age < self.fresh and not force:
                 return entry[1], 'hit'
             flight = self.flights.get(flight_key)
             if flight is None:
                 self.sequence += 1
                 ticket = self.sequence
-                self.requested[key] = ticket
+                self.requested[key] = (revision, ticket)
                 flight = self.executor.submit(copy_context().run, self._build, key, generation, build, revision, ticket)
                 self.flights[flight_key] = flight
                 def done(future):
                     with self.lock:
                         self.flights.pop(flight_key, None)
-                        if key not in self.entries and self.requested.get(key) == ticket:
+                        if key not in self.entries and self.requested.get(key) == (revision, ticket):
                             self.requested.pop(key, None)
                     if not future.cancelled() and future.exception():
                         logging.getLogger(__name__).warning('read_snapshot_refresh_failed', exc_info=future.exception())
@@ -149,9 +170,14 @@ class ReadSnapshots:
                 register = False
         if register:
             flight.add_done_callback(done)
-        if allow_stale and not force and entry and age < self.stale:
+        if allow_stale and not force and same_revision and age < self.stale:
             return entry[1], 'stale'
-        return flight.result(), 'miss'
+        value, valid = flight.result()
+        with self.lock:
+            current = self.entries.get(key)
+            if current and revision is not None and current[2] is not None and current[2] > revision:
+                return current[1], 'hit'
+        return value, 'miss' if valid else 'stale'
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
