@@ -1,3 +1,5 @@
+import {caseProgressStatus,sourceStatusPending} from './stageModel';
+import {lifecycleGate} from './sourceLifecycle';
 import type {ReactNode} from 'react';
 import type {useSopTasks} from './useSopTasks';
 import {withLocalChecklist,localCase} from './nodeWorkbenchModel';
@@ -31,7 +33,7 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const stage=resolveStages({nodes:model.nodes,list,requested:c.route.node?selectedKey:undefined});
  const execution={allowed:executionAllowed(p,c.w),reason:executionReason(p)};
  const fresh=!!list&&list.writes_enabled&&!list.stale&&assignments.state.kind==='ready' || !list&&!unavailable;
- const step=stageNextStep({caseStatus:p.status,ctx:stage,list,today:c.w.as_of,fresh,block:p.status==='paused'?{kind:'paused',reason:`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`}:execution.allowed?undefined:{kind:p.execution_system==='meegle'?'meegle':!p.execution_system||p.execution_system==='pending'?'ownership':'execution',reason:execution.reason}});
+ const step=stageNextStep({caseStatus:caseProgressStatus(p),ctx:stage,list,today:c.w.as_of,fresh,block:sourceStatusPending(p)?{kind:'source',reason:lifecycleGate(p)||'來源案件狀態待核對'}:caseProgressStatus(p)==='paused'?{kind:'paused',reason:`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`}:execution.allowed?undefined:{kind:p.execution_system==='meegle'?'meegle':!p.execution_system||p.execution_system==='pending'?'ownership':'execution',reason:execution.reason}});
  const current=stage.nodes.find(n=>n.key===stage.currentIds[0]);
  const shared=current?sharedBlockerReasons(current.taskRows.map(row=>taskView(row,current,c.w.as_of))):[];
  const emptyBlocked=stage.currentSelected&&!localCase(p)&&current&&!current.taskRows.length&&!execution.allowed&&isProjectLead(c.s,p);

@@ -1,9 +1,9 @@
+import {CaseStatus} from './CaseStatus';
 import {PickerPopover} from './design/PickerPopover';
 import {Select as FormSelect} from './design/Select';
 import {useSourceRefresh} from './useSourceRefresh';
 import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {readLibraryMemory,writeLibraryMemory} from './libraryMemory';
-import {caseStatusLabel} from './stageModel';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
 import {readPortfolio, cachedPortfolio, tableCalendarDay} from './companyDashboardCache';
@@ -49,7 +49,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
    <div className="pl-field pl-pm"><small>負責 PM</small><Person name={person(p.pm_id)}/></div>
    <div className="pl-field pl-owner"><small>目前節點負責人</small><Person name={row.current?.owners.map(o=>o.name).join('、')||'未指派'}/></div>
    <div className="pl-field pl-current"><small>目前節點</small><span>{row.current?.label||(row.state==='已完成'?'流程完成':'待核對')}</span></div>
-   <div className="pl-states"><small className="pl-case-status">案件狀態：{caseStatusLabel(row.project.status)}</small><span className="pl-status" data-state={row.state}>流程進度：{row.state}</span></div>
+   <div className="pl-states"><small className="pl-case-status">案件狀態：<CaseStatus project={row.project}/></small><span className="pl-status" data-state={row.state}>流程進度：{row.state}</span></div>
    <div className="pl-flow" tabIndex={0} role="region" aria-label="九階段流程，可左右捲動"><Stepper row={row}/></div>
    <div className="pl-more" ref={menuAnchor}><button ref={trigger} aria-label={`${p.code} 更多操作`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(!menu)}><MoreVertical size={17}/></button>
     {menu&&<PickerPopover anchor={menuAnchor} onClose={()=>setMenu(false)}><div ref={menuRef} className="pl-menu" role="menu" aria-label={`${p.code} 操作`} onKeyDown={e=>{
@@ -59,7 +59,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
     }}><a role="menuitem" href={href}>開啟案件 <ArrowRight size={14}/></a><button role="menuitem" onClick={()=>{onPin();setMenu(false);trigger.current?.focus()}}>{pinned?'取消釘選':'釘選案件'}<Star size={14}/></button><button role="menuitem" onClick={()=>void copy()}>複製連結<Copy size={14}/></button><button role="menuitem" onClick={()=>{setDetails(!details);setMenu(false);trigger.current?.focus()}}>{details?'收合':'查看'}案件詳情<FileText size={14}/></button></div></PickerPopover>}
    </div>
   </div>
-  {details&&<div className="pl-details"><div><strong>資料來源</strong><span>來源 {p.source_status||'未填'}</span><span className="verification-cell" aria-label={verification(p)}>{verification(p)}</span><span>{p.case_type==='intake'?'待確認接案':'正式案件'}{p.parent_code?` · 母案 ${p.parent_code}`:''}</span><span>工作台狀態 {STATUS[p.execution_status||p.status]||p.execution_status||p.status||'未知'}</span>{p.source_lifecycle?.reasons?.length?<span>來源狀態待核對 · {p.source_lifecycle.reasons.join('、')}</span>:null}</div><div><strong>執行歸屬</strong><AdmissionCell p={p} role={c.s.user?.role}/></div><div><strong>期限與關注</strong><span className={`deadline${attention.soon?' is-upcoming':''}${deadlineLate?' is-overdue':''}`}>{taipeiDate(p.due_date,'未排期限')}</span><span>{[attention.late?'逾期':'',attention.blocked?'受阻':'',attention.soon?'即將到期':''].filter(Boolean).join(' · ')||'目前無已知期限警示'}</span></div><div><strong>SOP 納管</strong><span>{p.sop_summary?.policy==='managed'?'已納管':p.sop_summary?.policy==='legacy'?'歷史案件':p.sop_summary?.policy==='needs_review'?'政策待核對':'尚無納管紀錄'}{p.sop_summary?.imported_tasks?' · 已匯入 SOP 任務':''}</span><span>節點依工作區持久化摘要，最新指派請至案件核對。</span></div></div>}
+  {details&&<div className="pl-details"><div><strong>資料來源</strong><span>來源 {p.source_status||'未填'}</span><span className="verification-cell" aria-label={verification(p)}>{verification(p)}</span><span>{p.case_type==='intake'?'待確認接案':'正式案件'}{p.parent_code?` · 母案 ${p.parent_code}`:''}</span><span>工作台狀態 <CaseStatus project={p}/></span></div><div><strong>執行歸屬</strong><AdmissionCell p={p} role={c.s.user?.role}/></div><div><strong>期限與關注</strong><span className={`deadline${attention.soon?' is-upcoming':''}${deadlineLate?' is-overdue':''}`}>{taipeiDate(p.due_date,'未排期限')}</span><span>{[attention.late?'逾期':'',attention.blocked?'受阻':'',attention.soon?'即將到期':''].filter(Boolean).join(' · ')||'目前無已知期限警示'}</span></div><div><strong>SOP 納管</strong><span>{p.sop_summary?.policy==='managed'?'已納管':p.sop_summary?.policy==='legacy'?'歷史案件':p.sop_summary?.policy==='needs_review'?'政策待核對':'尚無納管紀錄'}{p.sop_summary?.imported_tasks?' · 已匯入 SOP 任務':''}</span><span>節點依工作區持久化摘要，最新指派請至案件核對。</span></div></div>}
   {message&&<p className="pl-row-message" role="status">{message}</p>}
  </article>;
 }

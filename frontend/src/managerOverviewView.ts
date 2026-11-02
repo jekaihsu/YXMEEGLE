@@ -56,7 +56,7 @@ export type CaseRow={
  entry:{label:string;route:string}|null;
 };
 export type CaseDetail={
- id:string;rowKeys:string[]|null;rowKeysText:string;rowKeysStateLabel:string|null;rowKeysReason:string|null;pmId:string|null;executionStatus:string|null;admission:Record<string,unknown>|null;
+ id:string;rowKeys:string[]|null;rowKeysText:string;rowKeysStateLabel:string|null;rowKeysReason:string|null;pmId:string|null;executionStatus:string|null;sourceStatusPending:boolean;admission:Record<string,unknown>|null;
  mappingLabel:string;amounts:{text:string;reason:string};formula:string|null;
 };
 export type CardView={
@@ -196,7 +196,7 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  const detail:CaseDetail={
   id,rowKeys,
   rowKeysText:rowKeys===null?OVERVIEW_LABELS.rowKeysUnknown:rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.dash,
-  rowKeysStateLabel:rowKeysState,rowKeysReason:rowKeys!==null&&!rowKeys.length?OVERVIEW_LABELS.rowKeysEmptyReason:rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
+  rowKeysStateLabel:rowKeysState,rowKeysReason:rowKeys!==null&&!rowKeys.length?OVERVIEW_LABELS.rowKeysEmptyReason:rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.progress_status)??optStr(d.execution_status),sourceStatusPending:d.execution_status==='paused'&&typeof d.progress_status==='string'&&d.progress_status!=='paused',admission,
   mappingLabel:OVERVIEW_LABELS.unverifiedMapping,
   amounts:{text:OVERVIEW_LABELS.withheld,reason:reqStr(am.reason)},
   formula:optStr(d.formula),

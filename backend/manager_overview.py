@@ -116,7 +116,7 @@ def _case(project, versions, people):
             'pending_decision': _unknown('No manager-level pending-decision definition.'),
             'entry_point': {'route': _route(project['id']), 'kind': 'case', 'read_only': True},
             'details': {'row_keys': deepcopy(versions), 'pm_id': person.get('id') if person else None,
-                        'execution_status': status,
+                        'execution_status': status, 'progress_status': project.get('progress_status', status),
                         'admission': admission_fields(project, project.get('execution_allowed') is True),
                         'mapping_state': 'receipt_missing',
                         'amounts': {'value': None, 'state': 'withheld', 'reason': 'G-AMT remains open.'},

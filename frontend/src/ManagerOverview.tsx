@@ -1,3 +1,5 @@
+import './CaseStatus.css';
+import {caseStatusLabel} from './stageModel';
 import { useRef, useEffect, useId, type ReactNode } from 'react';
 import type {
   ManagerOverviewView,
@@ -361,7 +363,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                         {view.drawer.case.executionStatus && (
                           <div>
                             <dt>執行狀態</dt>
-                            <dd>{{in_progress:'進行中',completed:'已完成',paused:'暫停中',pending:'待處理'}[view.drawer.case.executionStatus] || '執行狀態尚待核對'}</dd>
+                            <dd>{caseStatusLabel(view.drawer.case.executionStatus)}{view.drawer.case.sourceStatusPending&&<small className="case-source-status">來源狀態待核對</small>}</dd>
                           </div>
                         )}
                         <div>

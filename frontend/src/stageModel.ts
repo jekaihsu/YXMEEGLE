@@ -5,7 +5,10 @@ import {uniqueReasons} from './sopActionReasons';
 export const STATUS_LEVEL_NOTE='案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作';
 export const UNKNOWN_STATUS='狀態待確認';
 const CASE_STATUS:Record<string,string>={pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',engineering_complete:'工程完成、財務待結',source_conflict:'來源待核對',internal:'內部案',active:'進行中',ongoing:'進行中'};
-export const caseStatusLabel=(status:string|undefined)=>(status&&CASE_STATUS[status])||UNKNOWN_STATUS;
+export type CaseStatusSource={progress_status?:string;execution_status?:string;status?:string};
+export const caseProgressStatus=(p:CaseStatusSource)=>p.progress_status??p.execution_status??p.status;
+export const sourceStatusPending=(p:CaseStatusSource)=>(p.execution_status??p.status)==='paused'&&p.progress_status!==undefined&&p.progress_status!=='paused';
+export const caseStatusLabel=(value:string|CaseStatusSource|undefined)=>{const status=typeof value==='object'?caseProgressStatus(value):value;return (status&&CASE_STATUS[status])||UNKNOWN_STATUS;};
 // One dictionary for Lark, local-flow and SOP tasks: the same lifecycle state reads the same everywhere (R12, R38).
 const TASK_STATUS:Record<string,string>={pending:'待處理',in_progress:'進行中',completed:'已完成',paused:'暫停中',rework:'退回修正',blocked:'受阻',superseded:'舊版留存',canceled:'取消',cancelled:'取消',待處理:'待處理',尚未開始:'待處理',進行中:'進行中',已完成:'已完成',取消:'取消',待修正:'退回修正',退回修正:'退回修正',暫停中:'暫停中',受阻:'受阻'};
 export const taskStatusText=(status:string)=>TASK_STATUS[status]||UNKNOWN_STATUS;
@@ -74,8 +77,8 @@ export function groupTasks({ctx,filters,userId,today,loaded}:{ctx:StageContext;f
  return {selected:all.find(g=>g.node.key===ctx.selectedId),others:all.filter(g=>g.node.key!==ctx.selectedId&&(g.total>0||g.rows.length>0))};
 }
 
-export type StageBlock={kind:'paused'|'meegle'|'ownership'|'execution';reason:string};
-const BLOCK_TITLES:Record<StageBlock['kind'],string>={paused:'案件暫停中',meegle:'僅供參考',ownership:'尚未核定執行歸屬',execution:'案件執行受限'};
+export type StageBlock={kind:'source'|'paused'|'meegle'|'ownership'|'execution';reason:string};
+const BLOCK_TITLES:Record<StageBlock['kind'],string>={source:'來源案件狀態待核對',paused:'案件暫停中',meegle:'僅供參考',ownership:'尚未核定執行歸屬',execution:'案件執行受限'};
 
 
 export function sharedBlockerReasons(rows:TaskView[]):string[] {
@@ -97,7 +100,7 @@ export function stageNextStep({caseStatus,ctx,list,today,fresh,block,crossStageA
  if(!ctx.currentKnown)return {kind:'unknown',title:'目前階段待確認',reasons:['來源未提供目前階段，無法推薦下一步。請重新整理後再試。']};
  if(ctx.finished)return {kind:'none',title:'已完成',reasons:[]};
  const reasons:string[]=[];
- if(block)return {kind:'none',title:BLOCK_TITLES[block.kind],reasons:[block.reason]};
+ if(block)return {kind:'none',title:BLOCK_TITLES[block.kind],reasons:block.reason===BLOCK_TITLES[block.kind]?[]:[block.reason]};
  if(!fresh)reasons.push('等待來源核對，暫無可執行的動作。');
  const candidates=(keys:string[])=>keys.flatMap(key=>{
   const node=ctx.nodes.find(n=>n.key===key);if(!node)return [];

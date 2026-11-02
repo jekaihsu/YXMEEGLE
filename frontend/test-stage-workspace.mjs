@@ -199,6 +199,19 @@ await check('T22 the drawer takes focus, keeps Tab inside and closes with Escape
  await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick(20)});
  assert.equal(dialog(),null);await act(async()=>{await tick(30)});assert.ok(rowOf('c4').contains(document.activeElement));
 });
+await check('source lifecycle pause shows progress and one source review reason',async()=>{
+ await mount({node:'control',project:{status:'paused',execution_status:'paused',progress_status:'pending',source_kind:'lark',source_lifecycle:{state:'needs_verification',canonical:null,reasons:['blank']}}});
+ assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態尚未開始來源狀態待核對/);
+ assert.match(document.querySelector('.cs-next').textContent,/來源案件狀態待核對/);
+ assert.doesNotMatch(document.querySelector('.cs-next').textContent,/案件暫停中/);
+ assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/案件暫停中/);
+});
+await check('declared stop still displays paused with no source review chip',async()=>{
+ await mount({node:'control',project:{status:'paused',execution_status:'paused',progress_status:'paused',source_kind:'lark',source_lifecycle:{state:'mapped',canonical:'中止',reasons:[]}}});
+ assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態暫停中/);
+ assert.equal(document.querySelector('.case-source-status'),null);
+ assert.match(document.querySelector('.cs-next').textContent,/案件暫停中/);
+});
 await check('other stages use only the flow selector and case status is only in the header',async()=>{
  await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
  assert.equal(document.querySelector('.st-others'),null);assert.equal(document.querySelector('.cs-levels'),null);

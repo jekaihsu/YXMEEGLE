@@ -84,7 +84,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     clock=clock or datetime.now(timezone.utc);today=clock.astimezone(ZoneInfo('Asia/Taipei')).date()
     totals=Counter(cases=0,confirmed_cases=0,intake_records=0,workbench_cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0,
                    pending_local_reviews=0,pending_native_reviews=0,deliveries_confirmed=0)
-    source_counts=Counter();execution_counts=Counter();lifecycle_state_counts=Counter();lifecycle_counts=Counter();missing=Counter(task_due_date=0,group=0,source_status=0)
+    source_counts=Counter();execution_counts=Counter();progress_counts=Counter();lifecycle_state_counts=Counter();lifecycle_counts=Counter();missing=Counter(task_due_date=0,group=0,source_status=0)
     groups=defaultdict(lambda:Counter(cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0))
     rows=[]
     native=Counter();seen_native=set();deadline_cases=Counter();deadline_tasks=Counter()
@@ -102,7 +102,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         # Meegle-only legacy objects without a current Lark source are not company source cases.
         if p.get('source_kind')!='lark':continue
         status=p.get('source_status') or '未提供';execution=p.get('execution_status') or 'pending'
-        totals['cases']+=1;source_counts[status]+=1;execution_counts[execution]+=1
+        totals['cases']+=1;source_counts[status]+=1;execution_counts[execution]+=1;progress_counts[p.get('progress_status',execution)]+=1
         totals['confirmed_cases']+=int(p.get('case_type')=='formal')
         totals['intake_records']+=int(p.get('case_type')=='intake')
         if not p.get('source_status'):missing['source_status']+=1
@@ -150,7 +150,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         totals.update(counts)
         rows.append({'id':p['id'],'code':p.get('code',''),'name':p.get('name',''),'case_type':p.get('case_type','unknown'),'group':'、'.join(sorted(project_groups)) or '未分組',
                      'pm_id':p.get('pm_id'),'next_due':min(next_dates).isoformat() if next_dates else None,'deadline_basis':'local_workflow',
-                     'groups':sorted(project_groups),'source_status':status,'source_lifecycle':entry,'execution_status':execution,
+                     'groups':sorted(project_groups),'source_status':status,'source_lifecycle':entry,'execution_status':execution,'progress_status':p.get('progress_status',execution),
                      **admission_fields(p,runnable),
                      'workbench_execution_enabled':runnable,**dict(counts)})
     filtered=[r for r in rows if (not q or q.casefold() in (r['code']+' '+r['name']).casefold())
@@ -177,7 +177,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     return {'as_of':today.isoformat(),'checked_at':clock.isoformat(),'date_basis':'Asia/Taipei; actual task due_date only',
         'source':{'status':source.get('status','missing'),'last_success_at':source.get('last_sync'),
                   'mapping_status':source.get('mapping_status','unknown')},
-        'totals':{**dict(totals),'source_status_counts':dict(source_counts),'execution_status_counts':dict(execution_counts),'lifecycle_state_counts':dict(lifecycle_state_counts),'lifecycle_counts':dict(lifecycle_counts)},
+        'totals':{**dict(totals),'source_status_counts':dict(source_counts),'execution_status_counts':dict(execution_counts),'progress_status_counts':dict(progress_counts),'lifecycle_state_counts':dict(lifecycle_state_counts),'lifecycle_counts':dict(lifecycle_counts)},
         'source_deadlines':{'cases':sum(deadline_cases.values()),'tasks':sum(deadline_tasks.values()),
             'buckets':[{'key':key,'cases':deadline_cases[key],'tasks':deadline_tasks[key]} for key in DEADLINE_BUCKETS]},
         'missing':dict(missing),'groups':[{'group':key,**dict(value)} for key,value in sorted(groups.items())],

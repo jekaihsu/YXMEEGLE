@@ -1,3 +1,5 @@
+import {caseProgressStatus,sourceStatusPending} from './stageModel';
+import {lifecycleGate} from './sourceLifecycle';
 import {useEffect,useState,type MutableRefObject,type ReactNode} from 'react';
 import {StageBlockerBanner} from './StageBlockerBanner';
 import {TriangleAlert} from 'lucide-react';
@@ -48,7 +50,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  const filterRoute=(key:typeof STAGE_FILTERS[number])=>c.go(withTaskFilter(c.route,key,!filters[key]),true);
  const clear=()=>c.go({...c.route,task_filters:undefined},true);
  const assignButton=(row:TaskView)=>!row.ownerId&&row.task?.can.assign&&<FlowAction allowed={!busy&&row.task.can.assign} reason={busy?reason:'你可查看此任務，但目前無指派權限。'} onClick={()=>open(row.nodeKey,row.id)}>指派</FlowAction>;
- const caseReason=!executionAllowed(p,c.w)?executionReason(p):p.status==='paused'?'案件暫停中':'';
+ const caseReason=sourceStatusPending(p)?lifecycleGate(p)||'來源案件狀態待核對':!executionAllowed(p,c.w)?executionReason(p):caseProgressStatus(p)==='paused'?'案件暫停中':'';
  const sharedReasons=sharedBlockerReasons(selected?.rows||[]);
  const rowView=(row:TaskView,group:TaskGroup)=>{
   const rowReasons=row.flags.blocker.state==='blocked'?row.flags.blocker.reasons.filter(r=>!sharedReasons.includes(r)&&(!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r)))):[];
@@ -69,7 +71,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  return <section id="flow-tasks" className="pf-tasks st-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>本階段任務</h3>{!!selected?.total&&<span className="st-count" role="status">{incomplete?`${selected.rows.length} 項已載入，來源未完整`:`已完成 ${selected.done} / ${selected.total} 項`}</span>}</header>
   <StageBlockerBanner reasons={[
-   ...((!emptyActions||!!selected?.rows.length)&&!(caseReasonShown&&!executionAllowed(p,c.w))&&caseReason?[p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:caseReason]:[]),
+   ...((!emptyActions||!!selected?.rows.length)&&!(caseReasonShown&&!executionAllowed(p,c.w))&&caseReason?[caseProgressStatus(p)==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:caseReason]:[]),
    ...sharedReasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r)))
   ]}/>
   {selected&&selected.loaded&&!incomplete&&selected.rows.length!==selected.total&&<p className="st-note" role="status">列表載入 {selected.rows.length} 項，與節點總數 {selected.total} 項不一致，請重新整理後再確認。</p>}

@@ -195,6 +195,14 @@ def refresh_project_state(p,ws):
     financially_settled=financial_readiness(ws,p)['ready'] if ws.get('environment')=='production' else bool(p.get('payment_reconciliation',{}).get('confirmed'))
     if settlement and settlement['status']=='completed' and (not engineering or settlement_preconditions(p,ws) or not financially_settled or p.get('migration_review_required') or p.get('migration_conflicts') or p.get('migration_finance_reapproval_required')):
         invalidate(settlement,'工程交付或收付款尚未核實完成')
+    # Display progress is independent of the fail-closed execution gate below.
+    # A previous lifecycle pause carries no progress; started nodes still do.
+    prior_execution=p.get('execution_status')
+    if settlement and settlement['status']=='completed' and engineering: p['progress_status']='completed'
+    elif engineering: p['progress_status']='engineering_complete'
+    elif declared(p)=='中止': p['progress_status']='paused'
+    elif prior_execution in ('in_progress','engineering_complete','completed') or any(n['status'] in ('in_progress','rework','completed') for n in p['nodes']): p['progress_status']='in_progress'
+    else: p['progress_status']='pending'
     if settlement and settlement['status']=='completed' and engineering:
         p['execution_status']='completed'
     elif engineering: p['execution_status']='engineering_complete'
@@ -980,4 +988,4 @@ def project_summary(ws,p):
     closure_missing=missing(p,settlement,ws) if settlement else ['尚無結算節點']
     closure={'status':'completed' if p['execution_status']=='completed' else 'blocked' if closure_missing else 'ready','missing':closure_missing,
              'financial':financial_readiness(ws,p),'source_status_is_not_completion':True}
-    return {'project_id':p['id'],'sop_topology':topology_projection(p),'source_status':p.get('source_status'),'execution_status':p['execution_status'],'closure':closure,'source_conflicts':p.get('source_conflicts',{}),'migration_review_required':bool(p.get('migration_review_required') or p.get('migration_conflicts')),'migration_conflicts':p.get('migration_conflicts',{}),'migration_finance_reapproval_required':p.get('migration_finance_reapproval_required',False),'progress':{'completed_nodes':sum(n['status']=='completed' for n in p['nodes']),'approved_skipped_nodes':sum(valid_waiver(ws,p,n) for n in p['nodes']),'total_nodes':len(p['nodes'])},'nodes':[{'id':n['id'],'name':n['name'],'source_completed':n.get('source_completed',False),'status':n['status'],'missing':missing(p,n,ws),'skip':skip_summary(ws,p,n),'review':n['review_cycles'][-1] if n['review_cycles'] else None} for n in p['nodes']]}
+    return {'project_id':p['id'],'sop_topology':topology_projection(p),'source_status':p.get('source_status'),'execution_status':p['execution_status'],'progress_status':p['progress_status'],'closure':closure,'source_conflicts':p.get('source_conflicts',{}),'migration_review_required':bool(p.get('migration_review_required') or p.get('migration_conflicts')),'migration_conflicts':p.get('migration_conflicts',{}),'migration_finance_reapproval_required':p.get('migration_finance_reapproval_required',False),'progress':{'completed_nodes':sum(n['status']=='completed' for n in p['nodes']),'approved_skipped_nodes':sum(valid_waiver(ws,p,n) for n in p['nodes']),'total_nodes':len(p['nodes'])},'nodes':[{'id':n['id'],'name':n['name'],'source_completed':n.get('source_completed',False),'status':n['status'],'missing':missing(p,n,ws),'skip':skip_summary(ws,p,n),'review':n['review_cycles'][-1] if n['review_cycles'] else None} for n in p['nodes']]}

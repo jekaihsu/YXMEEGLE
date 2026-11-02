@@ -115,7 +115,7 @@ def card(r,state,per_project):
     """List-row view of one project_index row, shared by the shell and the paged overview."""
     summary=r['summary'] or {}; derived=summary.get('execution_status') or r['execution_status']  # full workspace shows the refreshed value (status mirrors it)
     active,overdue=per_project.get(r['project_id'],(0,0))
-    card=dict(id=r['project_id'],code=r['code'],name=r['name'],client=r['client'],pm_id=r['pm_id'],status=derived,execution_status=derived,
+    card=dict(id=r['project_id'],code=r['code'],name=r['name'],client=r['client'],pm_id=r['pm_id'],status=derived,execution_status=derived,progress_status=summary.get('progress_status',derived),
               due_date=r['due_date'],case_type=r['case_type'],source_kind=r['source_kind'],
               source_status=r['source_status'],concurrency_version=r['concurrency_version'],
               progress=summary.get('progress') or dict(completed_nodes=r['nodes_completed'],approved_skipped_nodes=0,total_nodes=r['nodes_total']),

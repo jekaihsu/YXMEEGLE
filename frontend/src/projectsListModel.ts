@@ -27,7 +27,9 @@ export function caseRow(project:PortfolioProject,users:User[],viewer:string,toda
  const source=project.portfolio_nodes;
  const local=source ? {...project,nodes:source.map(n=>({id:n.key,name:n.key,key:n.key,status:n.status,owner_id:n.owner_id||'',collaborator_ids:n.collaborator_ids,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,tasks:[]}))} : {...project,nodes:project.nodes||[]};
  const nodes=buildFlowModel({project:local,users,today}).nodes.map(n=>n.legacy?.status==='paused'?{...n,state:'暫停'}:n);
- const {current,state}=currentNode(nodes);
+ const result=currentNode(nodes);
+ const current=result.current;
+ const state:CaseState=!nodes.some(n=>n.assignment||n.legacy)&&project.progress_status?({pending:'尚未開始',in_progress:'進行中',engineering_complete:'進行中',completed:'已完成',paused:'暫停'} as const)[project.progress_status]??result.state:result.state;
  const mine=!!viewer && (project.pm_id===viewer || project.owner_id===viewer ||
   Array.isArray(project.collaborator_ids)&&project.collaborator_ids.includes(viewer) ||
   current?.legacy?.collaborator_ids?.includes(viewer)===true || current?.owners.some(p=>p.open_id===viewer)===true);

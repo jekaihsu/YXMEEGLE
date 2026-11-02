@@ -1,3 +1,4 @@
+import {CaseStatus} from './CaseStatus';
 import {useState, useEffect, lazy, Suspense, type ReactNode} from 'react';
 import {ArrowRight, CalendarDays, ChevronRight, CircleCheck, Clock3, GitBranch} from 'lucide-react';
 import {type HomeQueueItem,type HomeTaskFacts,type HomeWaitingItem,type Project} from './types';
@@ -106,9 +107,9 @@ function Inbox({c,count,caption,items,moreWork,morePending}:{c:Ctx;count:number;
 const taskItem=(c:Ctx,key:string,title:string,detail:string,due:string|null,go:()=>void):Item=>{const late=!!due&&due.slice(0,10)<c.w.as_of.slice(0,10);return{key,title,detail,late:late?elapsed(due,c.w.as_of):undefined,today:!!due&&!late&&due.slice(0,10)===c.w.as_of.slice(0,10),icon:<Clock3 size={20}/>,onClick:go}};
 const approvalItem=(c:Ctx,a:{id:string;title:string;type:string;project_id:string}):Item=>({key:a.id,title:a.title,detail:`${a.type==='change'?'設計變更':'期限展延'} · 等待確認`,icon:<GitBranch size={20}/>,onClick:()=>c.go({view:'project',project:a.project_id,tab:'approvals'})});
 
-function Portfolio({c,formal,rows}:{c:Ctx;formal:Project[];rows:{p:Project;stage:string;percent:number}[]}){
+function Portfolio({c,formal,rows}:{c:Ctx;formal:Project[];rows:{p:Project;stage:ReactNode;percent:number}[]}){
  return <Group title="案件進度" caption="正式案件">
-  {rows.map(({p,stage,percent})=><div key={p.id} className="project-preview-row"><Row href={`#view=project&project=${encodeURIComponent(p.id)}`} label={p.name} detail={`${p.code} · ${p.client} · ${stage}`} value={<span className="dh-progress"><strong>{percent}<small>%</small></strong><Progress value={percent} label={`${p.code} 任務進度`}/></span>}/></div>)}
+  {rows.map(({p,stage,percent})=><div key={p.id} className="project-preview-row"><Row href={`#view=project&project=${encodeURIComponent(p.id)}`} label={p.name} detail={<>{p.code} · {p.client} · {stage}</>} value={<span className="dh-progress"><strong>{percent}<small>%</small></strong><Progress value={percent} label={`${p.code} 任務進度`}/></span>}/></div>)}
   {!rows.length&&<Empty title="尚無正式案件" detail="待成案資料會分開保留，確認成案後再進入此清單。"/>}
   <More onClick={()=>c.go({view:'projects'})}>{`查看全部 ${formal.length} 案`}</More>
  </Group>
@@ -142,7 +143,7 @@ function LegacyDashboard({c}:{c:Ctx}){
   <Inbox c={c} count={attention.length+pending.length} caption={countLine([['本人可執行逾期',overdue.length],['當日到期',dueToday.length],['受阻',blocked.length]])} items={items} moreWork={attention.length>5} morePending={pending.length>2}/>
   <WaitingWork c={c} items={waiting}/>
   <HomeQueues c={c}/>
-  <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:progress(p),stage:p.nodes.filter(n=>['in_progress','paused'].includes(n.status)).map(n=>NODE_NAMES[n.key]||n.name).join('、')||STATUS[p.status]||p.status}))}/></div>
+  <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:progress(p),stage:p.nodes.filter(n=>['in_progress','paused'].includes(n.status)).map(n=>NODE_NAMES[n.key]||n.name).join('、')||<CaseStatus project={p}/>}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<section className="today-activity ds-section"><h2>近期活動</h2><div className="ds-group glass--flat"><EventList c={c} limit={3}/></div></section>} daily={<>{reports.slice(0,3).map(r=><Row key={r.id} label={r.case_code} detail={`${r.department} · ${r.person}`} onClick={()=>c.go({view:'project',project:r.p.id,tab:'daily'})}/>)}{!reports.length&&<Row label={c.s.mode==='lark'&&(c.w.source_status.status!=='ready'||unmatchedDaily(c.w)>0)?'日報來源待核對，尚無已配對紀錄':'資料日期內尚無已配對日報'}/>}</>}/></div></Head>
 }
 function LegacyShellDashboard({c}:{c:Ctx}){
@@ -158,7 +159,7 @@ function LegacyShellDashboard({c}:{c:Ctx}){
   <Inbox c={c} count={overdue+dueToday+counts.approvals_pending} caption={[countLine([['本人可執行逾期',overdue],['當日到期',dueToday]]),blocked.length?`受阻 ${blocked.length}（已載入）`:''].filter(Boolean).join(' · ')} items={items} moreWork={overdue+dueToday>attention.slice(0,5).length} morePending={counts.approvals_pending>pending.length}/>
   <WaitingWork c={c} items={waiting} counts={c.w.home_waiting_counts}/>
   <HomeQueues c={c}/>
-  <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:percent(p),stage:STATUS[p.execution_status||p.status]||p.status}))}/></div>
+  <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:percent(p),stage:<CaseStatus project={p}/>}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<ShellActivity c={c}/>} daily={<Row label="日報請至各案件的「日報」頁查看"/>}/></div></Head>
 }
 function ShellActivity({c}:{c:Ctx}){
