@@ -1,9 +1,9 @@
 .pl-page {
-  --pl-bg: #f7f8fa;
-  --pl-text: #172033;
-  --pl-secondary: #667085;
-  --pl-border: #e5e7eb;
-  --pl-blue: #2563eb;
+  --pl-bg: var(--bg);
+  --pl-text: var(--label);
+  --pl-secondary: var(--label-2);
+  --pl-border: var(--sep);
+  --pl-blue: var(--accent);
   background: var(--pl-bg);
   color: var(--pl-text);
   min-width: 0;
@@ -33,8 +33,8 @@
 }
 
 .pl-page ::selection {
-  background: #dbeafe;
-  color: #172033;
+  background: var(--status-info-bg);
+  color: var(--label);
 }
 
 .pl-page input {
@@ -74,7 +74,7 @@
   height: 44px;
   border: 1px solid var(--pl-border);
   border-radius: 7px;
-  background: white;
+  background: var(--surface);
   color: var(--pl-secondary);
   padding: 0 12px;
   min-width: 0;
@@ -82,7 +82,7 @@
 
 .pl-header .pl-search {
   width: 305px;
-  background: #f2f4f7;
+  background: var(--surface-2);
 }
 
 .pl-search input {
@@ -111,7 +111,7 @@
   border: 1px solid var(--pl-border);
   border-radius: 7px;
   overflow: hidden;
-  background: white;
+  background: var(--surface);
 }
 
 .pl-view button {
@@ -125,7 +125,7 @@
 }
 
 .pl-view button[aria-pressed=true] {
-  background: #e9edf3;
+  background: var(--surface-2);
   color: var(--pl-text);
 }
 
@@ -135,9 +135,9 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: #202b3d;
-  color: white;
-  border: 1px solid #202b3d;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
   border-radius: 7px;
   padding: 0 18px;
   white-space: nowrap;
@@ -147,7 +147,7 @@
   min-height: 44px;
   border: 1px solid var(--pl-border);
   border-radius: 7px;
-  background: white;
+  background: var(--surface);
   color: var(--pl-text);
   padding: 0 14px;
   white-space: nowrap;
@@ -168,7 +168,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--pl-border);
   border-radius: 12px;
   padding: 16px 20px;
@@ -178,7 +178,7 @@
   height: 42px;
   width: 42px;
   border-radius: 50%;
-  background: #f3f4f6;
+  background: var(--surface-2);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -186,12 +186,12 @@
 
 .pl-kpi:nth-child(2) .pl-kpi-icon {
   color: var(--pl-blue);
-  background: #edf3ff;
+  background: var(--accent-fill);
 }
 
 .pl-kpi:nth-child(4) .pl-kpi-icon {
-  color: #168365;
-  background: #edf7f3;
+  color: var(--positive);
+  background: var(--status-ok-bg);
 }
 
 .pl-kpi>div {
@@ -201,7 +201,7 @@
 }
 
 .pl-kpi>div>span {
-  color: #475467;
+  color: var(--label-2);
   font-size: 12px;
 }
 
@@ -224,8 +224,8 @@
   max-width: 200px;
   border: 1px solid var(--pl-border);
   border-radius: 7px;
-  background: white;
-  color: #344054;
+  background: var(--surface);
+  color: var(--label-2);
   padding: 0 30px 0 12px;
   font-size: 12px;
 }
@@ -256,10 +256,10 @@
   width: 410px;
   max-width: 80vw;
   padding: 16px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--pl-border);
   border-radius: 12px;
-  box-shadow: 0 8px 20px #17203312;
+  box-shadow: 0 8px 20px var(--sep);
 }
 
 .pl-extra button, .pl-clear {
@@ -307,7 +307,7 @@
 .pl-group h2>span {
   font-size: 12px;
   font-weight: 500;
-  background: #e9edf3;
+  background: var(--surface-2);
   border-radius: 6px;
   min-width: 25px;
   text-align: center;
@@ -321,7 +321,7 @@
   gap: 10px;
   border: 0;
   background: none;
-  color: #475467;
+  color: var(--label-2);
   font-size: 12px;
   min-height: 44px;
   padding: 0 8px;
@@ -334,14 +334,14 @@
 
 .pl-case {
   position: relative;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--pl-border);
   border-radius: 9px;
   min-width: 0;
 }
 
 .pl-case:hover {
-  border-color: #cbd2dd;
+  border-color: var(--sep);
 }
 
 .pl-row {
@@ -354,13 +354,13 @@
   height: 44px;
   background: none;
   border: 0;
-  color: #98a2b3;
+  color: var(--label-2);
   display: grid;
   place-items: center;
 }
 
 .pl-pin[aria-pressed=true] {
-  color: #eda600;
+  color: var(--warning);
 }
 
 .pl-identity {
@@ -378,9 +378,9 @@
 }
 
 .pl-removed {
-  color: #9a3412;
+  color: var(--status-warn-fg);
   font-weight: 600;
-  background: #ffedd5;
+  background: var(--status-warn-bg);
   border-radius: 4px;
   padding: 2px 5px;
 }
@@ -423,7 +423,7 @@
   flex-direction: column;
   gap: 3px;
   min-width: 0;
-  border-left: 1px solid #eef0f3;
+  border-left: 1px solid var(--sep);
   padding-left: 10px;
 }
 
@@ -451,8 +451,8 @@
   width: 19px;
   height: 19px;
   border-radius: 50%;
-  background: #eef0f4;
-  color: #667085;
+  background: var(--surface-2);
+  color: var(--label-2);
   flex-shrink: 0;
 }
 
@@ -474,41 +474,41 @@
 .pl-case-status {
   font-size: inherit;
   line-height: 1.3;
-  color: #667085;
+  color: var(--label-2);
 }
 
 .pl-status {
   justify-self: start;
   font-size: inherit;
   white-space: nowrap;
-  background: #eaf1ff;
-  color: #1757c6;
+  background: var(--status-info-bg);
+  color: var(--status-info-fg);
   border-radius: 6px;
   padding: 3px 8px;
 }
 
 .pl-status[data-state=待審核] {
-  background: #fff0d5;
-  color: #8a4b08;
+  background: var(--status-warn-bg);
+  color: var(--status-warn-fg);
 }
 
 .pl-status[data-state=尚未開始], .pl-status[data-state=待核對], .pl-status[data-state=暫停] {
-  background: #f0f2f5;
-  color: #475467;
+  background: var(--status-unknown-bg);
+  color: var(--label-2);
 }
 
 .pl-status[data-state=已完成] {
-  background: #e7f4ee;
-  color: #14765c;
+  background: var(--status-ok-bg);
+  color: var(--status-ok-fg);
 }
 
 .pl-flow {
   min-width: 0;
-  border-left: 1px solid #eef0f3;
+  border-left: 1px solid var(--sep);
   padding: 0 8px 0 10px;
   overflow-x: auto;
   scrollbar-width: thin;
-  scrollbar-color: #cbd2dd transparent;
+  scrollbar-color: var(--sep) transparent;
 }
 
 .pl-stepper {
@@ -539,7 +539,7 @@
   height: 1px;
   left: -50%;
   width: 100%;
-  background: #d9dfe8;
+  background: var(--sep);
 }
 
 .pl-stepper li:first-child:before {
@@ -550,21 +550,21 @@
   width: 14px;
   height: 14px;
   z-index: 1;
-  background: white;
-  border: 1.5px solid #a7b1c2;
+  background: var(--surface);
+  border: 1.5px solid var(--label-2);
   border-radius: 50%;
   display: grid;
   place-items: center;
 }
 
 .pl-stepper li[data-state=done] .pl-step-dot {
-  background: #168365;
-  border-color: #168365;
-  color: white;
+  background: var(--positive);
+  border-color: var(--positive);
+  color: var(--on-accent);
 }
 
 .pl-stepper li[data-state=done]:before {
-  background: #7fbdac;
+  background: var(--positive);
 }
 
 .pl-stepper li[data-state=current] {
@@ -591,13 +591,13 @@
 
 .pl-more {
   position: relative;
-  border-left: 1px solid #eef0f3;
+  border-left: 1px solid var(--sep);
 }
 
 .pl-more>button {
   background: none;
   border: 0;
-  color: #344054;
+  color: var(--label-2);
   min-width: 32px;
   height: 44px;
   display: grid;
@@ -609,12 +609,12 @@
   right: 0;
   top: 48px;
   z-index: 12;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--pl-border);
   border-radius: 10px;
   padding: 5px;
   min-width: 175px;
-  box-shadow: 0 8px 24px #17203320;
+  box-shadow: 0 8px 24px var(--label)20;
 }
 
 .pl-menu a, .pl-menu button {
@@ -634,7 +634,7 @@
 }
 
 .pl-menu a:hover, .pl-menu button:hover {
-  background: #f2f4f7;
+  background: var(--surface-2);
 }
 
 .pl-details {
@@ -658,11 +658,11 @@
 }
 
 .pl-details .is-overdue {
-  color: #b42318;
+  color: var(--critical);
 }
 
 .pl-details .is-upcoming {
-  color: #8a4b08;
+  color: var(--status-warn-fg);
 }
 
 .pl-row-message {
@@ -686,7 +686,7 @@
 
 .pl-state {
   border: 1px solid var(--pl-border);
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
   padding: 24px;
   margin: 16px 0;
@@ -697,7 +697,7 @@
 }
 
 .pl-state button {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--pl-border);
   border-radius: 7px;
   min-height: 44px;
@@ -705,7 +705,7 @@
 }
 
 .pl-state[role=alert] {
-  border-color: #f3d3cf;
+  border-color: var(--status-error-bg);
 }
 
 .pl-grid .pl-group-rows {
@@ -1089,7 +1089,7 @@
 
 .workspace:has(>.pl-page) {
   padding: 0;
-  background: #f7f8fa;
+  background: var(--bg);
 }
 
 .pl-page .sr-only {
@@ -1366,7 +1366,7 @@
 }
 
 .main-shell:has(.pl-page) {
-  background: #f7f8fa;
+  background: var(--bg);
 }
 
 .pl-page {
@@ -1374,7 +1374,7 @@
 }
 
 .pl-page .skeleton {
-  background: #edf0f4;
+  background: var(--surface-2);
   background-image: none;
   animation: none;
 }

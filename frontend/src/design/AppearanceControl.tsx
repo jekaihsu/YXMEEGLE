@@ -2,7 +2,7 @@ import {Segmented} from './index';
 import {useAppearance,type TextSize,type ThemeMode} from './appearance';
 
 const THEMES:[ThemeMode,string][]=[['system','自動'],['light','淺色'],['dark','深色']];
-const SIZES:[TextSize,string][]=[['s','S'],['m','M'],['l','L'],['xl','XL']];
+const SIZES:[TextSize,string][]=[['s','小'],['m','標準'],['l','大'],['xl','特大']];
 
 export function AppearanceControl(){
  const a=useAppearance();

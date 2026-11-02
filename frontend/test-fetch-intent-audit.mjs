@@ -15,7 +15,8 @@ const legacy={
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
- 'AppShell.tsx': '08c909c3a490826bc80f82ec07750800bf72070032d55d2bcfaf23a6445cba1f',
+ // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
+ 'AppShell.tsx': '1ccb29b07ceb1d4be923ad120a236209c786ec36e1b7f7adc98b942f8910071c',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
@@ -26,7 +27,8 @@ const legacy={
  'assistant/feedback.tsx': '4cd1a98c53d93890b93faf8cf5025bd9dadebd528908030a0f8cd43ff6ec5bbb',
  'assistant/useInputModality.ts': '822efb5b2e63069ef075c0a0bef50d0d5f3045dc34fb1a8422dc72fb85e11bf9',
  'design/PickerPopover.tsx': 'c9573b531f847dddeff291b4823f403f16688d4f75531339853f7d516c260ca8',
- 'design/index.tsx': '0d15d44f66c4d3d7828a09a27d27137b97d20fae59243a2cbf9bd161a8210578',
+ // I1: DataState export; existing picker presentation listeners unchanged.
+ 'design/index.tsx': 'fe0146b94de390791220bb6765b7e5f616892bc19c6a87972dc72bf79088e9be',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1bfb68b728abee62479f560fa761651fe1fd3ecb94453a52c65d6f0b3190e74d',
  'reports/ProgressTab.tsx': '07324dd7af61e77ed2a499fb579b11884c3a3329f2416b01d9f893b7859bc11b',
