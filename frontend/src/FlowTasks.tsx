@@ -17,7 +17,7 @@ import {AssignmentTaskInspector} from './AssignmentTaskInspector';
 import {isProductionSeedTask,productionPlanFacts} from './productionPlan';
 import {ProductionPlanFacts} from './FlowEvidence';
 import {sharedBlockerReasons,STAGE_FILTERS,STAGE_FILTER_LABELS,activeFilters,blockedKnown,groupTasks,type StageContext,type TaskGroup,type TaskView} from './stageModel';
-import {prefetchNodeAssignmentDetail,type useNodeAssignments} from './useNodeAssignments';
+import {type useNodeAssignments} from './useNodeAssignments';
 import {assignRequests} from './assignRequests';
 
 type Props={c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;evidence:ReactNode;emptyActions?:ReactNode;caseReasonShown?:boolean;reopened?:MutableRefObject<string>;children?:ReactNode};
@@ -91,7 +91,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
   {assigning&&drawerNode&&<AssignDrawer key={`${assigning.nodeKey}:${assigning.taskId}`} task={drawerTask} nodeKey={assigning.nodeKey} nodeLabel={drawerNode.label} caseLabel={`${p.code} ${p.name}`} people={drawerDetail?.assignable_people||[]}
    unavailableReason={assignments.state.kind==='error'?'節點來源更新失敗，請重新整理後再試。':assignments.state.kind==='ready'&&assignments.state.data.stale?'資料已過期，請重新整理後再試。':!drawerDetail?.writes_enabled?drawerDetail?.writes_disabled_reason||'節點修改尚未開放。':''}
    mutate={assignments.mutate} retry={assignments.retryMutation} refresh={()=>void assignments.reload()}
-   verify={async()=>{const detail=await prefetchNodeAssignmentDetail(p.id,assigning.nodeKey,undefined,true);void assignments.reload();return detail.tasks.find(t=>t.id===assigning.taskId)}}
+   verify={async()=>{const detail=await assignments.verifyNode(assigning.nodeKey);return detail.tasks.find(t=>t.id===assigning.taskId)}}
    onClose={()=>{setRestore(assigning.taskId);setAssigning(null)}}/>}
  </section>;
 }

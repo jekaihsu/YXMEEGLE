@@ -90,13 +90,13 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
    if (!sop.current()) return true;
    if (receipt.task) sop.applyTask(receipt.task, receipt.checklist_revision);
    setNotice(done);
-   void sop.reload();
+   await sop.reload();
    return true;
   } catch (e) {
    if (!sop.current()) return false;
    if (e instanceof SopError && e.ambiguous) {verifying = true; void confirmOutcome(); return false}
    setError(sopErrorText(e));
-   if (e instanceof SopError && e.code === 'task_revision_conflict') void sop.reload();
+   if (e instanceof SopError && e.code === 'task_revision_conflict') await sop.reload();
    return false;
   } finally {if (!verifying) writing.current = false; if (sop.current()) {setBusy(false); setPending('')}}
  };

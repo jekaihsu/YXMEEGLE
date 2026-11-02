@@ -1,3 +1,4 @@
+import {DetailRefreshProvider} from './detailRefresh';
 import {Select as FormSelect} from './design/Select';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -22,7 +23,7 @@ function QuoteFields({q,pmName}:{q:Quote;pmName?:string}) {return <Section><Row 
 function LocalFlow({c,q}:{c:Ctx;q:Quote}) {
  const sop=useSopTasks(q.project_id||'',c.s.workspace_id||'',canReadSop(c.s.user));
  const [node,setNode]=useState<SopNodeKey>('sales'),[importing,setImporting]=useState<SopImportTarget>(null);
- return <><div className="quote-stages" role="group" aria-label="SOP 節點">{SOP_NODES.map(([key,label])=><Button key={key} aria-pressed={node===key} onClick={()=>setNode(key)}>{label}</Button>)}</div><SopTasks c={c} p={{id:q.project_id!}} nodeKey={node} sop={sop} importing={importing} setImporting={setImporting}/></>;
+ return <><p>資料時間：{sop.dataTime||'來源未提供'}</p><div className="quote-stages" role="group" aria-label="SOP 節點">{SOP_NODES.map(([key,label])=><Button key={key} aria-pressed={node===key} onClick={()=>setNode(key)}>{label}</Button>)}</div><SopTasks c={c} p={{id:q.project_id!}} nodeKey={node} sop={sop} importing={importing} setImporting={setImporting}/></>;
 }
 function QuoteSheet({c,detail,onClose,onReload}:{c:Ctx;detail:QuoteDetail;onClose:()=>void;onReload:()=>Promise<void>}) {
  const q=detail.quote,[importing,setImporting]=useState(false);
@@ -44,7 +45,8 @@ const COLUMNS = [
   ['quote_owners', '負責人', 'col-owner'],
 ] as const;
 
-export function Quotes({c}:{c:Ctx}) {
+export function Quotes({c}:{c:Ctx}) {return <DetailRefreshProvider scope={c.s.workspace_id||''} identityFingerprint={JSON.stringify([c.s.user?.id,c.s.user?.authz_version,c.s.user?.capabilities])}><QuotesContent c={c}/></DetailRefreshProvider>}
+function QuotesContent({c}:{c:Ctx}) {
  const [items,setItems]=useState<Quote[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [q,setQ]=useState(''),[stage,setStage]=useState(''),[sort,setSort]=useState<QuoteSort>('quote_no'),[dir,setDir]=useState(-1),[page,setPage]=useState(0),[size,setSize]=useState(25);
  const [detail,setDetail]=useState<QuoteDetail|null>(null),[creating,setCreating]=useState(false),[version,setVersion]=useState(0);

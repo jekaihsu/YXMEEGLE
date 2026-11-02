@@ -1,16 +1,18 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import type {PageData} from './pageData';
-import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import type {PageData, FetchIntent} from './pageData';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh, useCaseWrite} from './detailRefresh';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
-import {canConfirmSop, fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
+import {canConfirmSop, parseSopPreview, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
+function loadStart(id:string,current:()=>boolean,intent:FetchIntent,signal:AbortSignal){return assignmentRequest(sopPath(id),{signal,cache:'no-store',headers:{'X-YX-Fetch-Intent':intent.reason,'X-YX-Fetch-Generation':'id' in intent?intent.id:'initial'}},current).then(parseSopPreview)}
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
 const cache=new Map<string,SopPreview>();
 export function prefetchStartSop(id:string,force:boolean|symbol=false,owner?:PageData){
- return readCase(owner,`start:${id}`,force,current=>fetchSop(id,current)).then(data=>{cache.set(caseKey(owner,id),data);return data});
+ return readCase(owner,`start:${id}`,force,(current,intent,signal)=>loadStart(id,current,intent,signal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
-export function seedStartSop(id:string,data:SopPreview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){cache.set(caseKey(owner,id),data);seedCase(owner,`start:${id}`,data,current=>fetchSop(id,current),true,meta,batch)}
-export function useStartSop(id: string, enabled: boolean, refreshOverview: () => Promise<void>) {
+export function seedStartSop(id:string,data:SopPreview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){cache.set(caseKey(owner,id),data);seedCase(owner,`start:${id}`,data,(current,intent,signal)=>loadStart(id,current,intent,signal),true,meta,batch)}
+export function useStartSop(id: string, enabled: boolean, _refreshOverview: () => Promise<void>) {
+ const commit=useCaseWrite();
  const owner=useCaseData(),key=caseKey(owner,id);
  const [state, setState] = useState<State>({kind: 'hidden'});
  const [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
@@ -26,7 +28,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
  }, [id,owner]);
  useEffect(() => {life.current = {active: true, epoch: getSessionEpoch(),key}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && life.current.epoch === getSessionEpoch() && cache.has(key) ? {kind: 'ready', data: cache.get(key)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
  const reloadDetail=useCallback((batch:symbol)=>reload(batch),[reload]);
- const refreshDetail=useDetailRefresh(reloadDetail,enabled);
+ useDetailRefresh(reloadDetail,enabled);
  const confirm = async (seed = false) => {
   if (posting.current || state.kind !== 'ready' || !canConfirmSop(state.data, seed)) return false;
   posting.current = true; setBusy(true); setNotice('');
@@ -39,7 +41,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
    attempt.current = null;
    pendingSync.current = result.results.some(node => node.sync === 'failed');
    setNotice(sopResultMessage(result, state.data, seed));
-   await refreshOverview(); if(!refreshDetail)await reload(true); return result.complete;
+   await commit([{endpoint:`start:${id}`},{endpoint:id},{endpoint:`progress:${id}`},{endpoint:`${owner.scope.workspace}:${id}:tasks`}]); return result.complete;
   } catch (e) {
    if (!valid()) return false;
    if (e instanceof NodeAssignmentError && e.code === 'preview_stale') {attempt.current = null; await reload(true); setNotice('計畫已變更，已重新讀取預覽，請確認後再啟動。')}
