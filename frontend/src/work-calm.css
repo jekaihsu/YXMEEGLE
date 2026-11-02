@@ -1,0 +1,240 @@
+.work-page {
+  color:var(--label);
+  min-width:0
+}
+.work-meta {
+  color:var(--muted);
+  margin:8px 0 24px
+}
+.work-tabs {
+  display:flex;
+  gap:4px;
+  flex-wrap:wrap;
+  margin-bottom:20px
+}
+.work-tabs button {
+  min-height:44px;
+  padding:10px 18px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:var(--muted);
+  background:transparent;
+  font:inherit
+}
+.work-tabs button[aria-selected=true] {
+  background:var(--surface);
+  border-color:var(--sep);
+  font-weight:700;
+  color:var(--accent)
+}
+.work-mobile-panel {
+  display:none!important
+}
+.work-page .my-work-toolbar {
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:0;
+  margin:0 0 20px;
+  background:transparent;
+  border:0
+}
+.work-page .my-work-toolbar label {
+  display:grid;
+  gap:6px;
+  flex:1;
+  min-width:160px
+}
+.work-page .my-work-toolbar input {
+  min-height:44px;
+  background:var(--surface);
+  color:var(--label);
+  border:1px solid var(--sep);
+  border-radius:10px;
+  padding:10px
+}
+.work-page .my-work-table-scroll {
+  border:1px solid var(--sep);
+  border-radius:12px;
+  background:var(--surface)
+}
+.work-page .assignment-work-table {
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed
+}
+.assignment-work-table th:first-child {
+  width:46%
+}
+.assignment-work-table th {
+  color:var(--muted);
+  background:var(--surface-2);
+  text-align:left;
+  font-weight:500
+}
+.assignment-work-table td,.assignment-work-table th {
+  padding:12px 16px;
+  border-bottom:1px solid var(--sep);
+  overflow-wrap:anywhere
+}
+.assignment-work-table td small {
+  display:block;
+  color:var(--muted);
+  margin-top:4px
+}
+.work-title-link {
+  display:inline-block;
+  text-align:left;
+  min-height:44px;
+  background:transparent;
+  border:0;
+  padding:8px 0;
+  color:var(--accent);
+  font:inherit;
+  font-weight:700;
+  overflow-wrap:anywhere
+}
+.work-status {
+  display:inline-block;
+  background:var(--status-info-bg);
+  color:var(--label);
+  padding:4px 10px;
+  border-radius:20px;
+  font-size:.875rem
+}
+.work-status.is-overdue {
+  color:var(--critical);
+  background:var(--status-error-bg)
+}
+.work-page .my-work-actions {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  color:var(--muted);
+  margin-top:16px
+}
+.work-page .ds-data-state {
+  margin-bottom:16px
+}
+.work-page button:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+@media(max-width:700px) {
+  .work-tabs {
+  display:none
+}
+.work-mobile-panel {
+  display:grid!important
+}
+.work-page .assignment-work-table {
+  min-width:0
+}
+.work-page .assignment-work-table thead {
+  display:none
+}
+.work-page .assignment-work-table tr {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  padding:12px;
+  border-bottom:1px solid var(--sep)
+}
+.work-page .assignment-work-table td {
+  border:0;
+  padding:4px;
+  min-width:0
+}
+.work-page .assignment-work-table td:first-child {
+  grid-column:1/-1
+}
+.work-page .assignment-work-table td:last-child {
+  grid-column:1/-1
+}
+.work-page .my-work-toolbar label {
+  min-width:130px
+}
+.work-page .my-work-table-scroll {
+  overflow:visible
+}
+
+}
+
+
+.work-page.work-page {
+  gap:0
+}
+.work-page.work-page .section-heading {
+  margin:0 0 8px
+}
+.work-page.work-page>p.work-meta {
+  margin:0 0 24px
+}
+.work-page.work-page .my-work-toolbar {
+  background:transparent;
+  border:0;
+  box-shadow:none
+}
+.work-page.work-page .my-work-table-scroll {
+  background:var(--surface);
+  border-color:var(--sep)
+}
+.work-page .sr-only {
+  position:absolute;
+  width:1px;
+  height:1px;
+  clip-path:inset(50%);
+  overflow:hidden
+}
+.work-page .my-work-toolbar select {
+  min-height:44px;
+  padding:8px 12px;
+  border:1px solid var(--sep);
+  border-radius:10px;
+  background:var(--surface);
+  color:var(--label);
+  font:inherit
+}
+.work-title-link {
+  text-decoration:none
+}
+.work-title-link:hover {
+  text-decoration:underline
+}
+.work-title-link:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+
+
+@media(max-width:700px) {
+  .work-page.work-page .my-work-toolbar {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px
+}
+.work-page.work-page .my-work-toolbar label {
+  min-width:0;
+  width:100%;
+  display:grid
+}
+.work-page.work-page .my-work-toolbar .work-mobile-panel,.work-page.work-page .my-work-toolbar label:has(input[type=search]) {
+  grid-column:1/-1
+}
+.work-page.work-page .my-work-toolbar .ds-select {
+  min-width:0;
+  width:100%
+}
+
+}
+
+.workspace:has(.work-page) {
+  background:var(--bg)
+}
+.work-page .my-work-toolbar .ds-picker-trigger {
+  border-radius:10px
+}
+
+@media(max-width:767px) {
+  .work-page { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+}
