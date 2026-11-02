@@ -21,11 +21,14 @@ const advance=ms=>act(async()=>clock.advance(ms));
 const reset=async()=>{await act(async()=>root.render(null));requests=[];queue=[]};
 const warming=(seconds=1)=>[503,{detail:'warming',warming:true,retry_after:seconds}];
 try{
- await render();assert.equal(requests.length,1);await render('2026-10-17');assert.equal(requests.length,1);await render('2026-10-19');assert.equal(requests.length,2);
- await reset();queue=[warming(),[200,fixture]];await render();assert.equal(read.loading,true);await advance(999);assert.equal(requests.length,1);await advance(1);assert.equal(requests.length,2);assert.equal(read.data.week,'2026-10-12');assert.equal(read.error,'');
- await reset();queue=[warming(20),warming(20),warming(20)];await render();await advance(4999);assert.equal(requests.length,1);await advance(1);assert.equal(requests.length,2);await advance(5000);assert.equal(requests.length,3);assert.equal(read.error,'週報資料暫時無法更新；已保留上次資料。');await advance(10000);assert.equal(requests.length,3);await render('2026-10-18',1);assert.equal(requests.length,4);assert.equal(read.data.week,'2026-10-12');
+ await render();assert.equal(requests.length,1);await render('2026-10-17');await render('2026-10-19');assert.equal(requests.length,1,'week rollover never refreshes an open report');
+ for(const response of [warming(),warming(20),[503,{warming:false,retry_after:1}],[500,{warming:true,retry_after:1}],[503,{warming:true}]]){
+  await reset();queue=[response];await render();assert.equal(read.loading,false);assert.equal(read.data,undefined);
+  await advance(86400000);assert.equal(requests.length,1,'warming and failures never schedule retries');
+  for(const event of ['focus','online','pointerdown','keydown','wheel'])window.dispatchEvent(new Event(event));document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(requests.length,1);assert.equal(read.error,'週報資料暫時無法更新；已保留上次資料。');
+  await render('2026-10-19',1);assert.equal(requests.length,2,'explicit generation retries exactly once');assert.equal(read.data.week,'2026-10-12');
+ }
  await reset();queue=[warming()];await render();await act(async()=>root.render(null));assert.equal(clock.timers.size,0);await advance(1000);assert.equal(requests.length,1);assert.equal(requests[0].signal.aborted,true);
- await reset();queue=[warming(),[200,fixture]];await render();await render('2026-10-19');assert.equal(requests.length,2);assert.equal(clock.timers.size,0);await advance(1000);assert.equal(requests.length,2);
- for(const response of [[503,{warming:false,retry_after:1}],[500,{warming:true,retry_after:1}],[503,{warming:true}]]){await reset();queue=[response];await render();await advance(5000);assert.equal(requests.length,1);assert.equal(read.error,'週報資料暫時無法更新；已保留上次資料。')}
- console.log('PASS 8 report week, warming success, capped attempts, manual retry, unmount, token change and ordinary errors scenarios');
+ console.log('PASS report rollover 1→1; warming/failures +24h/events 1→1; explicit refresh 1→2; unmount aborts');
 }finally{await act(async()=>root.unmount());clock.restore()}
