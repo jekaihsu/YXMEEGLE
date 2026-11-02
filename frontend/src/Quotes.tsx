@@ -1,3 +1,4 @@
+import {DetailRefreshProvider,useCaseWrite} from './detailRefresh';
 import {Select as FormSelect} from './design/Select';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -16,22 +17,22 @@ import './Quotes.css';
 
 function QuoteSopStart({c,projectId,onStart}:{c:Ctx;projectId:string;onStart:()=>void}) {
  const sop=useSopTasks(projectId,c.s.workspace_id||'',canReadSop(c.s.user));
- return sop.state.kind==='ready'&&sop.state.data.allowed.import?<Button onClick={onStart}>開始 SOP</Button>:null;
+ return <><p>資料時間：{sop.dataTime||'來源未提供'}</p>{sop.state.kind==='ready'&&sop.state.data.allowed.import?<Button onClick={onStart}>開始 SOP</Button>:null}</>;
 }
 function QuoteFields({q,pmName}:{q:Quote;pmName?:string}) {return <Section><Row label="報價編號" value={q.quote_no}/><Row label="工程編號" value={q.engineering_no||'未設定'}/><Row label="案件名稱" value={q.name}/><Row label="業主" value={q.client||'未設定'}/><Row label="報價日期" value={q.quoted_on||'未設定'}/><Row label="報價期限" value={q.quote_deadline||'未設定'}/><Row label="合約金額" value={amountLabel(q)}/><Row label="報價負責人" value={q.quote_owners.join('、')||'未指派'}/><Row label="PM" value={q.pm_names.join('、')||pmName||'未指派'}/><Row label="SOP 進度" value={!q.project_id?'未納入案件':q.sop_counts?`${q.sop_counts.done}/${q.sop_counts.total}`:'無任務'}/></Section>}
 function LocalFlow({c,q}:{c:Ctx;q:Quote}) {
  const sop=useSopTasks(q.project_id||'',c.s.workspace_id||'',canReadSop(c.s.user));
  const [node,setNode]=useState<SopNodeKey>('sales'),[importing,setImporting]=useState<SopImportTarget>(null);
- return <><div className="quote-stages" role="group" aria-label="SOP 節點">{SOP_NODES.map(([key,label])=><Button key={key} aria-pressed={node===key} onClick={()=>setNode(key)}>{label}</Button>)}</div><SopTasks c={c} p={{id:q.project_id!}} nodeKey={node} sop={sop} importing={importing} setImporting={setImporting}/></>;
+ return <><p>資料時間：{sop.dataTime||'來源未提供'}</p><div className="quote-stages" role="group" aria-label="SOP 節點">{SOP_NODES.map(([key,label])=><Button key={key} aria-pressed={node===key} onClick={()=>setNode(key)}>{label}</Button>)}</div><SopTasks c={c} p={{id:q.project_id!}} nodeKey={node} sop={sop} importing={importing} setImporting={setImporting}/></>;
 }
 function QuoteSheet({c,detail,onClose,onReload}:{c:Ctx;detail:QuoteDetail;onClose:()=>void;onReload:()=>Promise<void>}) {
- const q=detail.quote,[importing,setImporting]=useState(false);
+ const q=detail.quote,[importing,setImporting]=useState(false),commit=useCaseWrite();
  const local=q.origin==='local';
  const openFlow=()=>{onClose();c.go(local?{view:'quotes',project:quoteKey(q),tab:'flow'}:{view:'project',project:q.project_id!,tab:'flow'})};
  return createPortal(<Sheet title={q.name} onClose={onClose}><div className="sop-import"><div className="sop-badges"><Badge>{QUOTE_STAGES[q.stage]}</Badge>{local&&<Badge>本地規劃</Badge>}</div><QuoteFields q={q} pmName={c.w.users.find(u=>u.id===q.pm_id)?.name}/>
   <div className="sop-sheet-actions">{q.project_id&&<Button variant="primary" onClick={openFlow}>開啟流程</Button>}{q.project_id&&!q.sop_counts&&<QuoteSopStart c={c} projectId={q.project_id} onStart={()=>setImporting(true)}/>}</div>
   <details><summary>來源</summary><Section>{Object.entries(detail.facts).map(([key,value])=><Row key={key} label={key} value={typeof value==='object'?JSON.stringify(value):String(value??'未設定')}/>)}</Section></details>
-  {importing&&q.project_id&&<SopImportSheet projectId={q.project_id} startNode="sales" onApplied={onReload} onClose={()=>setImporting(false)} onOpenImported={openFlow}/>}
+  {importing&&q.project_id&&<SopImportSheet projectId={q.project_id} startNode="sales" onApplied={async()=>{await commit([{endpoint:`${c.s.workspace_id||''}:${q.project_id}:tasks`}]);await onReload()}} onClose={()=>setImporting(false)} onOpenImported={openFlow}/>}
  </div></Sheet>,document.body);
 }
 
@@ -44,7 +45,8 @@ const COLUMNS = [
   ['quote_owners', '負責人', 'col-owner'],
 ] as const;
 
-export function Quotes({c}:{c:Ctx}) {
+export function Quotes({c}:{c:Ctx}) {return <DetailRefreshProvider scope={c.s.workspace_id||''} identityFingerprint={JSON.stringify([c.s.user?.id,c.s.user?.authz_version,c.s.user?.capabilities])}><QuotesContent c={c}/></DetailRefreshProvider>}
+function QuotesContent({c}:{c:Ctx}) {
  const [items,setItems]=useState<Quote[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [q,setQ]=useState(''),[stage,setStage]=useState(''),[sort,setSort]=useState<QuoteSort>('quote_no'),[dir,setDir]=useState(-1),[page,setPage]=useState(0),[size,setSize]=useState(25);
  const [detail,setDetail]=useState<QuoteDetail|null>(null),[creating,setCreating]=useState(false),[version,setVersion]=useState(0);
@@ -65,6 +67,7 @@ export function Quotes({c}:{c:Ctx}) {
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
  const localFlow=routeKey&&c.route.tab==='flow'&&detail?.quote.origin==='local'&&quoteKey(detail.quote)===routeKey;
  return <Page title={localFlow?detail.quote.name:'報價總表'} actions={<>{localFlow&&<Button onClick={()=>{setDetail(null);c.go({view:'quotes'})}}>報價總表</Button>}{canCreate&&<Button variant="primary" onClick={e=>{e.currentTarget.focus();setCreating(true)}}>建立報價</Button>}<Button onClick={reload}>重新整理</Button></>}>
+  {!localFlow&&!loading&&<p>資料時間：來源未提供</p>}
   {error&&<p className="quote-error" role="alert">{error}<Button onClick={reload}>重試</Button></p>}
   {localFlow?<><Badge>本地規劃</Badge><LocalFlow key={detail.quote.project_id} c={c} q={detail.quote}/></>:<div className="quote-register">
    <div className="table-toolbar"><label className="search-field"><Search size={15} className="search-icon" aria-hidden="true"/><input aria-label="搜尋報價" maxLength={240} placeholder="報價編號、工程編號、案件名稱、業主" value={q} onChange={e=>{setQ(e.target.value);setPage(0)}}/>{q&&<button type="button" className="search-clear" aria-label="清除搜尋" onClick={()=>{setQ('');setPage(0)}}>&times;</button>}</label><label className="quote-stage-filter">階段<FormSelect value={stage} onChange={e=>{setStage(e.target.value);setPage(0)}}><option value="">全部階段</option>{Object.entries(QUOTE_STAGES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</FormSelect></label><span role="status">{loading?'正在載入報價…':`${rows.length} 筆`}</span></div>

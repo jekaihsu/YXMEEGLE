@@ -1,3 +1,4 @@
+import {DetailRefreshProvider} from './detailRefresh';
 import {canOperateTestTasks} from './sopTaskModel';
 import {Button,Skeleton} from './design';
 import {SopTaskInspector} from './SopTaskInspector';
@@ -6,13 +7,14 @@ import type {Ctx} from './appCommon';
 import './SopTasks.css';
 import './ProjectCalm.css';
 
-export default function AssignedSopTaskPage({c}:{c:Ctx}){
+export default function AssignedSopTaskPage({c}:{c:Ctx}){return <DetailRefreshProvider scope={c.s.workspace_id||''} identityFingerprint={JSON.stringify([c.s.user?.id,c.s.user?.authz_version,c.s.user?.capabilities])}><AssignedSopTaskContent c={c}/></DetailRefreshProvider>}
+function AssignedSopTaskContent({c}:{c:Ctx}){
  const sop=useSopTasks(c.route.project||'',c.s.workspace_id||'');
  const data='data' in sop.state?sop.state.data:undefined;
  const task=data?.tasks.find(t=>t.id===c.route.task);
  const leave=()=>window.history.length>1?window.history.back():c.go({view:'work'});
  return <div className="project-detail project-detail-calm"><Button onClick={leave}>返回</Button>
-  {data&&<header><p>{data.caseHeader?.code}</p><h1>{data.caseHeader?.name||'SOP 任務'}</h1></header>}
+  {data&&<p>資料時間：{sop.dataTime||'來源未提供'}</p>}{data&&<header><p>{data.caseHeader?.code}</p><h1>{data.caseHeader?.name||'SOP 任務'}</h1></header>}
   {sop.state.kind==='loading'&&<div aria-busy="true"><p role="status">正在讀取你的 SOP 任務…</p><Skeleton lines={3} height="3rem"/></div>}
   {sop.state.kind==='error'&&(sop.state.retrying
    ?<div role="status" aria-busy="true" className="pg-callout">正在重新讀取 SOP 任務，不會變更任何資料…<Button disabled>重新讀取中…</Button></div>

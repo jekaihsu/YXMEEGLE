@@ -103,7 +103,7 @@ console.log('K2: successor adoption, cancellation signals, retained failure stat
 // Initial/query reads use scoped conditional GET; explicit actions bypass 304.
 const cached=createPageData(scope);const readCached=(o,intent)=>requestPageData(o,resource,intent,value);
 const c1=readCached(cached,{reason:'initial_open'});await Promise.resolve();requests.at(-1).resolve(ok({secret:'a'},'"scoped"'));await c1;
-const sameNamespace=createPageData(scope);const c2=readCached(sameNamespace,{reason:'initial_open'});await Promise.resolve();assert.equal(requests.at(-1).init.headers.get('If-None-Match'),'"scoped"');requests.at(-1).resolve(new Response(null,{status:304}));assert.equal((await c2).data.secret,'a');
+const sameNamespace=createPageData({...scope,openId:'a-new-page-open'});const c2=readCached(sameNamespace,{reason:'initial_open'});await Promise.resolve();assert.equal(requests.at(-1).init.headers.get('If-None-Match'),'"scoped"');requests.at(-1).resolve(new Response(null,{status:304}));assert.equal((await c2).data.secret,'a');
 const grants=createPageData({...scope,identityFingerprint:'new-grants'});const c3=readCached(grants,{reason:'initial_open'});await Promise.resolve();assert.notEqual(cached.key(resource),grants.key(resource));assert.equal(requests.at(-1).init.headers.has('If-None-Match'),false);requests.at(-1).resolve(ok({secret:'b'},'"b"'));await c3;
 const c4=readCached(cached,{reason:'explicit_refresh',id:'fresh'});await Promise.resolve();assert.equal(requests.at(-1).init.cache,'reload');assert.equal(requests.at(-1).init.headers.has('If-None-Match'),false);requests.at(-1).resolve(ok({secret:'fresh'},'"fresh"'));await c4;
 cached.close();sameNamespace.close();grants.close();
