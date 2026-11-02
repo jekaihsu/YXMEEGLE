@@ -1,5 +1,8 @@
 .people-manage{margin-top:var(--space-4,16px)}
-.people-manage>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+.people-manage>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;gap:8px;list-style:none}
+.people-manage>summary::-webkit-details-marker{display:none}
+.people-manage>summary>svg{flex-shrink:0;transition:transform .15s}
+.people-manage[open]>summary>svg{transform:rotate(90deg)}
 .people-manage>label{display:grid;gap:4px;margin:12px 0}
 .people-manage .ops-form>h4{margin:16px 0 8px;font-size:15px}
 /* At phone width each row becomes a card, so 節點期限 and 來源 are never pushed off-screen. */
