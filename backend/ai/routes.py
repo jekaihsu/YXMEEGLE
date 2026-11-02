@@ -135,12 +135,7 @@ def register(app, *, identity, sessions, cfg):
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
     def authenticated(request: Request):
-        try:
-            return identity(request)
-        except HTTPException as exc:
-            if exc.status_code == 403:
-                raise HistoryDenied() from None
-            raise
+        return identity(request)
 
     @app.exception_handler(HistoryDenied)
     async def history_denied(request, exc):
@@ -149,7 +144,7 @@ def register(app, *, identity, sessions, cfg):
 
     def authorize_scopes(workspace_id, scopes):
         projects = {project for scope, project in scopes if scope == 'project'}
-        if projects and not projects.issubset(visible_cases(sessions, workspace_id)):
+        if projects and not projects.issubset(visible_cases(sessions, workspace_id, cfg)):
             raise HistoryDenied()
 
     @app.get('/api/ai/models')
@@ -166,7 +161,7 @@ def register(app, *, identity, sessions, cfg):
                            auth=Depends(authenticated)):
         data, user = auth
         try:
-            allowed = visible_cases(sessions, data['wid']) if scope == 'project' else None
+            allowed = visible_cases(sessions, data['wid'], cfg) if scope == 'project' else None
             if allowed is not None and project_id is not None and project_id not in allowed:
                 raise HistoryDenied()
             result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before,
@@ -199,7 +194,7 @@ def register(app, *, identity, sessions, cfg):
         if any(scope != ('project' if body.project_id else 'global', body.project_id) for scope in existing):
             raise HTTPException(422, '對話範圍不可變更')
         if body.project_id is not None:
-            await run_in_threadpool(require_case, sessions, data['wid'], body.project_id)
+            await run_in_threadpool(require_case, sessions, data['wid'], body.project_id, cfg)
         adapter = app.state.ai_providers.get(body.model)
         if adapter is None:
             return JSONResponse({'code': 'ai_unconfigured', 'message': '此模型尚未設定金鑰'}, status_code=503)
@@ -264,7 +259,7 @@ def register(app, *, identity, sessions, cfg):
             if (current_data['wid'], current_user['id']) != key:
                 raise HistoryDenied()
             if body.project_id is not None:
-                require_case(sessions, current_data['wid'], body.project_id)
+                require_case(sessions, current_data['wid'], body.project_id, cfg)
 
         return ChatResponse(run, authorize)
 

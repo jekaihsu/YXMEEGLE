@@ -341,3 +341,19 @@ def test_mixed_scope_conversation_cannot_bypass_case_denial(app, client):
     assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
     response = client.post('/api/ai/chat', json={**BODY, 'conversation_id':'mixed'})
     assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
+
+
+def test_history_uses_server_owned_environment_for_legacy_demo(app, client):
+    from .test_ai_project import project
+    from .test_ai_api import wid
+    from .test_ai_history_queries import seed_turn
+    from .models import WorkspaceRow
+    pid = project(client)
+    workspace = wid(app, client)
+    actor = client.get('/api/session').json()['user']['id']
+    seed_turn(app.state.sessions, 'legacy-demo', 'legacy-demo', workspace=workspace, actor=actor,
+              scope='project', project=pid)
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, workspace)
+        row.data = {k:v for k,v in row.data.items() if k != 'environment'}
+    assert client.get('/api/ai/conversations/legacy-demo').status_code == 200
