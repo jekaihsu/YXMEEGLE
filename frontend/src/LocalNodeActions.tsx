@@ -21,7 +21,7 @@ export function LocalNodeActions({workbench,sop,projectId}:{workbench:NodeWorkbe
  };
  const commands={assign:()=>{setPerson(local?.ownerId||'');setForm('assign')},complete:()=>{setReason('');setForm('complete')},reject:()=>{setReason('');setForm('reject')}};
  const available=NODE_ACTIONS.filter(([id])=>workbench.actions[id].visible&&id in commands);
- if(!available.length)return null;
+ if(!available.length||local&&!Object.values(local.can).some(Boolean))return <p className="nw-action-reason">{local?.disabledReason||'僅供檢視'}</p>;
  const actionButton=([id,label]:typeof NODE_ACTIONS[number],closeMenu?:()=>void)=>{const action=workbench.actions[id];return <FlowAction key={id} allowed={action.enabled&&!busy} reason={busy?'正在儲存，請稍候':action.disabledReason} primary={id==='complete'} onClick={()=>{closeMenu?.();trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;if(id==='assign'||id==='complete'||id==='reject')commands[id]()}}>{label}</FlowAction>};
  return <div className="nw-local-actions"><div className="nw-actions">{available.filter(([id])=>id==='complete').map(action=>actionButton(action))}{available.some(([id])=>id!=='complete')&&<DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作">{closeMenu=><div>{available.filter(([id])=>id!=='complete').map(action=>actionButton(action,closeMenu))}</div>}</DetailsMenu>}</div>
  {form && <form className="nw-local-form" aria-label={form==='assign'?'指派節點負責人':form==='complete'?'確認完成節點':'退回節點'} onKeyDown={e=>{if(e.key==='Escape'&&!busy){e.preventDefault();close()}}} onSubmit={e=>{e.preventDefault();void submit()}}>

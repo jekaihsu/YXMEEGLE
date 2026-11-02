@@ -33,7 +33,7 @@ export function FlowNodeActions({detail,busy,error,reason,mutate,registry}:{deta
  const visibleActions=ORDER.filter(name=>actions[name].visible && !(name==='complete'&&(done||detail.node.derived_status==='略過')));
  const legacyVisible=detail.can.legacy_complete===true && actions.legacy_complete.visible && !done && detail.node.derived_status!=='略過';
  const viewOnly=!visibleActions.length && !legacyVisible;
- if(viewOnly)return null;
+ if(viewOnly)return <p className="nw-action-reason">{detail.writes_disabled_reason || reason || detail.node.auto_done?.reason || detail.node.derived_status || '僅供檢視'}</p>;
  const label=(n:ActionName)=>n==='reject'&&done?REOPEN.label:ACTIONS[n].label;
  const run=(name:ActionName)=>name==='assign' ? setForm('assign') : name==='create_task' ? setForm('task') : name==='reject' ? setForm('reject') : ACTIONS[name].confirm ? setConfirm(name) : void save({action:name as 'claim',nodeKey:detail.node.key,expected_revision:detail.node.revision});
  const primary=visibleActions.find(n=>n==='approve')||visibleActions.find(n=>n==='complete')||visibleActions.find(n=>n==='create_task')||visibleActions.find(n=>n==='claim');

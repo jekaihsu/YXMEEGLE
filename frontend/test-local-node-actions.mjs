@@ -12,6 +12,7 @@ const bundle=await build({stdin:{contents:"export {LocalNodeActions} from './src
 const file=new URL('./.local-node-actions-test.mjs',import.meta.url);await writeFile(file,bundle.outputFiles[0].text);const ui=await import(file.href);await unlink(file);
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text);
 const click=async element=>act(async()=>{element.focus();element.click()});
+const more=async()=>act(async()=>{const menu=document.querySelector('.pf-more');menu.open=true;menu.dispatchEvent(new Event('toggle'))});
 const local=(can={assign:true,complete:false,reject:false},reason=null)=>({local:{key:'sales',revision:0,can,disabledReason:reason},actions:ui.actionRegistry({can,reason:reason||'',local:true})});
 const sop={assignees:[{id:'u1',name:'林先生'}],current:()=>true,reload:async()=>{},assigneeError:''};
 test('policy-blocked local actions show one reason without inaccessible buttons',async()=>{
@@ -24,18 +25,22 @@ test('409 reloads local node state and preserves the form draft',async()=>{
  const root=createRoot(document.getElementById('root'));let reloads=0;
  ui.sopApi.localNode=async()=>{throw new ui.SopError(409,'node_revision_conflict')};
  await act(async()=>root.render(React.createElement(ui.LocalNodeActions,{projectId:'p',sop:{...sop,reload:async()=>{reloads++}},workbench:local()})));
+ // Secondary node actions now live in the overflow; closing returns to its summary.
+ await more();const summary=document.querySelector('.pf-more>summary');
  await click(button('指派負責人'));
  const select=document.querySelector('select');await act(async()=>{select.value='u1';select.dispatchEvent(new Event('change',{bubbles:true}))});
  await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  assert.equal(reloads,1);assert.equal(select.value,'u1');assert.match(document.querySelector('[role=alert]').textContent,/更新|重新/);
- await click(button('取消'));await new Promise(resolve=>setTimeout(resolve,5));assert.equal(document.activeElement,button('指派負責人'));
+ await click(button('取消'));await new Promise(resolve=>setTimeout(resolve,5));assert.equal(document.activeElement,summary);
  await act(async()=>root.unmount());
 });
 test('local cancel and Escape return focus without scrolling',async()=>{
  const root=createRoot(document.getElementById('root'));
  await act(async()=>root.render(React.createElement(ui.LocalNodeActions,{projectId:'p',sop,workbench:local()})));
+ // Secondary node actions now live in the overflow; closing returns to its summary.
+ await more();const summary=document.querySelector('.pf-more>summary');
  await click(button('指派負責人'));await act(async()=>document.querySelector('form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await new Promise(resolve=>setTimeout(resolve,5));
- assert.equal(document.querySelector('form'),null);assert.equal(document.activeElement,button('指派負責人'));await act(async()=>root.unmount());
+ assert.equal(document.querySelector('form'),null);assert.equal(document.activeElement,summary);await act(async()=>root.unmount());
 });
 test('completion confirmation reports all unfinished tasks and hides completed-node completion',async()=>{
  const root=createRoot(document.getElementById('root'));
@@ -69,8 +74,10 @@ test('visible remote actions retain specific busy and writes-off reasons',async(
  const root=createRoot(document.getElementById('root'));
  for(const props of [{busy:true,reason:'正在更新節點資料，請稍候。'}, {busy:false,reason:'',writes_disabled_reason:'節點修改尚未開放。'}]){
   await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail:{can:{assign:true},node:{derived_status:'進行中'},tasks:[],writes_disabled_reason:props.writes_disabled_reason},...props,error:null,mutate:async()=>false})));
+  await more();
   assert.equal(button('指派負責人').disabled,true);
   assert.equal(button('指派負責人').title,props.reason || props.writes_disabled_reason);
+  assert.equal(document.getElementById(button('指派負責人').getAttribute('aria-describedby')).textContent,props.reason || props.writes_disabled_reason);
  }
  await act(async()=>root.unmount());
 });
