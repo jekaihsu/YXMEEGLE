@@ -1,11 +1,12 @@
+import {SessionCache} from './sessionCache';
 import {parseInstant, taipeiDate} from './taipeiTime';
-import {api, ApiError, getSessionEpoch} from './api';
+import {api, ApiError, getSessionEpoch,onSessionEpochChange} from './api';
 import type {PortfolioPage} from './projectsListModel';
 import type {ProjectPage} from './appCommon';
 import type {CompanyDashboard} from './companyDashboardTypes';
 
-const snapshots=new Map<string,CompanyDashboard>();
-const savedAt=new Map<string,number>();
+const snapshots=new SessionCache<string,CompanyDashboard>();
+const savedAt=new SessionCache<string,number>();
 let namespace=-1;
 function key(version:number,params:string){
  const epoch=getSessionEpoch();
@@ -23,10 +24,11 @@ export function rememberDashboard(epoch:number,version:number,params:string,data
 
 type PendingRead<T>={promise:Promise<T>;controller:AbortController;readers:Set<AbortSignal>};
 function panelReader<T>(conditional=false){
- const panels=new Map<string,T>();
+ const panels=new SessionCache<string,T>();
  const pending=new Map<string,PendingRead<T>>();
  const latest=new Map<string,AbortController>();
  let epoch=-1;
+ onSessionEpochChange(()=>{for(const read of pending.values())read.controller.abort();pending.clear();panels.clear();latest.clear()});
  function key(url:string,scope:string){
   const current=getSessionEpoch();
   if(current!==epoch){for(const read of pending.values())read.controller.abort();pending.clear();panels.clear();latest.clear();epoch=current}
@@ -44,7 +46,7 @@ function panelReader<T>(conditional=false){
      if(panels.size>32){const oldest=panels.keys().next();if(!oldest.done)panels.delete(oldest.value)}
     }return body})
     .catch(error=>{if(latest.get(ident)===controller&&error instanceof ApiError&&(error.status===401||error.status===403))panels.delete(ident);throw error})
-    .finally(()=>{if(pending.get(flight)?.controller===controller)pending.delete(flight)});
+    .finally(()=>{if(pending.get(flight)?.controller===controller)pending.delete(flight);if(latest.get(ident)===controller)latest.delete(ident)});
    entry={promise,controller,readers:new Set()};pending.set(flight,entry);
   }
   const shared=entry;

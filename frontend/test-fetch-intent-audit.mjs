@@ -29,7 +29,7 @@ const legacy={
  'design/index.tsx': '0d15d44f66c4d3d7828a09a27d27137b97d20fae59243a2cbf9bd161a8210578',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1bfb68b728abee62479f560fa761651fe1fd3ecb94453a52c65d6f0b3190e74d',
- 'reports/ProgressTab.tsx': '5279cd42916dda306ef7a9a5f7d76183a96558f37f98e4658d85099306c8376a',
+ 'reports/ProgressTab.tsx': '07324dd7af61e77ed2a499fb579b11884c3a3329f2416b01d9f893b7859bc11b',
  "AssigneePicker.tsx": "2f3f8a6e8081097da460588d7957851de7e4b7bc84091a76da4af69569b16489",
  "App.tsx": "797b6a8c2d4447c5a89a4f1d0593ba5a1834e7cbfca654ea3f968f02bf869cae",
  "CompletionCelebration.tsx": "f73bd9143729b0934efc35be418bb0b8d01ae4b7291389d022a5342af0adde7d",
@@ -42,7 +42,7 @@ const legacy={
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
  "refreshSources.ts": "41162fecd19aacd07713c0bb5decc4eb91e456cbdee31ed8a2ab144da77b42ca",
  "TokenDashboard.tsx": "a01af58e64d817f35890b11339b712e2283fc9558c0b3c78e8571ca5af3942bb",
- "HomeDispatchCard.tsx": "74d8f6cff0919960f17c37dbd8dbc5ddc0b4089e4558ab3904421686c7a185b0",
+ "HomeDispatchCard.tsx": "3cd4ce3f0572cd34767e44489432b04e43d3cc974f83aa00e3fe9ccc3bd29aee",
  "useDialogFocus.ts": "b636c3476c8855862349e384da2886332caf2b28740e59a8eb69299b3be767ff",
  "DispatchPublishDialog.tsx": "28bc218ce2feb8aed4316350a97726aa6136a30210acda644ed03d7824479655",
  "routeLoader.ts": "5bff6b1339b36475ea28d559deb6190be55eba60970a08bbee5194543b10ce36",
@@ -50,7 +50,7 @@ const legacy={
  "reloadGuard.ts": "1983950556280811e13d243bfcba34e97ce91814745e222e234e34f458750f0e",
  "assistant/ProjectChatLauncher.tsx": "df78000709295f98a73c8dc2f1f2a3dd078910e9cb830671fb0243e1151dcfde",
  "reports/ContactsTab.tsx": "9a7d005c955c51c0492c185a51c77e23237661c5dc582ead8717debdd3d800ff",
- "reports/useReport.ts": "5eb0692208f2e474609abc0a2e64ef2120ae08c928a6dc97aa917254220ab6c8"
+ "reports/useReport.ts": "b5254276d664fd7407c0f628f2516591e0f72429243fc6818c60676200b237a0"
 };
 export function triggers(source){
  const tree=ts.createSourceFile('source.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

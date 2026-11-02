@@ -69,13 +69,18 @@ class ReadSnapshots:
         self.flights = {}
         self.lock = Lock()
         self.generation = 0
+        self.workspace_generations = {}
         self.requested = {}
         self.sequence = 0
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='read-snapshot')
 
     def invalidate(self, workspace=None):
         with self.lock:
-            self.generation += 1
+            if workspace is None:
+                self.generation += 1
+                self.workspace_generations.clear()
+            else:
+                self.workspace_generations[workspace] = self.workspace_generations.get(workspace, 0) + 1
             # Workspace keys always carry wid in position 1; page keys nest it.
             def affected(key):
                 if workspace is None:
@@ -88,6 +93,16 @@ class ReadSnapshots:
                 if affected(key):
                     self.requested.pop(key, None)
 
+            # Detach affected flights so a same-revision read after a write builds
+            # again. Running readers retain their Future and publication ticket.
+            for flight_key in list(self.flights):
+                if affected(flight_key[0]):
+                    self.flights.pop(flight_key, None)
+
+    def fence(self, workspace=None):
+        with self.lock:
+            return self.generation, self.workspace_generations.get(workspace, 0)
+
     def peek(self, key):
         with self.lock:
             entry = self.entries.get(key)
@@ -99,15 +114,15 @@ class ReadSnapshots:
             self.entries.move_to_end(key)
             while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
                 evicted, _ = self.entries.popitem(last=False)
-                if not any(flight[1] == evicted for flight in self.flights):
+                if not any(flight[0] == evicted for flight in self.flights):
                     self.requested.pop(evicted, None)
 
-    def retain(self, key, value, generation):
+    def retain(self, key, value, generation, *, workspace=None):
         with self.lock:
-            if generation == self.generation and key not in self.entries:
+            if generation == (self.generation, self.workspace_generations.get(workspace, 0)) and key not in self.entries:
                 self._store(key, value, None)
 
-    def _build(self, key, generation, build, revision, ticket):
+    def _build(self, key, build, revision, ticket):
         from .request_timing import _current
         cpu = thread_time()
         try:
@@ -131,8 +146,7 @@ class ReadSnapshots:
         here; first-screen authority/generation checks belong to the caller.
         """
         with self.lock:
-            generation = self.generation
-            flight_key = (generation, key, revision)
+            flight_key = (key, revision)
             entry = self.entries.get(key)
             age = self.clock() - entry[0] if entry else float('inf')
             same_revision = bool(entry and entry[2] == revision)
@@ -142,7 +156,7 @@ class ReadSnapshots:
                 age = max(age, self.fresh)
             highest = self.requested.get(key)
             if revision is not None and highest is not None and highest[0] is not None and highest[0] > revision:
-                newer_key = next((k for k in self.flights if k[1] == key and k[2] == highest[0]), None)
+                newer_key = next((k for k in self.flights if k[0] == key and k[1] == highest[0]), None)
                 if newer_key is not None:
                     revision = highest[0]
                     flight_key = newer_key
@@ -155,11 +169,12 @@ class ReadSnapshots:
                 self.sequence += 1
                 ticket = self.sequence
                 self.requested[key] = (revision, ticket)
-                flight = self.executor.submit(copy_context().run, self._build, key, generation, build, revision, ticket)
+                flight = self.executor.submit(copy_context().run, self._build, key, build, revision, ticket)
                 self.flights[flight_key] = flight
                 def done(future):
                     with self.lock:
-                        self.flights.pop(flight_key, None)
+                        if self.flights.get(flight_key) is future:
+                            self.flights.pop(flight_key, None)
                         if key not in self.entries and self.requested.get(key) == (revision, ticket):
                             self.requested.pop(key, None)
                     if not future.cancelled() and future.exception():

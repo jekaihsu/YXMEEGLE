@@ -103,7 +103,7 @@ def test_retained_pagination_snapshot_cannot_outlive_write_fence_or_expiry():
     clock = [0]
     cache = ReadSnapshots(clock=lambda: clock[0], stale=10)
     try:
-        generation = cache.generation
+        generation = cache.fence()
         cache.retain('page-version', b'old', generation)
         assert cache.peek('page-version') == b'old'
         clock[0] = 11

@@ -1,3 +1,4 @@
+import {SessionCache} from './sessionCache';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {PageData, FetchIntent} from './pageData';
 import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh, useCaseWrite} from './detailRefresh';
@@ -6,7 +7,7 @@ import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestI
 import {canConfirmSop, parseSopPreview, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
 function loadStart(id:string,current:()=>boolean,intent:FetchIntent,signal:AbortSignal){return assignmentRequest(sopPath(id),{signal,cache:'no-store',headers:{'X-YX-Fetch-Intent':intent.reason,'X-YX-Fetch-Generation':'id' in intent?intent.id:'initial'}},current).then(parseSopPreview)}
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
-const cache=new Map<string,SopPreview>();
+const cache=new SessionCache<string,SopPreview>();
 export function prefetchStartSop(id:string,force:boolean|symbol=false,owner?:PageData){
  return readCase(owner,`start:${id}`,force,(current,intent,signal)=>loadStart(id,current,intent,signal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }

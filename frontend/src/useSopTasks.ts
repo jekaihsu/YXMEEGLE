@@ -1,3 +1,4 @@
+import {SessionCache} from './sessionCache';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {api, getSessionEpoch} from './api';
 import type {PageData, FetchIntent} from './pageData';
@@ -10,7 +11,7 @@ function loadOverview(id:string,current:()=>boolean,intent:FetchIntent,signal:Ab
  return api(`/api/projects/${encodeURIComponent(id)}/sop-tasks`,{signal,cache:'no-store',headers:{'X-YX-Fetch-Intent':intent.reason,'X-YX-Fetch-Generation':'id' in intent?intent.id:'initial'}},current).then(parseOverview).catch(error=>{if(error&&typeof error==='object'&&'status' in error)throw new SopError(Number(error.status),'code' in error?String(error.code):'request_failed');throw error});
 }
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview; retrying?: boolean} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
-const cache = new Map<string,SopOverview>();
+const cache = new SessionCache<string,SopOverview>();
 export function seedSopTasks(id:string,workspace:string,data:SopOverview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol) {
  const resource=`${workspace}:${id}:tasks`;cache.set(caseKey(owner,resource),data);
  seedCase(owner,resource,data,(current,intent,signal)=>loadOverview(id,current,intent,signal),true,meta,batch);
