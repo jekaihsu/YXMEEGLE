@@ -1,3 +1,4 @@
+import {overdueDays,dataTime} from './homeViews/deadline';
 import type {ReactNode} from 'react';
 import {homeTarget} from './projectRoutes';
 import {ArrowUpRight} from 'lucide-react';
@@ -13,33 +14,35 @@ export function Card({id,subtitle,children,href,action='查看全部',compact=fa
  return <section className={`home-card glass--flat${compact?' home-card-compact':''}`} data-home-card={id} aria-labelledby={`home-${id}`}>
   <header><h3 id={`home-${id}`}>{HOME_CARDS[id].title}</h3>{!compact&&<p>{subtitle}</p>}</header>
   <div className="home-card-content">{children}</div>
-  <a className="home-card-more" href={href}>{action}<ArrowUpRight size={16} aria-hidden="true"/></a>
+  <a className={`home-card-more ${id==='mycases'||id==='work'?'ds-button':''}`} data-variant={id==='work'?'primary':'secondary'} href={href}>{action}<ArrowUpRight size={16} aria-hidden="true"/></a>
  </section>;
 }
 export function Message({children}:{children:ReactNode}){return <p className="home-message" role="status">{children}</p>}
-function dueText(deadline:string|null|undefined,today:string){
+export function dueText(deadline:string|null|undefined,today:string){
  if(!deadline)return '期限待確認';
  const due=deadline.slice(0,10),days=Math.round((Date.parse(`${due}T00:00:00Z`)-Date.parse(`${today}T00:00:00Z`))/86400000);
- if(days<0)return `已逾期 ${Math.abs(days)} 天`;
+ const overdue=overdueDays(deadline,today);
+ if(overdue)return `逾期 ${overdue} 天`;
  if(days===0)return '今天到期';
  if(days===1)return '明天到期';
  return due.replaceAll('-','/');
 }
-function Deadline({value,today}:{value:string|null|undefined;today:string}){
- const label=dueText(value,today),tone=label.startsWith('已逾期')?'critical':label==='今天到期'?'warning':label==='明天到期'?'warning':'neutral';
+export function Deadline({value,today}:{value:string|null|undefined;today:string}){
+ const label=dueText(value,today),tone=label.startsWith('逾期')?'critical':label==='今天到期'?'warning':label==='明天到期'?'warning':'neutral';
  return <span className="home-deadline" data-tone={tone}>{label}</span>;
 }
 export function WorkPreview({item,today}:{item:HomeItem;today:string}){
  const detail=[item.kind==='sop_task'?'SOP 任務':null,item.case.name||item.case.code||'案件關聯待核對',item.source_status||({todo:'待處理',done:'已完成',blocked:'受阻'}[item.status]||STATUS[item.status]||'狀態待核對'),item.blocked_reasons[0]].filter(Boolean).join(' · ');
- return <Row label={item.title} detail={detail} value={<Deadline value={item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(homeTarget(item.target)):undefined}/>;
+ return <Row label={item.title} detail={detail} value={<Deadline value={item.status==='done'||item.status==='completed'?null:item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(homeTarget(item.target)):undefined}/>;
 }
-export function WorkCard({c,panel,id,today,read}:{c:Ctx;panel:HomePanel;id:HomeCardId;today:string;read:PanelRead}) {
+export function WorkCard({c,panel,id,today,read,sharedNotice=false}:{c:Ctx;panel:HomePanel;id:HomeCardId;today:string;read:PanelRead;sharedNotice?:boolean}) {
  const body=read.body;
  const demo=usesDemoWork(c,read);
  const legacy=demo&&panel==='assigned'?legacyWork(c):[];
  const queue=demoQueue(c,panel);
  const unavailable=demo?!legacy.length&&!queue?.length:!read.pending&&!body?.items.length;
- return <Card id={id} compact={unavailable} subtitle={panel==='assigned'?'依期限排序，先處理最緊急的工作':panel==='delegated'?'你交辦給他人的工作與目前進度':'需要你覆核或確認的事項'} href={homeHref({view:'work',tab:demo&&panel==='assigned'?'legacy':panel})}>
+ return <Card id={id} compact={unavailable} subtitle={panel==='assigned'?'依期限排序，先處理最緊急的工作':panel==='delegated'?'你交辦給他人的工作與目前進度':'需要你覆核或確認的事項'} href={homeHref({view:'work',tab:demo&&panel==='assigned'?'legacy':panel})} action={id==='work'?'開啟我的工作':'查看全部'}>
+  <p className="home-data-time">資料時間：{dataTime(demo?c.w.as_of:body?.as_of||body?.freshness.last_success_at)}</p>
   {read.pending&&!body&&!demo?<div role="status" aria-label="工作讀取中"><Skeleton lines={3}/></div>:null}
   {demo?<>
    {legacy.slice(0,PREVIEW_LIMIT).map(r=><Row key={r.t.id} href={homeHref({view:'project',project:r.p.id,node:r.n.id,task:r.t.id,tab:'flow'})} label={r.t.title} detail={`${r.p.name} · ${STATUS[r.t.status]||r.t.status}`} value={<Deadline value={r.t.due_date} today={today}/>}/>)}
@@ -50,7 +53,7 @@ export function WorkCard({c,panel,id,today,read}:{c:Ctx;panel:HomePanel;id:HomeC
    {read.error&&<><Message>{read.error}{body?.items.length?'，保留上次資料。':''}</Message>{read.retry&&<Button onClick={read.retry} disabled={read.pending}>重試讀取</Button>}</>}
    {!read.error&&!read.pending&&!body&&<Message>工作來源尚未提供。</Message>}
    {!read.error&&body&&!body.items.length&&<Message>{body.readState==='disabled'?'目前無法讀取這類工作。':body.complete?'目前沒有待處理的事項。':'工作清單尚未更新完成，請稍後重新讀取。'}</Message>}
-   {!unavailable&&body&&(!body.complete||body.freshness.status==='stale')&&<p className="home-source-note">{body.freshness.status==='stale'?'上次快照 · ':''}資料尚未完整；預覽不代表完整清單。</p>}
+   {!sharedNotice&&!unavailable&&body&&(!body.complete||body.freshness.status==='stale')&&<p className="home-source-note">{body.freshness.status==='stale'?'上次快照 · ':''}資料尚未完整；預覽不代表完整清單。</p>}
   </>}
  </Card>;
 }

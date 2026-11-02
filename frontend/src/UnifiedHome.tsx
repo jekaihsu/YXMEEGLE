@@ -1,3 +1,5 @@
+import {DataState} from './design/DataState';
+import {dataTime} from './homeViews/deadline';
 import {HomeDispatchCard} from './HomeDispatchCard';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowDown,ArrowUp,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
@@ -23,7 +25,7 @@ import './UnifiedHome.css';
 
 function Sections({view,ids,render,reportStale=false}:{view:HomeViewId;ids:HomeCardId[];render:(id:HomeCardId)=>ReactNode;reportStale?:boolean}){
  const sections=homeSections(view,{order:ids,hidden:[]});
- const renderSection=(section:typeof sections[number])=><section className="home-section" data-home-section={section.id} key={section.id} aria-labelledby={`home-section-${section.id}`}><header><h2 id={`home-section-${section.id}`}>{section.label}</h2>{reportStale&&section.cards.some(isReportCard)&&<small className="home-source-note">週報資料為舊快照</small>}</header>{section.cards.includes('attention')&&<div className="home-attention-strip">{render('attention')}</div>}<div className="home-card-grid">{section.cards.filter(id=>id!=='attention').map(render)}</div></section>;
+ const renderSection=(section:typeof sections[number])=><section className="home-section" data-home-section={section.id} key={section.id} aria-labelledby={view==='mine'?undefined:`home-section-${section.id}`}><header hidden={view==='mine'&&section.id==='todo'}><h2 id={`home-section-${section.id}`}>{section.label}</h2>{reportStale&&section.cards.some(isReportCard)&&<small className="home-source-note">週報資料為舊快照</small>}</header>{section.cards.includes('attention')&&<div className="home-attention-strip">{render('attention')}</div>}<div className="home-card-grid">{section.cards.filter(id=>id!=='attention').map(render)}</div></section>;
  return <>{sections.filter(section=>section.id==='todo').map(renderSection)}{ids.includes('kpi')&&render('kpi')}{sections.filter(section=>section.id!=='todo').map(renderSection)}</>;
 }
 
@@ -91,13 +93,14 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const contentIds=availableVisible;
  const props:ViewProps={cases,dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error?String(attendance.error):''},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
  const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
- const renderCard=(id:HomeCardId)=>id==='dispatch'?dispatchCard():id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
+ const sharedNotice=view==='mine'&&cases===assigned&&!!assigned.body&&!assigned.error&&(!assigned.body.complete||assigned.body.has_more||assigned.body.freshness.status==='stale'||assigned.body.readState==='disabled');
+ const renderCard=(id:HomeCardId)=>id==='dispatch'?dispatchCard():id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props} sharedNotice={sharedNotice}/>;
  return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>
-  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1>{preview&&<p>預覽角色：{HOME_PREVIEWS[preview].label}</p>}
+  <h1>今日工作台</h1><Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><p>個人案件與指派工作 · 資料時間見各卡片</p>{preview&&<p>預覽角色：{HOME_PREVIEWS[preview].label}</p>}
   {views.length>1&&<div className="home-view-switcher" role="group" aria-label="首頁視圖">{views.map(id=><Button key={id} aria-pressed={view===id} onClick={()=>choose(id)}>{HOME_VIEWS[id].label}</Button>)}</div>}
  </div><div className="ds-actions">
   {view==='company'&&reports.data&&!reports.unavailable&&<CopyReportSummary report={reports.data}/>}
-  <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>
+  <Button disabled={refreshing||c.busy||assigned.pending} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing||assigned.pending?'讀取中…':'重新讀取'}</Button>
  </div></header>
   {editing&&<section className="home-customize glass--flat" id="home-customize" aria-label="自訂首頁卡片">
    <header><div><h2>安排你的首頁 · {HOME_VIEWS[view].label}</h2><p>顯示、隱藏與排序目前視圖的卡片。設定依登入身分與視圖儲存在此瀏覽器。</p></div><Button onClick={()=>update(defaultHomeLayout(view),'已還原目前視圖的建議配置')}><RotateCcw size={15}/>還原建議配置</Button></header>
@@ -112,6 +115,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
   {!availableVisible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
   {!!attendance.error&&<Button onClick={attendance.retry} disabled={attendance.loading}>重試出勤資料</Button>}
   {attendanceUnavailable&&availableVisible.some(id=>['leave','trips','absence','impact'].includes(id))&&<p className="home-source-note" role="status">出勤資料尚未提供。 <a href="#view=people">查看人員與出勤</a></p>}
+  {sharedNotice&&<DataState kind={assigned.body?.freshness.status==='stale'?'Stale':'Partial'} title="僅顯示已載入的資料" body={<>案件與工作共用的指派來源尚未完整；預覽不代表完整清單。{assigned.body?.freshness.status==='stale'&&<> 保留上次快照，資料時間：{dataTime(assigned.body.as_of||assigned.body.freshness.last_success_at)}；可按重新讀取。</>}</>}/>}
   <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={contentIds} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
  </div></div>;
 }
