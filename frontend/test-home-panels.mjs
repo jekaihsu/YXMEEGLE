@@ -46,7 +46,7 @@ assert.match(host.textContent,/來源尚未完整/,'partial lists report incompl
 await act(async()=>root.unmount());
 behavior='pending';root=createRoot(host);
 await act(async()=>{root.render(React.createElement(mod.ShellDashboard,{c}))});
-assert.match(host.textContent,/已核對案件/);
+assert.doesNotMatch(host.textContent,/已核對案件/,'a new page generation starts unknown rather than reusing a retired cache');
 assert.equal(pending.length,5);
 await act(async()=>root.unmount());
 mod.invalidateSessionEpoch();

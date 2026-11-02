@@ -1,6 +1,6 @@
-import {createContext,createElement,useContext,useEffect,useRef,useState,useCallback,useSyncExternalStore,type ReactNode} from 'react';
-import {api,ApiError,getSessionEpoch} from './api';
-import {createPageData,type PageData,type PageValue,type PageResource,type FetchIntent} from './pageData';
+import {createContext,createElement,useContext,useEffect,useState,useCallback,useSyncExternalStore,type ReactNode} from 'react';
+import {ApiError} from './api';
+import {usePageOwner,requestPageData,type PageData,type PageValue,type PageResource,type FetchIntent} from './pageData';
 import {useDebounce} from './reports/useReport';
 import type {Ctx} from './appCommon';
 
@@ -77,23 +77,16 @@ export function homePanelUrl(query:HomeQuery, full=false) {
  if (full && query.panel==='assigned') params.set('kinds',query.kinds ?? 'node_assignment,task,sop_task');
  return `${full ? '/api/my-work' : '/api/home-panels'}?${params}`;
 }
-// One owner spans lazy Home views and Work queries for the lifetime of the page.
-const snapshots=new Map<string,unknown>();
-const initialRevisions=new WeakMap<PageData,unknown>();
+// Lazy Home views and normalized Work queries share the mounted page owner.
+const generations=new WeakMap<PageData,Map<string,{revision:number;retries:Set<string>}>>();
 const HomeDataContext=createContext<PageData|null>(null);
 function useHomeOwner(c:Ctx){
  const shared=useContext(HomeDataContext);
- const identity=JSON.stringify([getSessionEpoch(),c.s.workspace_id,c.w?.workspace_id,c.s.mode,c.s.access_mode,c.s.user,c.s.features]);
- // Temporary K adapter: swap this helper to K2 usePageOwner when integrated.
- const slot=useRef<{identity:string;shared:PageData|null;owner:PageData}>();
- if(!slot.current||slot.current.identity!==identity||slot.current.shared!==shared){
-  slot.current={identity,shared,owner:shared??createPageData({workspace:c.s.workspace_id||c.w?.workspace_id||'',identityFingerprint:identity,openId:crypto.randomUUID()})};
- }
- const owner=slot.current.owner;
- const lifetime=useRef(0);
- useEffect(()=>{const generation=++lifetime.current;return()=>{queueMicrotask(()=>{if(!shared&&(generation===lifetime.current||owner!==latest.current))owner.close()})}},[owner,shared]);
- const latest=useRef(owner);latest.current=owner;
- return owner;
+ const [openId]=useState(()=>crypto.randomUUID());
+ const user=c.s.user;
+ const identityFingerprint=JSON.stringify([c.s.mode,c.s.environment,c.s.access_mode,user?.id,user?.name,user?.role,user?.department,user?.default_workspace,user?.active,user?.authz_version,user?.can_business_override,user?.can_mention,[...(user?.capabilities??[])].sort(),Object.entries(c.s.features??{}).sort(([a],[b])=>a.localeCompare(b))]);
+ const owner=usePageOwner({workspace:c.s.workspace_id||c.w?.workspace_id||'',identityFingerprint,openId});
+ return shared??owner;
 }
 export function HomeDataProvider({c,children}:{c:Ctx;children:ReactNode}){
  const owner=useHomeOwner(c);
@@ -102,35 +95,26 @@ export function HomeDataProvider({c,children}:{c:Ctx;children:ReactNode}){
 export function homeValue<T>(data:T,complete=true,asOf:string|null=null):PageValue<T>{
  return {data,snapshotId:null,fetchedAt:asOf,verifiedAt:asOf,changedAt:null,completeness:complete?'complete':'partial',localRevision:null,empty:false,stale:false};
 }
-export function useHomeResource<T>(c:Ctx,resource:PageResource,decode:(raw:unknown)=>PageValue<T>,enabled=true,retainSnapshot=true){
- const owner=useHomeOwner(c),[retryTick,setRetryTick]=useState(0);
- const savedKey=JSON.stringify([getSessionEpoch(),owner.scope.workspace,owner.scope.identityFingerprint,resource]);
+export function useHomeResource<T>(c:Ctx,resource:PageResource,decode:(raw:unknown)=>PageValue<T>,enabled=true){
+ const owner=useHomeOwner(c),[retryId,setRetryId]=useState('');
  const revision=c.reloadVersion??c.w?.version??0;
- if(!initialRevisions.has(owner))initialRevisions.set(owner,revision);
- const initial=initialRevisions.get(owner);
- const firstResource=useRef(owner.key(resource));
- const intent:FetchIntent=retryTick?{reason:'explicit_refresh',id:`retry:${owner.key(resource)}:${revision}:${retryTick}`}:
-  revision===initial?{reason:firstResource.current===owner.key(resource)?'initial_open':'user_query_change'}:{reason:'explicit_refresh',id:`workspace:${revision}`};
- const selected=enabled?resource:{endpoint:'home:disabled'};
- const key=owner.key(selected),intentKey=JSON.stringify(intent);
- const subscribe=useCallback((notify:()=>void)=>owner.subscribe(selected,notify),[owner,key]);
- const snapshot=useCallback(()=>owner.state<T>(selected),[owner,key]);
+ const key=owner.key(resource),generation=JSON.stringify([revision,retryId]);
+ const subscribe=useCallback((notify:()=>void)=>owner.subscribe(resource,notify),[owner,key]);
+ const snapshot=useCallback(()=>owner.state<T>(resource),[owner,key]);
  const state=useSyncExternalStore(subscribe,snapshot,snapshot);
- useEffect(()=>{void owner.read(selected,intent,async(signal,current,activeIntent)=>{
-  if(!enabled)return homeValue(undefined as T);
-  const params=new URLSearchParams();
-  for(const [name,value] of Object.entries(resource.query??{}).sort(([a],[b])=>a.localeCompare(b)))if(value!==null)params.set(name,String(value));
-  const raw=await api<unknown>(resource.endpoint+(params.size?'?'+params:''),{signal,timeoutMs:35000,cache:'reload',cacheScope:owner.key(resource),headers:{'Cache-Control':'no-cache','X-YX-Fetch-Intent':activeIntent.reason,'X-YX-Fetch-Generation':'id' in activeIntent?activeIntent.id:owner.scope.openId}},current);
-  const value=decode(raw);
-  if(current()&&retainSnapshot){snapshots.set(savedKey,value.data);if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
-  return value;
- }).catch(()=>{})},[owner,key,intentKey]);
- const last=useRef<{key:string;data:T}>();
- const resourceKey=owner.key(resource);
- if(enabled&&'value' in state)last.current={key:resourceKey,data:state.value.data};
- if(state.kind==='Denied'){last.current=undefined;snapshots.delete(savedKey)}
- const data=enabled&&'value' in state?state.value.data:last.current?.key===resourceKey?last.current.data:(retainSnapshot?snapshots.get(savedKey):undefined) as T|undefined;
- return {data,loading:enabled&&state.kind==='Loading',error:enabled&&'error' in state?state.error:null,retry:()=>setRetryTick(value=>value+1),owner};
+ useEffect(()=>{
+  if(!enabled)return;
+  let seen=generations.get(owner);if(!seen){seen=new Map();generations.set(owner,seen)}
+  const previous=seen.get(key);
+  const retry=!!retryId&&!previous?.retries.has(retryId);
+  const intent:FetchIntent=previous===undefined?{reason:'initial_open'}:previous.revision===revision&&!retry?{reason:'user_query_change'}:{reason:'explicit_refresh',id:retry?retryId:`workspace:${revision}`};
+  const retries=previous?.retries??new Set<string>();if(retryId)retries.add(retryId);
+  seen.set(key,{revision,retries});
+  void requestPageData(owner,resource,intent,decode,{timeoutMs:35000}).catch(()=>{});
+ },[owner,key,generation,enabled]);
+ const value='value' in state?state.value:'previous' in state?state.previous:undefined;
+ const visible=enabled&&state.kind!=='Closed'&&state.kind!=='Denied';
+ return {data:visible?value?.data:undefined,dataTime:visible?value?.fetchedAt??null:null,loading:enabled&&(state.kind==='Loading'||state.kind==='Stale'),error:enabled&&'error' in state?state.error:null,retry:()=>setRetryId(crypto.randomUUID()),owner};
 }
 export function useHomePanels(c:Ctx,query:HomeQuery,enabled=true,full=false):PanelRead{
  const search=useDebounce(query.q??'');
@@ -138,5 +122,5 @@ export function useHomePanels(c:Ctx,query:HomeQuery,enabled=true,full=false):Pan
  const resource={endpoint:url.pathname,query:Object.fromEntries(url.searchParams)};
  const read=useHomeResource(c,resource,raw=>{const body=parseHomeResponse(raw);return homeValue(body,body.complete,body.as_of)},enabled);
  const denied=read.error instanceof ApiError&&(read.error.status===401||read.error.status===403);
- return {body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':'更新失敗':null,retry:read.retry};
+ return {body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':`更新失敗${read.data?`；保留上次資料。資料時間：${read.dataTime??'未提供'}`:''}`:null,retry:read.retry};
 }
