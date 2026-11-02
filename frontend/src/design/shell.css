@@ -15,7 +15,7 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 .app-shell .nav-item:hover,.app-shell .recent-project:hover{background:color-mix(in srgb,var(--label) 6%,transparent)}
 .app-shell .nav-item.active,.app-shell .recent-project.selected{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:color-mix(in srgb,var(--accent) 24%,transparent);box-shadow:var(--glass-highlight);color:var(--accent);font-weight:600}
 .app-shell .nav-item.active svg{color:var(--accent);stroke-width:1.75}
-.app-shell .nav-item em{background:var(--critical);color:#fff;border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
+.app-shell .nav-item em{background:var(--critical);color:var(--on-critical);border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
 .app-shell .recent-project small,.app-shell .sidebar-status{color:var(--label-2);font-size:var(--fs-footnote)}
 .app-shell .project-dot{background:var(--label-2)}.app-shell .status-dot,.app-shell .sidebar-status .tiny-dot{background:var(--positive)}
 .app-shell .user-button{color:var(--label)}
@@ -23,7 +23,7 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 .app-shell .breadcrumbs,.app-shell .top-date{color:var(--label-2);font-size:var(--fs-footnote)}
 .app-shell .breadcrumbs strong{color:var(--label);font-weight:600}
 .app-shell .demo-tag{background:var(--status-info-bg);color:var(--status-info-fg);border:0;border-radius:var(--radius-pill);padding:var(--space-1) var(--space-3);font-size:var(--fs-caption);font-weight:600;white-space:nowrap;flex:none}
-.app-shell .sidebar-scrim{background:rgb(0 0 0/.4);-webkit-backdrop-filter:none;backdrop-filter:none}
+.app-shell .sidebar-scrim{background:var(--scrim);-webkit-backdrop-filter:none;backdrop-filter:none}
 .app-shell .toast.glass{background:var(--glass-fill-strong);color:var(--label);border-radius:var(--radius-control)}.app-shell .toast.glass svg{color:var(--positive)}
 
 /* Route progress: a thin accent bar that sweeps once per navigation, indeterminate while the workspace loads. */
@@ -98,4 +98,27 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 }
 @media(min-width:761px) and (max-width:1100px){.app-shell.sidebar-compact .breadcrumbs{display:none}.app-shell.sidebar-compact .topbar-right{margin-left:auto}}
 @media(max-width:760px){.app-shell .sidebar-collapse{display:none}}
+}
+
+@layer polish{
+.app-shell .topbar-right{margin-left:auto}
+.app-shell .sidebar-toggle,.app-shell .sidebar-close{width:44px;min-width:44px;min-height:44px}
+.app-shell .nav-item,.app-shell .recent-project{min-height:44px}
+.app-shell .recent-project>span:last-child{min-width:0}.app-shell .recent-project small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+.skip-link{position:fixed;top:8px;left:8px;z-index:200;transform:translateY(-200%);padding:12px 16px;min-height:44px;box-sizing:border-box;background:var(--surface);color:var(--accent);border-radius:var(--radius-s)}
+.skip-link:focus{transform:none}
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px}
+.appearance-control .appearance-field{flex-wrap:wrap;align-items:flex-start;flex-direction:column;max-width:100%}
+.appearance-control .ds-segmented{flex-wrap:wrap;max-width:100%}
+.appearance-control .ds-segmented button{min-width:44px;min-height:44px}
+.modal:has(.appearance-control){overflow:auto;max-height:calc(100dvh - 32px)}
+.modal:has(.appearance-control) .icon-button{min-width:44px;min-height:44px}
+@media(max-width:760px){
+ .app-shell .breadcrumbs>span,.app-shell .breadcrumbs>strong,.app-shell .breadcrumbs>svg{display:none}
+ .app-shell .sidebar{width:min(320px,calc(100vw - 44px));height:100dvh;z-index:70}
+ .app-shell .sidebar-scrim{z-index:65}
+ .app-shell .topbar.glass--bar{height:auto;min-height:64px}
+ .mobile-tabs button[aria-current=page]{background:var(--accent-fill);border-radius:var(--radius-m)}
+ .mobile-tabs button{padding:var(--space-2) var(--space-1)}
+}
 }
