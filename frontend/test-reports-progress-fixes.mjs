@@ -4,12 +4,12 @@ import {build} from 'esbuild';
 import {createRequire} from 'node:module';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
-const bundle=await build({stdin:{contents:"export {default as Progress} from './src/reports/ProgressTab';export {mockReport} from './src/reports/mock';export {pollProgressRefresh,clearReportCache} from './src/reports/useReport';export {readProgressContext,progressHash} from './src/reports/progressView';",resolveDir:process.cwd(),loader:'tsx'},loader:{'.css':'empty'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic'});
+const bundle=await build({stdin:{contents:"export {default as Progress} from './src/reports/ProgressTab';export {mockReport} from './src/reports/mock';export {clearReportCache} from './src/reports/useReport';export {readProgressContext,progressHash} from './src/reports/progressView';",resolveDir:process.cwd(),loader:'tsx'},loader:{'.css':'empty'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic'});
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=reports&tab=progress&week=2026-10-12'});
 Object.assign(globalThis,{window:dom.window,document:dom.window.document,location:dom.window.location,localStorage:dom.window.localStorage,Element:dom.window.Element,getComputedStyle:dom.window.getComputedStyle,IS_REACT_ACT_ENVIRONMENT:true});
 const {createRoot}=await import('react-dom/client');
 const mod={exports:{}};new Function('require','module','exports',bundle.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports);
-const {Progress,mockReport,pollProgressRefresh,clearReportCache,readProgressContext,progressHash}=mod.exports;
+const {Progress,mockReport,clearReportCache,readProgressContext,progressHash}=mod.exports;
 let snapshot='old',posts=0,polls=0,refreshStatus=202,changeAfter=2,holdSearch=false;const requests=[];
 globalThis.fetch=async(url,options={})=>{
  requests.push({url,options});if(options.method==='POST'){posts++;polls=0;return new Response('{}',{status:refreshStatus})}
@@ -50,16 +50,16 @@ const selected=document.querySelector('.reports-status-filters [aria-pressed=tru
 const restored=readProgressContext(location.hash,'2026-10-05');assert.equal(restored.q,'absent');assert.equal(restored.status,'執行中');assert.match(progressHash('',restored),/status=/);
 await click(button('清除狀態篩選'));await inputChange('');await act(async()=>mock.timers.tick(251));
 await click(button('重新整理資料'));assert.equal(posts,1);assert.equal(polls,0);
-await act(async()=>mock.timers.tick(2999));assert.equal(polls,0);
-await act(async()=>mock.timers.tick(1));assert.equal(polls,1);assert.equal(document.querySelector('[role=status]'),null);
-await act(async()=>mock.timers.tick(3000));assert.match(document.querySelector('[role=status]').textContent,/資料已更新/);assert.match(document.querySelector('tbody').textContent,/更新後案件/);
+let count=requests.length;await act(async()=>mock.timers.tick(600000));assert.equal(requests.length,count);
+assert.match(document.querySelector('[role=status]').textContent,/請按查看更新結果/);
+snapshot='new';await click(button('查看更新結果'));assert.equal(polls,1);
+assert.match(document.querySelector('tbody').textContent,/更新後案件/);
 await click(document.querySelector('.reports-progress-table .reports-pagination button:last-child'));
 assert.match(document.querySelector('tbody').textContent,/更新後案件/);
 await click(document.querySelector('tbody tr button'));assert.match(document.querySelector('[role=dialog]').textContent,/更新後詳情/);
 window.history.replaceState(null,'',location.hash);await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
 refreshStatus=429;await click(button('重新整理資料'));assert.equal(posts,2);assert.match(document.querySelector('[role=status]').textContent,/每 60 秒只能重新整理一次/);
-refreshStatus=202;changeAfter=Infinity;await click(button('重新整理資料'));for(let i=0;i<6;i++)await act(async()=>mock.timers.tick(3000));assert.equal(posts,3);assert.match(document.querySelector('[role=status]').textContent,/資料仍在更新，稍後會自動出現/);
-const count=requests.length;await act(async()=>mock.timers.tick(30000));assert.equal(requests.length,count);
-let reads=0;globalThis.fetch=async()=>{reads++;return new Response(JSON.stringify({meta:{snapshot:'same',fingerprint:reads===2?'new':'old'}}))};
-const poll=pollProgressRefresh({dept:'field'},{snapshot:'same',fingerprint:'old'});await act(async()=>mock.timers.tick(3000));assert.equal(reads,1);await act(async()=>mock.timers.tick(3000));assert.equal(await poll,true);assert.equal(reads,2);
+refreshStatus=202;await click(button('重新整理資料'));assert.equal(posts,3);
+count=requests.length;await act(async()=>mock.timers.tick(600000));assert.equal(requests.length,count);
+assert.match(document.querySelector('[role=status]').textContent,/請按查看更新結果/);
 mock.timers.reset();await act(async()=>root.unmount());console.log('Progress regression behavior checks passed. Focus, page 2 identity, zero chip, hash, detail, 202, 429, bounded refresh and fingerprint.');

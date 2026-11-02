@@ -19,12 +19,10 @@ const legacy={
  "ProjectDetail.tsx": "bec3a55a2b06b4c71e100630f6dcf3aa96bc1af24d22cc517d4fd8afa894d3ec",
  "P2Pages.tsx": "e43860fe8bd3e7b811b594e63a6949854ecf344903541c34351562261ae593e7",
  "api.ts": "a63a733f181926716e31fde9dbc649da20d0ce978a2b70196d1d48b1a07b93f5",
- "ProjectsList.tsx": "4e04e846b5d132318070e7e3c74dc9a7a0761b3f60071a437477287107333501",
- "dispatchBoardRead.ts": "723c1765649ee9fa877267d754aa8d93fef8d66ee3f0166836b19abdf43a6163",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
  "useHomeReports.ts": "6fdd24349550a913ec1bae463d04167fc6ee2234752815ab3d01c345d4c7dd05",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
- "refreshSources.ts": "55675cabe14c1c03d37dfb62c528284b91c38ad4b3ed1e4b0cc34bf28ff61c0b",
+ "refreshSources.ts": "41162fecd19aacd07713c0bb5decc4eb91e456cbdee31ed8a2ab144da77b42ca",
  "TokenDashboard.tsx": "a01af58e64d817f35890b11339b712e2283fc9558c0b3c78e8571ca5af3942bb",
  "HomeDispatchCard.tsx": "74d8f6cff0919960f17c37dbd8dbc5ddc0b4089e4558ab3904421686c7a185b0",
  "useDialogFocus.ts": "b636c3476c8855862349e384da2886332caf2b28740e59a8eb69299b3be767ff",
@@ -33,10 +31,9 @@ const legacy={
  "routeLoader.ts": "5bff6b1339b36475ea28d559deb6190be55eba60970a08bbee5194543b10ce36",
  "TaskTimeline.tsx": "216aa59335a7c7c17cdf7a8b9681a40d00798b493b5f53ef1125a27743a26c71",
  "reloadGuard.ts": "1983950556280811e13d243bfcba34e97ce91814745e222e234e34f458750f0e",
- "assistant/ConversationHistory.tsx": "4efd01796fd357429ea8a7676f488d68ce94a743407bb8c76544ac51bd10fed6",
  "assistant/ProjectChatLauncher.tsx": "df78000709295f98a73c8dc2f1f2a3dd078910e9cb830671fb0243e1151dcfde",
  "reports/ContactsTab.tsx": "9a7d005c955c51c0492c185a51c77e23237661c5dc582ead8717debdd3d800ff",
- "reports/useReport.ts": "4946e4c6c0117cc0cf19b1de8ea7cf2b812d3825c5fc8586a06883fa3a4e0c1f"
+ "reports/useReport.ts": "940544793d277eee68475057c3094f4fce0c2a9db78a5630a2853678e8937c42"
 };
 export function triggers(source){
  const tree=ts.createSourceFile('source.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

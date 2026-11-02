@@ -21,18 +21,16 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  },[]);
  useEffect(()=>{
   ++listGeneration.current;list.current?.abort();const controller=new AbortController();list.current=controller;
-  let timer:ReturnType<typeof setTimeout>|undefined;
-  const load=async(retried=false)=>{
+  const load=async()=>{
    try{
     const page=await listConversations(scope,undefined,controller.signal);
     if(controller.signal.aborted)return;
     setState({status:'ready',page});
-    if(revision>0&&page.history_available&&!retried&&!page.items.some(item=>item.id===activeId))
-     timer=setTimeout(()=>{++listGeneration.current;void load(true)},500);
+
    }catch{if(!controller.signal.aborted)setState({status:'error'})}
   };
   void load();
-  return()=>{controller.abort();clearTimeout(timer)};
+  return()=>{controller.abort()};
  },[projectId,revision,attempt,activeId]);
  useEffect(()=>()=>action.current?.abort(),[]);
  useEffect(()=>{action.current?.abort();setBusy(false);setActionError('');setRetry(undefined)},[activeId]);
@@ -79,6 +77,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   <div className="assistant-history-heading"><h2 id={`${id}-title`}>對話紀錄</h2><Button variant="plain" onClick={close} aria-label="關閉對話紀錄">關閉</Button></div>
   <Button data-history-new onClick={fresh}>新對話</Button>
   {state.status==='loading'?<p role="status">正在載入對話…</p>:state.status==='error'?<p role="alert">無法載入對話紀錄。<Button onClick={()=>setAttempt(n=>n+1)}>重新載入紀錄</Button></p>:<>
+   {revision>0&&state.page.history_available&&!state.page.items.some(item=>item.id===activeId)&&<p role="status">目前對話尚未列入紀錄，請按重新載入紀錄查看結果。<Button onClick={()=>setAttempt(n=>n+1)}>重新載入紀錄</Button></p>}
    {state.page.items.length===0?<p>尚無對話紀錄</p>:<ul className="assistant-history-list">{state.page.items.map(item=><li key={item.id}>
     <div className="assistant-history-row"><Button variant="plain" className="assistant-history-open" data-history-id={item.id} disabled={busy} aria-current={activeId===item.id?'true':undefined} onClick={()=>open(item.id)}><span>{item.title||'未命名對話'}</span><time dateTime={item.updated_at} title={new Date(item.updated_at).toLocaleString('zh-TW')}>{relativeTime(item.updated_at)}</time></Button><Button variant="plain" disabled={busy} aria-label={`刪除對話：${item.title}`} onClick={()=>setConfirm(item.id)}>刪除</Button></div>
     {confirm===item.id&&<div className="assistant-history-confirm"><span>確定刪除此對話？</span><Button disabled={busy} variant="destructive" onClick={()=>remove(item.id)}>確定刪除</Button><Button disabled={busy} onClick={()=>setConfirm(undefined)}>取消</Button></div>}
