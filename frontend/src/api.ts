@@ -3,7 +3,7 @@ import {projectFlowRoute} from './projectRoutes';
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
 const etagCache=new Map<string,{etag:string;data:unknown}>();
-export type ApiRequestInit=RequestInit & {etag?:boolean;timeoutMs?:number};
+export type ApiRequestInit=RequestInit & {etag?:boolean;timeoutMs?:number;cacheScope?:string};
 const pendingMutations=new Map<number,number>();
 export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
@@ -16,7 +16,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
-  const {etag,timeoutMs=mutating?0:30000,...request}=init||{};
+  const {etag,cacheScope,timeoutMs=mutating?0:30000,...request}=init||{};
   // Race the whole read (headers and body), even when a transport ignores abort.
   const controller=timeoutMs||request.signal?new AbortController():undefined;
   let timer:ReturnType<typeof setTimeout>|undefined;
@@ -30,7 +30,8 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   }):undefined;
   const bounded=<V>(work:Promise<V>):Promise<V>=>deadline?Promise.race([work,deadline]):work;
   const cacheable=etag===true&&!mutating&&(!init?.method||init.method.toUpperCase()==='GET');
-  const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(url):undefined;
+  const cacheKey=cacheScope===undefined?url:JSON.stringify([cacheScope,url]);
+  const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(cacheKey):undefined;
   const headers=new Headers(init?.headers);
   if(!(init?.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   if(cached)headers.set('If-None-Match',cached.etag);
@@ -39,7 +40,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const response=await bounded(fetch(url,{credentials:'same-origin',...request,headers,...(controller?{signal:controller.signal}:{})}));
   perfHeaders(trace,response);
   onResponse?.(response.status,response);
-  if(response.status===304&&cached){perfParsed(trace,'');return receivedFreshness(cached.data,response) as T;}
+  if(response.status===304&&cached){if(epoch!==getSessionEpoch()||!isCurrent()||request.signal?.aborted)throw new DOMException('aborted','AbortError');perfParsed(trace,'');return receivedFreshness(cached.data,response) as T;}
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
   try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
@@ -49,9 +50,9 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   if(cacheable&&epoch===getSessionEpoch()&&isCurrent()&&!init?.signal?.aborted){
    const value=response.headers.get('ETag');
    if(value&&init?.cache!=='no-store'){
-    etagCache.delete(url);etagCache.set(url,{etag:value,data});
+    etagCache.delete(cacheKey);etagCache.set(cacheKey,{etag:value,data});
     if(etagCache.size>100)etagCache.delete(etagCache.keys().next().value!);
-   }else etagCache.delete(url);
+   }else etagCache.delete(cacheKey);
   }
   return receivedFreshness(data,response) as T;
   }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);controller?.abort();if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}

@@ -1,6 +1,6 @@
 import {createElement} from 'react';
 import {Section,Row,Skeleton} from './design';
-import {useCallback,useEffect,useRef,useState,type DependencyList} from 'react';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore,type DependencyList} from 'react';
 import {getSessionEpoch} from './api';
 import './design/skeleton.css';
 
@@ -44,4 +44,14 @@ export function useViewData<T>(key:string,fetcher:ViewDataFetcher<T>,deps:Depend
 /** Grouped row placeholders matching the title and detail of a loaded list. */
 export function ViewSkeleton({rows=3}:{rows?:number}){
  return createElement(Section,null,...Array.from({length:rows},(_,key)=>createElement(Row,{key,label:createElement(Skeleton,{width:'60%',height:'1.0625rem'}),detail:createElement(Skeleton,{lines:2,width:'80%',height:'.8125rem'})})));
+}
+
+export function usePageResource<T>(owner:import('./pageData').PageData,resource:import('./pageData').PageResource,intent:import('./pageData').FetchIntent,loader:import('./pageData').PageLoader<T>){
+ const key=owner.key(resource),intentKey=JSON.stringify(intent);
+ const latest=useRef({resource,intent,loader});latest.current={resource,intent,loader};
+ const subscribe=useCallback((listener:()=>void)=>owner.subscribe(latest.current.resource,listener),[owner,key]);
+ const snapshot=useCallback(()=>owner.state<T>(latest.current.resource),[owner,key]);
+ const state=useSyncExternalStore(subscribe,snapshot,snapshot);
+ useEffect(()=>{const {resource,intent,loader}=latest.current;void owner.read(resource,intent,loader).catch(()=>{})},[owner,key,intentKey]);
+ return state;
 }
