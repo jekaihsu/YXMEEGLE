@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Button} from './design';
 import {getSessionEpoch} from './api';
 import {DispatchBoardFrame} from './DispatchBoard';
+import {usePageOwner,type PageData} from './pageData';
 import {useDispatchBoardRead} from './dispatchBoardRead';
 import {canReadDispatch,canWriteDispatch} from './dispatchAccess';
 import {addDays,dispatchWeek,type DispatchSlot} from './dispatchBoardModel';
@@ -14,13 +15,15 @@ import './DispatchPublish.css';
 
 export function DispatchWorkflowPage({projects=[],session}:{projects?:DispatchProject[];session:Session}) {
  const [from,setFrom]=useState(dispatchWeek),[tab,setTab]=useState(new URLSearchParams(location.hash.slice(1)).get('tab')==='work'?'work':'board');
+ const [openId]=useState(()=>crypto.randomUUID());
+ const owner=usePageOwner({workspace:session.workspace_id||'',identityFingerprint:JSON.stringify(session),openId});
  const allowed=canReadDispatch(session),write=canWriteDispatch(session);
  if(!allowed)return <p>目前沒有派工看板權限。</p>;
- return <DispatchWorkspace key={`${getSessionEpoch()}:${from}`} session={session} projects={projects} from={from} setFrom={setFrom} tab={tab} setTab={setTab} write={write}/>;
+ return <DispatchWorkspace key={`${getSessionEpoch()}:${from}`} owner={owner} session={session} projects={projects} from={from} setFrom={setFrom} tab={tab} setTab={setTab} write={write}/>;
 }
 
-function DispatchWorkspace({session,projects,from,setFrom,tab,setTab,write}:{session:Session;projects:DispatchProject[];from:string;setFrom:(v:string)=>void;tab:string;setTab:(v:string)=>void;write:boolean}){
- const read=useDispatchBoardRead(from),[flow,setFlow]=useState<DispatchFlow>(),[version,setVersion]=useState(0),[message,setMessage]=useState('');
+function DispatchWorkspace({owner,session,projects,from,setFrom,tab,setTab,write}:{owner:PageData;session:Session;projects:DispatchProject[];from:string;setFrom:(v:string)=>void;tab:string;setTab:(v:string)=>void;write:boolean}){
+ const read=useDispatchBoardRead(from,0,owner),[flow,setFlow]=useState<DispatchFlow>(),[version,setVersion]=useState(0),[message,setMessage]=useState('');
  const storageKey=`yx:dispatch-drafts:${session.workspace_id}:${session.user?.id}`;
  const [drafts,setDrafts]=useState<SavedDraft[]>(()=>{try{return readLocalDrafts(localStorage.getItem(storageKey))}catch{return []}});
  const requests=useRef(new Set<AbortController>());

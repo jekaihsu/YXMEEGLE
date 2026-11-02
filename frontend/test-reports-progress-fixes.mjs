@@ -46,7 +46,7 @@ holdSearch=true;await inputChange('absent');await act(async()=>mock.timers.tick(
 assert.equal(document.querySelector('input[type=search]'),input);assert.ok(input.isConnected);assert.equal(document.activeElement,input);assert.match(document.body.textContent,/正在讀取/);
 holdSearch=false;clearReportCache();await act(async()=>{window.dispatchEvent(new dom.window.HashChangeEvent('hashchange'))});
 await inputChange('absent2');await act(async()=>mock.timers.tick(251));await inputChange('absent');await act(async()=>mock.timers.tick(251));
-const selected=document.querySelector('.reports-status-filters [aria-pressed=true]');assert.match(selected.textContent,/執行中.*0/);assert.ok(button('清除狀態篩選'));
+const selected=document.querySelector('.reports-status-filters [aria-pressed=true]');assert.match(selected.textContent,/執行中 —/);assert.ok(button('清除狀態篩選'));
 const restored=readProgressContext(location.hash,'2026-10-05');assert.equal(restored.q,'absent');assert.equal(restored.status,'執行中');assert.match(progressHash('',restored),/status=/);
 await click(button('清除狀態篩選'));await inputChange('');await act(async()=>mock.timers.tick(251));
 await click(button('重新整理資料'));assert.equal(posts,1);assert.equal(polls,0);

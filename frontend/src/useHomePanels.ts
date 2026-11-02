@@ -79,7 +79,7 @@ export function homePanelUrl(query:HomeQuery, full=false) {
 }
 // Lazy Home views and normalized Work queries share the mounted page owner.
 const generations=new WeakMap<PageData,Map<string,{revision:number;retries:Set<string>}>>();
-const HomeDataContext=createContext<PageData|null>(null);
+export const HomeDataContext=createContext<PageData|null>(null);
 function useHomeOwner(c:Ctx){
  const shared=useContext(HomeDataContext);
  const [openId]=useState(()=>crypto.randomUUID());

@@ -88,8 +88,8 @@ test('F7 pending joins never repeat the staging passive eight-GET burst',async()
   }
   await act(async()=>clock.advance(600000));assert.equal(calls,2);
   await click('上一週');assert.equal(calls,3);
-  pending=false;await click('下一週');assert.equal(calls,4);
-  await act(async()=>clock.advance(600000));assert.equal(calls,4);
-  await click('重新讀取');assert.equal(calls,5);
+  pending=false;await click('下一週');assert.equal(calls,3,'return to a loaded week uses its page snapshot');
+  await act(async()=>clock.advance(600000));assert.equal(calls,3);
+  await click('重新讀取');assert.equal(calls,4);
  }finally{await act(async()=>root.unmount());clock.restore();dom.window.close()}
 });
