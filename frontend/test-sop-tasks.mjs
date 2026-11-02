@@ -365,6 +365,7 @@ test('a retry that fails again shows the new failure with the retry available', 
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
+ await click(button('編輯'));
  const input = dialog().querySelector('[aria-label="任務名稱"]');
  await type(input, '業主需求確認');
  server.patchReply = () => {server.overview = overview([task('t1', {revision: 2})]); return response({code: 'task_revision_conflict'}, 409)};
@@ -376,8 +377,54 @@ test('a revision conflict reloads the task and keeps the draft for the next save
  assert.deepEqual(server.patch.map(b => [b.expected_revision, b.title]), [[1, '業主需求確認'], [2, '業主需求確認']]);
 });
 
+test('SOP sheet opens as facts; edit focuses the editor, cancel and save restore focus',async()=>{
+ await mount({route:{task:'t1',task_source:'sop_local'},tasks:[task('t1',{participants:{executor:'pm',checker:'member'},local:{due_date:'2026-11-10'}})]});
+ assert.equal(dialog().querySelector('.nw-task-editor'),null);
+ assert.equal(button('儲存任務'),undefined);assert.equal(button('取消'),undefined);
+ assert.match(dialog().querySelector('.task-drawer-facts').textContent,/負責人王經理.*檢核林組員.*期限2026-11-10/);
+ assert.equal(dialog().querySelectorAll('.task-drawer-text').length,1,'description is shown once');
+ await click(button('編輯'));
+ assert.equal(document.activeElement,dialog().querySelector('[aria-label="任務名稱"]'));
+ assert.equal(dialog().querySelector('.task-drawer-facts'),null);
+ assert.equal(dialog().querySelector('[aria-label=狀態操作]'),null,'state operations step aside while editing');
+ await type(dialog().querySelector('[aria-label="任務名稱"]'),'取消的草稿');await click(button('取消'));
+ assert.equal(server.patch.length,0);assert.equal(document.activeElement,button('編輯'));
+ await click(button('編輯'));await type(dialog().querySelector('[aria-label="任務名稱"]'),'儲存的名稱');await click(button('儲存任務'));
+ assert.deepEqual(server.patch,[{expected_revision:1,title:'儲存的名稱'}]);
+ assert.equal(dialog().querySelector('.nw-task-editor'),null);assert.equal(document.activeElement,button('編輯'));
+});
+
+test('successful save restores edit focus while its refresh is pending and blocks reopening',async()=>{
+ await mount({route:{task:'t1',task_source:'sop_local'}});
+ await click(button('編輯'));await type(dialog().querySelector('[aria-label="任務名稱"]'),'更新名稱');
+ let release;server.overviewHold=new Promise(r=>{release=r});
+ await click(button('儲存任務'));
+ assert.equal(dialog().querySelector('.nw-task-editor'),null);
+ assert.ok(document.activeElement===button('編輯'),'focus returns before refresh resolves');
+ assert.equal(button('編輯').getAttribute('aria-disabled'),'true');
+ await click(button('編輯'));assert.equal(dialog().querySelector('.nw-task-editor'),null,'stale view cannot reopen writes');
+ await act(async()=>{release();await tick()});assert.equal(button('編輯').getAttribute('aria-disabled'),'false');
+});
+
+test('restricted SOP instructions stay absent in view and editor',async()=>{
+ await mount({route:{task:'t1',task_source:'sop_local'},tasks:[task('t1',{instructions:null})]});
+ assert.equal(dialog().querySelector('.task-drawer-text'),null);
+ await click(button('編輯'));assert.equal(dialog().querySelector('[aria-label="任務備註"]'),null);
+ await click(button('取消'));assert.equal(document.activeElement,button('編輯'));
+});
+
+test('applicability-only capability stays reachable behind edit without enabling task fields',async()=>{
+ await mount({route:{task:'t1',task_source:'sop_local'},tasks:[task('t1',{allowed_actions:['set_applicability']})]});
+ assert.equal(button('儲存適用'),undefined);await click(button('編輯'));
+ assert.equal(dialog().querySelector('.nw-task-editor'),null);
+ assert.ok(document.activeElement===dialog().querySelector('.ds-select button'),'applicability picker gets focus');
+ assert.ok(button('儲存適用'));await click(button('取消'));
+ assert.equal(button('儲存適用'),undefined);assert.equal(document.activeElement,button('編輯'));
+});
+
 test('participant choices come only from eligible case people', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
+ await click(button('編輯'));
  const executor = dialog().querySelector('button[aria-label="task: 業主提出報價需求"]');
  await click(executor);
  assert.deepEqual([...dialog().querySelectorAll('[role=option]')].map(o => o.textContent), ['未指派', '王經理', '林組員']);
@@ -463,7 +510,8 @@ test('P4b with no reason from the API the dialog says so and offers a read-only 
  assert.equal(groups.length, 1, 'actions sharing the same missing reason are grouped once');
  assert.match(groups[0].textContent, /編輯任務內容.*開始.*完成.*封存：系統未提供原因/);
  assert.equal((body.match(/系統未提供原因/g) || []).length, 1, 'the reason is not repeated per control');
- assert.match(dialog().querySelector('#task-editor-readonly').textContent, /原因見下方/);
+ assert.equal(dialog().querySelector('.nw-task-editor'),null,'read-only view has no disabled editor');
+ assert.equal(button('編輯'),undefined,'server-denied editing has no entry point');
  const before = calls.filter(x => x.method === 'GET' && x.url.endsWith('/sop-tasks')).length, writes = calls.filter(x => x.method !== 'GET').length;
  await click([...groups[0].querySelectorAll('button')].find(b => b.textContent === '重新整理'));
  assert.ok(calls.filter(x => x.method === 'GET' && x.url.endsWith('/sop-tasks')).length > before, 'refresh re-reads');

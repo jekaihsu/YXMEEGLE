@@ -7,7 +7,8 @@ import {useRef, useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section} from './design';
 import {SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
 import {APPLICABILITY_LABEL, ROLE_LABEL, stateLabel, type TaskAction} from './sopTaskModel';
-import {TaskDrawer} from './TaskDrawer';
+import {TaskDrawer,DrawerFacts} from './TaskDrawer';
+import {useFocusFirstField,useRestoreEditFocus} from './taskSheetFocus';
 import {FlowAction} from './FlowActions';
 import type {useSopTasks} from './useSopTasks';
 import type {User} from './types';
@@ -52,6 +53,7 @@ function Field({label, children}: {label: string; children: ReactNode}) {
 
 export function SopTaskInspector({task, project, users, sop, onClose, testOperator=false, onCleaned}: {testOperator?:boolean; onCleaned?:()=>void; task: SopTask; project: {id:string}; users: User[]; sop: ReturnType<typeof useSopTasks>; onClose: () => void}) {
  const [review,setReview]=useState(false);
+ const [editing,setEditing]=useState(false),editRef=useRestoreEditFocus(editing);
  const [cleanupOpen,setCleanupOpen]=useState(false), [cleanupReason,setCleanupReason]=useState('');
  const cleanup = async () => {
   if (busy || !cleanupReason.trim()) return;
@@ -107,16 +109,21 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
  const reasonsId=`sop-unavailable-${task.id}`;
  const draft={title:task.title,assignee:task.participants.executor || '',due:task.dueDate || '',notes:task.instructions || '',status:task.state,reason:''};
  const editable=view.edit.allowed;
+ const finishEdit=async(result:Promise<boolean>)=>{const ok=await result;if(ok&&sop.current())setEditing(false);return ok};
+ const person=(id?:string)=>id?(users.find(u=>u.id===id)?.name||sop.assignees.find(u=>u.id===id)?.name||'人員待確認'):'未指派';
+ const canEdit=task.allowedActions.includes('edit')||task.allowedActions.includes('set_applicability');
+ const canOpenEditor=!busy&&sop.state.kind==='ready'&&!sop.state.refreshing&&(editable||task.allowedActions.includes('set_applicability'));
+ const facts=[{label:'負責人',value:person(task.participants.executor)},...(['checker','confirmer'] as const).filter(role=>task.participants[role]).map(role=>({label:ROLE_LABEL[role],value:person(task.participants[role])})),...(task.dueDate?[{label:'期限',value:task.dueDate.slice(0,10)}]:[])];
  const save=(value:TaskDraft)=>{
   const body:Record<string,unknown>={};
   if(value.title!==task.title)body.title=value.title.trim();
   if(value.notes!==draft.notes && task.instructions!==null)body.instructions=value.notes;
   if(value.assignee!==draft.assignee)body.participants=Object.fromEntries(Object.entries({...task.participants,executor:value.assignee}).filter(([,v])=>v));
   if(value.due!==draft.due){body.due_date=value.due || null;body.reason=value.reason.trim()}
-  return patch(body,'已儲存任務');
+  return finishEdit(patch(body,'已儲存任務'));
  };
 
- const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{writeBusy && <p role="status" className="sop-muted">{pending}</p>}{verify==='checking' && <p role="status" className="sop-muted">正在確認剛才的操作結果，確認前不能再修改…</p>}{verify==='failed' && <div role="alert" className="pg-callout">無法確認剛才的操作是否已完成，請先重新讀取，不要重複送出。<Button onClick={() => void confirmOutcome()}>重新讀取</Button></div>}{view.available.length>0&&<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{view.available.slice().reverse().map(a => a.reason
+ const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{writeBusy && <p role="status" className="sop-muted">{pending}</p>}{verify==='checking' && <p role="status" className="sop-muted">正在確認剛才的操作結果，確認前不能再修改…</p>}{verify==='failed' && <div role="alert" className="pg-callout">無法確認剛才的操作是否已完成，請先重新讀取，不要重複送出。<Button onClick={() => void confirmOutcome()}>重新讀取</Button></div>}{!editing&&view.available.length>0&&<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{view.available.slice().reverse().map(a => a.reason
     ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason}, a.label)}/>
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action, {}, a.label)}>{busy && pending===`${a.label}中…` ? pending : a.label}</FlowAction>)}</div>}
   {view.unavailable.length>0&&<div id={reasonsId} className="sop-unavailable" role="group" aria-label="目前無法使用的操作"><strong>目前無法使用</strong><ul>{view.unavailable.map(g=><li key={g.kind+g.reason} data-kind={g.kind}><span>{g.actions.map(x=>x.label).join('、')}</span>：{g.reason}{g.hint&&<small>{g.hint}</small>}{(g.kind==='no_reason'||g.kind==='stale')&&<Button disabled={busy||sop.state.kind==='loading'||sop.state.kind==='ready'&&sop.state.refreshing} onClick={()=>void sop.reload()}>重新整理</Button>}</li>)}</ul></div>}</>;
@@ -124,12 +131,18 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   <div className="sop-inspector">
    <div className="sop-badges">{task.isTest && <Badge tone="warning">測試</Badge>}<Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
    {notice && <p role="status" className="sop-muted">{notice}</p>}
-   <AssigneeTaskEditor projectId={project.id} nodeKey={task.nodes[0]?.node_key} busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:statusFields(editable,task),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:editable?undefined:'目前為唯讀檢視，原因見下方「目前無法使用」。'}} onSave={save}/>
-   {editable && <ParticipantRoles projectId={project.id} task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
-   {task.allowedActions.includes('set_applicability') && <ApplicabilityEditor task={task} busy={busy} save={(applicability,reason)=>transition('set_applicability',{applicability,reason})}/>}
+   {editing?<section className="task-drawer-section">
+    {editable&&<AssigneeTaskEditor projectId={project.id} nodeKey={task.nodes[0]?.node_key} busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} hideLocked onCancel={()=>{if(!busy)setEditing(false)}} model={{draft,fields:statusFields(editable,task),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true}} onSave={save}/>}
+    {editable&&<ParticipantRoles projectId={project.id} task={task} people={sop.assignees} busy={busy} save={participants=>finishEdit(patch({participants},'已更新人員'))}/>}
+    {task.allowedActions.includes('set_applicability')&&<ApplicabilityEditor focus={!editable} task={task} busy={busy} save={(applicability,reason)=>finishEdit(transition('set_applicability',{applicability,reason}))}/>}
+    {!editable&&<Button disabled={busy} onClick={()=>setEditing(false)}>取消</Button>}
+   </section>:<>
+    <section className="task-drawer-section"><div className="task-drawer-section-head"><h3>任務資訊</h3>{canEdit&&<button ref={editRef} className="text-button" type="button" disabled={busy} aria-disabled={!canOpenEditor} aria-describedby={canOpenEditor?undefined:reasonsId} onClick={()=>{if(canOpenEditor)setEditing(true)}}>編輯</button>}</div><DrawerFacts facts={facts}/></section>
+    {task.instructions&&<section className="task-drawer-section"><h3>任務說明</h3><p className="task-drawer-text">{task.instructions}</p></section>}
+   </>}
 
    {task.result && <Section title="完成結果"><Row label="完成人員" value={task.result.actorName}/><Row label="完成時間" value={new Date(task.result.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})}/><Row label="結果說明" value={<span className="sop-raw">{task.result.note}</span>}/></Section>}
-   {task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()},'完成')}}>
+   {!editing&&task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()},'完成')}}>
     <Field label="結果說明"><textarea rows={4} maxLength={20000} value={resultNote} disabled={busy||!view.completion.allowed} onChange={e=>setResultNote(e.target.value)}/></Field>
     {view.completion.allowed&&completionReason&&<p className="sop-muted" role="status">{completionReason}</p>}
     <Button type="submit" variant="primary" disabled={!!completionReason} aria-describedby={view.completion.allowed?undefined:reasonsId}>完成</Button>
@@ -149,9 +162,10 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
  </TaskDrawer>;
 }
 
-function ApplicabilityEditor({task,busy,save}:{task:SopTask;busy:boolean;save:(value:Applicability,reason:string)=>Promise<boolean|undefined>}) {
+function ApplicabilityEditor({task,busy,save,focus}:{focus:boolean;task:SopTask;busy:boolean;save:(value:Applicability,reason:string)=>Promise<boolean|undefined>}) {
  const [value,setValue]=useState(task.applicability),[reason,setReason]=useState('');
- return <form className="sop-form" onSubmit={e=>{e.preventDefault();if(reason.trim())void save(value,reason.trim())}}>
+ const formRef=useFocusFirstField<HTMLFormElement>(focus);
+ return <form ref={formRef} className="sop-form" onSubmit={e=>{e.preventDefault();if(reason.trim())void save(value,reason.trim())}}>
   <Field label="適用"><FormSelect aria-label="適用" value={value} disabled={busy} onChange={e=>{const next=e.target.value;if(next==='applicable'||next==='not_applicable'||next==='unresolved')setValue(next)}}>{(Object.entries(APPLICABILITY_LABEL)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</FormSelect></Field>
   <Field label="適用原因"><input aria-label="適用原因" value={reason} maxLength={1000} disabled={busy} onChange={e=>setReason(e.target.value)}/></Field>
   <Button type="submit" disabled={busy||value===task.applicability||!reason.trim()} disabledReason="請變更適用狀態並填寫原因">儲存適用</Button>
