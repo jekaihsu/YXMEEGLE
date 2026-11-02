@@ -300,17 +300,21 @@ def test_revoke_access_then_resume(app, client):
     assert client.get('/api/ai/conversations/global-chat').status_code == 200
 
 
-def test_inflight_case_revocation_blocks_later_events_and_keeps_usage(app, client):
+def test_inflight_case_revocation_blocks_later_events_and_keeps_usage(app, client, monkeypatch):
     from .test_ai_project import project
     from .test_ai_api import wid
     from .test_backend import WorkspaceRow, BusinessRow, storage
     pid = project(client)
     workspace = wid(app, client)
+    from .ai import routes
+    clock = [routes.monotonic()]
+    monkeypatch.setattr(routes, 'monotonic', lambda: clock[0])
 
     class Revoking(Fake):
         async def stream(self, *args):
             async for event in super().stream(*args):
                 if event.kind == 'text':
+                    clock[0] += 2.01
                     with app.state.sessions.begin() as db:
                         root = db.get(WorkspaceRow, workspace)
                         state = storage.load(db, BusinessRow, root)

@@ -15,7 +15,7 @@ def test_startup_creates_usage_table(tmp_path):
     assert {c['name'] for c in inspect(engine).get_columns('ai_usage')} == {
         'id', 'created_at', 'day', 'workspace_id', 'actor_id', 'actor_name', 'conversation_id', 'provider',
         'model', 'effort', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
-        'cost_micro_usd', 'price_version', 'steps', 'tool_calls', 'latency_ms', 'first_token_ms', 'status', 'error_code', 'scope', 'project_id'}
+        'cost_micro_usd', 'price_version', 'steps', 'tool_calls', 'latency_ms', 'first_token_ms', 'status', 'error_code', 'scope', 'project_id', 'authz_version', 'permission_key', 'provenance_version'}
     engine.dispose()
 
 
@@ -163,4 +163,26 @@ def test_schema_upgrade_tolerates_concurrent_column_add(tmp_path, monkeypatch, t
     assert any(s.startswith(f'ALTER TABLE {table_name} ADD COLUMN {column_name} ') for s in statements)
     assert column_name in {c['name'] for c in original(engine).get_columns(table_name)}
     ledger.ensure_schema(engine)
+    engine.dispose()
+
+
+def test_read_provenance_migration_keeps_old_rows_explicitly_unknown(tmp_path):
+    from sqlalchemy.orm import sessionmaker
+    from .ai import ledger
+    from .test_ai_history_queries import seed_turn
+    engine = create_engine('sqlite:///' + str(tmp_path/'old-provenance.db'))
+    ledger.ensure_schema(engine)
+    sessions = sessionmaker(bind=engine)
+    seed_turn(sessions,'old-usage','old-conversation')
+    with engine.begin() as db:
+        ledger.AiCaseRead.__table__.drop(db)
+        for field in ('authz_version','permission_key','provenance_version'):
+            db.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN ' + field)
+    ledger.ensure_schema(engine)
+    ledger.ensure_schema(engine)
+    with sessions() as db:
+        row = db.get(ledger.AiUsageRow,'old-usage')
+        assert row.provenance_version is None and row.permission_key is None and row.authz_version is None
+        assert db.get(ledger.AiExchangeRow,'old-usage').question
+    assert inspect(engine).get_pk_constraint('ai_case_read')['constrained_columns'] == ['usage_id','tool_call_id','project_id']
     engine.dispose()

@@ -14,6 +14,9 @@ from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
 from .tools import TOOLS, execute, result_display
+from .read_provenance import case_reads
+from fastapi import HTTPException
+from .history_authorization import permission_key, stream_error
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -49,6 +52,10 @@ class ChatRun:
         self.finished = False
         self.answer = ''
         self.tool_names = []
+        self.case_reads = set()
+        self.case_ids = set()
+        self.provenance_version = 1
+        self.authorize = self.unrestricted
         self.error_detail = None
         self.cookie = ''
         self.project_context = None
@@ -56,6 +63,9 @@ class ChatRun:
         self.recorded = lambda: None
         self.step_final_usage = False
         self.streamed_chars = self.input_floor = 0
+
+    async def unrestricted(self, force=False):
+        pass
 
     def elapsed(self):
         return int((perf_counter() - self.started) * 1000)
@@ -82,6 +92,8 @@ class ChatRun:
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
                       scope=self.scope, project_id=self.body.project_id,
+                      authz_version=self.user.get('authz_version', 0), permission_key=permission_key(self.user),
+                      provenance_version=self.provenance_version, case_reads=self.case_reads,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
                       cache_write_tokens=usage.cache_write, output_tokens=usage.output,
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
@@ -121,6 +133,7 @@ class ChatRun:
         result_pool = {}
         shown_displays = {}
         try:
+            await self.authorize(force=True)
             yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id, scope=self.scope))
             system = project_system_prompt(self.project_context) if self.project_context else system_prompt()
             tools = {} if self.project_context else TOOLS
@@ -156,6 +169,7 @@ class ChatRun:
                 if content is None:
                     raise ProviderError()
                 if not calls:
+                    await self.authorize(force=True)
                     self.status = 'ok'
                     done = dict(type='done', usage=dict(input_tokens=self.usage.input_tokens, output_tokens=self.usage.output))
                     if self.user['role'] == 'manager':
@@ -166,6 +180,7 @@ class ChatRun:
                     return
                 if self.project_context or self.steps == 7:
                     raise ProviderError()
+                await self.authorize(force=True)
                 keys = [(c.name, json.dumps(c.args, sort_keys=True, ensure_ascii=False)) for c in calls]
                 pending = {}
                 for call, key in zip(calls, keys):
@@ -177,10 +192,16 @@ class ChatRun:
                         pending[key] = call
 
                 async def run_tool(call):
+                    def observed(project):
+                        self.case_ids.add(project)
+                        self.case_reads.add((call.id, project))
+                    token = case_reads.set(observed)
                     try:
                         return await asyncio.wait_for(execute(self.app, self.cookie, call.name, call.args), timeout=15)
                     except TimeoutError:
                         return json.dumps({'error': '查詢逾時，請稍後重試', 'retryable': True}, ensure_ascii=False), True
+                    finally:
+                        case_reads.reset(token)
 
                 self.tool_calls += len(pending)
                 async def run_any(call):
@@ -213,6 +234,11 @@ class ChatRun:
         except (asyncio.CancelledError, GeneratorExit):
             self.status = 'aborted'
             raise
+        except HTTPException as exc:
+            self.status = 'error'
+            error = stream_error(exc)
+            self.error_code = error['code']
+            yield sse(error)
         except Exception as exc:
             log_failure(self.spec.provider, self.steps, exc, model=self.model, elapsed_ms=self.elapsed())
             self.status = 'error'

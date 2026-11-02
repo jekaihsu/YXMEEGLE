@@ -41,7 +41,10 @@ class Reader:
                 detail = '查詢參數無效'
             raise ReadValidation(detail)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        from .read_provenance import observed
+        observed(path, data)
+        return data
 
 
 def pick(value, *keys):

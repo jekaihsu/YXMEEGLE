@@ -8,7 +8,7 @@ import logging
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect, true
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.schema import CreateColumn
 from ..models import Base
@@ -32,6 +32,9 @@ class AiUsageRow(Base):
     provider = Column(String(16), nullable=False)
     scope = Column(String(16), nullable=False, default='global', server_default='global')
     project_id = Column(String(200), nullable=True)
+    authz_version = Column(Integer, nullable=True)
+    permission_key = Column(String(64), nullable=True)
+    provenance_version = Column(Integer, nullable=True)
     model = Column(String(120), nullable=False)
     effort = Column(String(24), nullable=False)
     input_tokens = Column(BigInteger, nullable=False)
@@ -46,6 +49,14 @@ class AiUsageRow(Base):
     first_token_ms = Column(Integer, nullable=True)
     status = Column(String(16), nullable=False)
     error_code = Column(String(64), nullable=True)
+
+
+class AiCaseRead(Base):
+    """Server-observed reads, including inherited conversation dependencies."""
+    __tablename__ = 'ai_case_read'
+    usage_id = Column(String(36), primary_key=True)
+    tool_call_id = Column(String(120), primary_key=True)
+    project_id = Column(String(200), primary_key=True)
 
 
 class AiExchangeRow(Base):
@@ -221,7 +232,7 @@ def today():
     return datetime.now(TAIPEI).date().isoformat()
 
 
-def record(sessions, *, exchange=None, conversation_generation=None, **values):
+def record(sessions, *, exchange=None, conversation_generation=None, case_reads=(), **values):
     created = datetime.now(timezone.utc)
     values = dict(created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values)
     values.setdefault('id', str(uuid4()))
@@ -230,6 +241,8 @@ def record(sessions, *, exchange=None, conversation_generation=None, **values):
             with sessions.begin() as db:
                 if db.get(AiUsageRow, values['id']) is None:
                     db.add(AiUsageRow(**values))
+                    db.add_all(AiCaseRead(usage_id=values['id'], tool_call_id=call, project_id=project)
+                               for call, project in set(case_reads))
             break
         except Exception:
             if attempt == 1:
@@ -259,11 +272,12 @@ def daily_tokens(sessions, workspace_id, actor_id):
                                 AiUsageRow.day == today()))
 
 
-def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None, q=None, *, content_enabled=True, retention_days=90, export=False):
+def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None, q=None, *, content_enabled=True, retention_days=90, export=False, allowed_project_ids=None, permission_keys=None):
     row = AiUsageRow
     rating_row = AiFeedbackRow
     joined = row.__table__.outerjoin(rating_row, and_(row.id == rating_row.usage_id, row.actor_id == rating_row.actor_id))
-    joined = joined.outerjoin(AiExchangeRow, and_(row.id == AiExchangeRow.usage_id,
+    authorized = content_authorized(row, allowed_project_ids, permission_keys=permission_keys)
+    joined = joined.outerjoin(AiExchangeRow, and_(authorized, row.id == AiExchangeRow.usage_id,
         row.workspace_id == AiExchangeRow.workspace_id,
         AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days)))
     filters = [row.workspace_id == workspace_id, row.day >= start, row.day <= end]
@@ -306,10 +320,10 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
             # SQLite SELECT alone does not start a snapshot with the legacy driver.
             db.connection().exec_driver_sql('BEGIN')
         if export:
-            entries = [exchange_json(r, f, e if content_enabled else None)
-                       for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+            entries = [exchange_json(r, f, e if content_enabled else None, authorized=permitted)
+                       for r, f, e, permitted in db.execute(select(row, rating_row, AiExchangeRow, authorized).select_from(joined)
                            .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(501))]
-            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
+            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools', 'authorization_basis')
             return dict(rows=[{k: entry[k] for k in keys} for entry in entries[:500]], truncated=len(entries) > 500)
         names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
         totals = public(db.execute(select(*metrics).select_from(joined).where(*filters)).mappings().one())
@@ -327,8 +341,8 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         for person in groups['by_person']:
             person['name'] = names.get(person['actor_id'], person['actor_id'])
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
-        entries = [exchange_json(r, f, e if content_enabled else None)
-                   for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+        entries = [exchange_json(r, f, e if content_enabled else None, authorized=permitted)
+                   for r, f, e, permitted in db.execute(select(row, rating_row, AiExchangeRow, authorized).select_from(joined)
                        .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
         recent = [{k: v for k, v in entry.items() if k not in ('question', 'answer', 'project_id')} for entry in entries]
         reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other', 'unspecified'), 0)
@@ -337,11 +351,14 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
     return dict(range={'from': start, 'to': end}, totals=totals, **groups, people=people, recent=recent, reasons=reasons)
 
 
-def exchange_json(row, feedback, exchange):
+def exchange_json(row, feedback, exchange, *, authorized=True):
+    if not authorized:
+        exchange = None
     question = exchange.question if exchange else None
     answer = exchange.answer if exchange else None
     return dict(usage_id=row.id, created_at=iso(row.created_at), actor_id=row.actor_id, name=row.actor_name,
-        provider=row.provider, scope=row.scope, project_id=row.project_id, status=row.status,
+        provider=row.provider, scope=row.scope, project_id=row.project_id if authorized else None, status=row.status,
+        authorization_basis='recorded' if row.provenance_version == 1 else 'legacy_workspace',
         rating={1: 'up', -1: 'down'}.get(feedback.rating) if feedback else None,
         reason=feedback.reason if feedback else None, question=question, answer=answer,
         question_preview=question[:120] if question is not None else None,
@@ -351,7 +368,7 @@ def exchange_json(row, feedback, exchange):
         cost_usd=None if row.cost_micro_usd is None else row.cost_micro_usd / 1_000_000)
 
 
-def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retention_days=90):
+def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retention_days=90, allowed_project_ids=None, permission_keys=None):
     with sessions() as db:
         row = db.scalar(select(AiUsageRow).where(AiUsageRow.id == usage_id, AiUsageRow.workspace_id == workspace_id))
         if row is None:
@@ -360,7 +377,8 @@ def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retentio
         content = db.scalar(select(AiExchangeRow).where(AiExchangeRow.usage_id == usage_id,
             AiExchangeRow.workspace_id == workspace_id,
             AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days))) if content_enabled else None
-        result = exchange_json(row, feedback, content)
+        authorized = db.scalar(select(content_authorized(AiUsageRow, allowed_project_ids, permission_keys=permission_keys)).where(AiUsageRow.id == usage_id))
+        result = exchange_json(row, feedback, content, authorized=authorized)
         result.pop('question_preview')
         result.pop('answer_preview')
         return result
@@ -372,7 +390,7 @@ def iso(value):
     return value.astimezone(timezone.utc).isoformat()
 
 
-ADDED_USAGE_COLUMNS = ('scope', 'project_id')
+ADDED_USAGE_COLUMNS = ('scope', 'project_id', 'authz_version', 'permission_key', 'provenance_version')
 
 
 def column_ddl(name, dialect):
@@ -382,7 +400,7 @@ def column_ddl(name, dialect):
 
 def ensure_schema(engine):
     """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
-    Base.metadata.create_all(engine, tables=[AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    Base.metadata.create_all(engine, tables=[AiCaseRead.__table__, AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
     for table, names in ((AiConversationGeneration.__table__, ('active_runs', 'last_activity_at')),
                          (AiUsageRow.__table__, ADDED_USAGE_COLUMNS)):
         for name in names:
@@ -401,6 +419,35 @@ def ensure_schema(engine):
             connection.execute(update(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).values(last_activity_at=datetime.now(timezone.utc)))
     for index in AiUsageRow.__table__.indexes:
         index.create(engine, checkfirst=True)
+
+
+def content_authorized(row, allowed_project_ids=None, permission_key=None, permission_keys=None):
+    conditions = []
+    if allowed_project_ids is not None:
+        conditions += [or_(row.scope != 'project', row.project_id.in_(allowed_project_ids)),
+            ~select(AiCaseRead.usage_id).where(AiCaseRead.usage_id == row.id,
+                AiCaseRead.project_id.not_in(allowed_project_ids)).exists()]
+    if permission_key is not None:
+        conditions.append(or_(row.permission_key.is_(None), row.permission_key == permission_key))
+    if permission_keys is not None:
+        conditions.append(or_(row.permission_key.is_(None), *[
+            and_(row.actor_id == actor, row.permission_key == key) for actor, key in permission_keys.items()]))
+    return and_(*conditions) if conditions else true()
+
+
+def conversation_authority(sessions, workspace_id, actor_id, conversation_id):
+    with sessions() as db:
+        usages = db.execute(select(AiUsageRow.id, AiUsageRow.scope, AiUsageRow.project_id,
+            AiUsageRow.permission_key, AiUsageRow.provenance_version).where(
+            AiUsageRow.workspace_id == workspace_id, AiUsageRow.actor_id == actor_id,
+            AiUsageRow.conversation_id == conversation_id)).all()
+        refs = set(db.scalars(select(AiCaseRead.project_id).join(AiUsageRow,
+            AiUsageRow.id == AiCaseRead.usage_id).where(AiUsageRow.workspace_id == workspace_id,
+            AiUsageRow.actor_id == actor_id, AiUsageRow.conversation_id == conversation_id)))
+    refs.update(u.project_id for u in usages if u.scope == 'project')
+    return dict(case_ids=refs, permission_keys={u.permission_key for u in usages if u.permission_key},
+        scopes={(u.scope,u.project_id) for u in usages},
+        legacy=any(u.provenance_version != 1 for u in usages))
 
 
 def conversation_scopes(sessions, workspace_id, actor_id, conversation_id):
@@ -422,7 +469,7 @@ def conversation_title(question):
     return ' '.join(question.split())[:60]
 
 
-def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days, allowed_project_ids=None):
+def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days, allowed_project_ids=None, permission_key=None):
     import base64
     cursor = None
     if before:
@@ -438,14 +485,19 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
         return result
     u, e = AiUsageRow, AiExchangeRow
     stmt = history_statement(workspace_id, actor_id, retention_days).where(u.scope == scope)
-    if allowed_project_ids is not None:
-        stmt = stmt.where(or_(u.scope == 'global', u.project_id.in_(allowed_project_ids)))
+    from sqlalchemy.orm import aliased
+    other = aliased(u)
+    forbidden = select(other.id).where(other.workspace_id == workspace_id, other.actor_id == actor_id,
+        other.conversation_id == u.conversation_id,
+        ~content_authorized(other, allowed_project_ids, permission_key)).exists()
+    stmt = stmt.where(~forbidden)
     if project_id is not None:
         stmt = stmt.where(u.project_id == project_id)
     # Rank only retained, authorized exchanges so a deleted/expired first turn
     # cannot supply a title. One statement also keeps titles and counts consistent.
     ranked = stmt.with_only_columns(
         u.conversation_id.label('id'), u.scope, u.project_id, u.id.label('usage_id'),
+        func.min(case((u.provenance_version == 1, 1), else_=0)).over(partition_by=u.conversation_id).label('tracked'),
         func.max(u.created_at).over(partition_by=u.conversation_id).label('updated_at'),
         func.count().over(partition_by=u.conversation_id).label('turns'),
         func.row_number().over(partition_by=u.conversation_id,
@@ -463,7 +515,7 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
         rows = db.execute(statement).mappings().all()
         for row in rows[:limit]:
             result['items'].append(dict(id=row['id'], title=conversation_title(row['question']), scope=row['scope'],
-                project_id=row['project_id'], updated_at=iso(row['updated_at']), turns=row['turns']))
+                project_id=row['project_id'], authorization_basis='recorded' if row['tracked'] else 'legacy_workspace', updated_at=iso(row['updated_at']), turns=row['turns']))
     if len(rows) > limit:
         last = result['items'][-1]
         result['next_cursor'] = base64.urlsafe_b64encode(json.dumps([last['updated_at'], last['id']]).encode()).decode()
@@ -484,7 +536,7 @@ def conversation(sessions, workspace_id, actor_id, conversation_id, *, content_e
         messages = [dict(role=role, content=text, at=iso(exchange.created_at), usage_id=usage.id)
             for usage, exchange in rows for role, text in [('user', exchange.question), ('assistant', exchange.answer)] if text]
         return dict(id=conversation_id, title=conversation_title(content.question), scope=first.scope,
-            project_id=first.project_id, messages=messages[-200:], truncated=len(messages)>200 or len(rows)>200)
+            project_id=first.project_id, authorization_basis='recorded' if all(u.provenance_version == 1 for u, _ in rows) else 'legacy_workspace', messages=messages[-200:], truncated=len(messages)>200 or len(rows)>200)
 
 
 def delete_conversation(sessions, workspace_id, actor_id, conversation_id):
