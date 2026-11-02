@@ -26,9 +26,14 @@ window.scrollTo=()=>{};globalThis.requestAnimationFrame=cb=>cb();globalThis.IS_R
 const root=createRoot(document.getElementById('root'));
 const props={s:{user:{id:'u',name:'User',role:'manager'},workspace_id:'w',features:{change_extension:true,routines:true}},w:{projects:[{id:'a',code:'A',name:'案件A'}]},route:{view:'dashboard'},error:'',setError(){},mobile:false,setMobile(){},sessionOpen:false,setSessionOpen(){},ready:true,go(){},refresh:async()=>{},children:React.createElement('h1',null,'今日工作台')};
 await act(async()=>root.render(React.createElement(m.AppShell,props)));
-assert.deepEqual([...document.querySelectorAll('.mobile-tabs button span')].map(n=>n.textContent),['今日工作台','案件總覽','更多']);assert.equal(document.querySelectorAll('.recent-project').length,0);
+assert.deepEqual([...document.querySelectorAll('.mobile-tabs button span')].map(n=>n.textContent),['今日工作台','案件總覽','更多']);assert.equal(document.querySelectorAll('.recent-project').length,0);assert.equal(document.querySelector('.recent-empty').textContent,'尚無最近開啟的案件');
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'false');
+await act(async()=>document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true})));
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'true');
+await act(async()=>document.dispatchEvent(new window.Event('pointerdown',{bubbles:true})));
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'false');
 await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'project',project:'a'},children:React.createElement('h1',null,'案件A')})));
-assert.equal(document.querySelector('.recent-project').textContent,'A案件A');assert.equal(document.title,'案件詳情｜詠翔工作台');
+assert.equal(document.querySelector('.recent-project').textContent,'A案件A');assert.equal(document.querySelector('.recent-empty'),null);assert.equal(document.title,'案件詳情｜詠翔工作台');
 await act(async()=>m.invalidateSessionEpoch());assert.equal(document.querySelectorAll('.recent-project').length,1,'the currently open authorized case becomes first in the new epoch');
 await act(async()=>root.render(React.createElement(m.AppShell,{...props,s:{...props.s,user:{id:'v',name:'Other'}}})));
 assert.equal(document.querySelectorAll('.recent-project').length,0,'user switch removes previous recents');

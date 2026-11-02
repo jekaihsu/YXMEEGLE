@@ -122,3 +122,10 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
  .mobile-tabs button{padding:var(--space-2) var(--space-1)}
 }
 }
+
+@layer polish{
+/* Keep route focus and pointer modal-return focus quiet; preserve visible keyboard focus. */
+.app-shell[data-keyboard-focus=false] :is(h1[tabindex="-1"],.user-button):focus{outline:none;box-shadow:none}
+.app-shell[data-keyboard-focus=true] :is(h1[tabindex="-1"],.user-button):focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px}
+.app-shell .recent-empty{margin:0;padding:var(--space-2) var(--space-3);font-size:var(--fs-footnote);line-height:1.6;color:var(--label-2)}
+}
