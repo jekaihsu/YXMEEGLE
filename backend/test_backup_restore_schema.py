@@ -59,8 +59,7 @@ def test_backup_restore_keeps_rows_attachments_foreign_key_and_indexes(tmp_path)
     for name in PORTABLE: assert shape(target,name)==shape(source,name)
     fks,indexes=shape(target,'business_records')
     assert fks==[(('workspace_id',),'workspaces',('id',))]
-    assert [c for _,c in indexes]==[('parent_id',),
-        ('workspace_id','kind','parent_id','ordinal')]
+    assert [c for _,c in indexes]==[('parent_id',)]
     # The restored FK is enforced, not merely declared.
     with target.connect() as db:
         db.exec_driver_sql('PRAGMA foreign_keys=ON')

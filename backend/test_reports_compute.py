@@ -389,3 +389,23 @@ def test_contacts_case_name_fallback_when_v3_case_has_blank_title():
     res = c.contacts(d, **{'from': '2026-10-19', 'to': '2026-10-25'})
     row = next(r for r in res['items'] if r['case_code'] == 'C115259-01')
     assert row['case_name'] == '鋼構垂直度測量'
+
+
+def test_sales_multivalue_lookup_amount_is_not_digit_concatenation():
+    # Lark lookups can return multiple cells. Their comma-separated display
+    # must never be interpreted as a thousands-separated scalar currency.
+    assert c.number([120000, 340000]) is None
+    assert c.number({'value': [120000, 340000]}) is None
+    assert c.number([{'value': [120000, 340000]}]) is None
+    assert c.number([{'value': 120000}]) == 120000
+    assert c.number('120,000') == 120000
+    data = c.normalize({'case': {'status': 'ok', 'records': [
+        {'record_id': 'lookup', 'fields': {'PM': 'A', '實際合約金額': [120000, 340000]}},
+        {'record_id': 'scalar', 'fields': {'PM': 'A', '實際合約金額': 250000}},
+        {'record_id': 'fallback', 'fields': {'PM': 'B', '實際合約金額': 0, '預期合約金額': 50000}},
+    ]}})
+    result = c.sales(data)
+    assert result['kpi']['contract_total'] == 300000
+    assert result['by_pm'][0]['contract_total'] == 250000
+    assert result['by_pm'][1]['contract_total'] == 50000
+    assert next(r for r in result['items'] if r['id'] == 'lookup')['contract'] is None

@@ -31,6 +31,13 @@ function revisionRegresses(before:string|number,next:string|number|null):boolean
  if(typeof before==='string'&&typeof next==='string'&&/^\d+$/.test(before)&&/^\d+$/.test(next))return BigInt(next)<BigInt(before);
  return next<before;
 }
+/** Publish an accepted workspace write to mounted owners, using declared dependencies. */
+export function workspaceWriteCommitted(workspace:string,id:string,action:string,projectId?:string){
+ const panels=action.includes('confirmation')?['confirmation','assigned']:action.includes('delegate')?['delegated','assigned']:['assigned','completed'];
+ const dependencies:PageDependency[]=[resource=>['/api/home-panels','/api/my-work'].includes(resource.endpoint)&&panels.includes(String(resource.query?.panel)),
+  ...(projectId?[{endpoint:`progress:${projectId}`}]:[])];
+ return Promise.all([...liveOwners].filter(owner=>owner.epoch===getSessionEpoch()&&owner.scope.workspace===workspace).map(owner=>owner.invalidate(id,dependencies)));
+}
 export function createPageData(scope:PageScope){
  scope=Object.freeze({...scope});
  const epoch=getSessionEpoch();
@@ -45,7 +52,9 @@ export function createPageData(scope:PageScope){
  const closedState={kind:'Closed',error:abortError()} as const;
  let unsubscribe:(()=>void)|undefined;
  const activate=()=>{if(!active())throw abortError();if(!unsubscribe){unsubscribe=onSessionEpochChange(close);liveOwners.add(registration)}};
- const close=()=>{if(closed)return;closed=true;for(const entry of entries.values())entry.controller.abort();entries.clear();for(const ident of listeners.keys())notify(ident);listeners.clear();unsubscribe?.();unsubscribe=undefined;liveOwners.delete(registration)};
+ const close=()=>{if(closed)return;closed=true;for(const entry of entries.values())entry.controller.abort();entries.clear();for(const ident of listeners.keys())notify(ident);listeners.clear();writeListeners.clear();unsubscribe?.();unsubscribe=undefined;liveOwners.delete(registration)};
+ const writeListeners=new Set<()=>void|Promise<unknown>>();
+ const subscribeWrites=(listener:()=>void|Promise<unknown>)=>{writeListeners.add(listener);return()=>{writeListeners.delete(listener)}};
  const appliedWrites=new Map<string,Promise<unknown[]>>();
  function read<T>(resource:PageResource,intent:FetchIntent,load:PageLoader<T>):Promise<PageValue<T>>{
   if(!active())return Promise.reject(abortError());
@@ -79,10 +88,11 @@ export function createPageData(scope:PageScope){
  }
  function invalidateLocal(id:string,dependencies:readonly PageDependency[]):Promise<unknown[]>{
   const pending=appliedWrites.get(id);if(pending)return pending;
-  const completion=Promise.all([...entries.values()].filter(entry=>dependencies.some(dependency=>
+  const completion=Promise.allSettled([...entries.values()].filter(entry=>dependencies.some(dependency=>
    typeof dependency==='function'?dependency(entry.resource):'endpointPrefix' in dependency?entry.resource.endpoint.startsWith(dependency.endpointPrefix):'tag' in dependency?entry.resource.tags?.includes(dependency.tag):key(dependency)===key(entry.resource)
-  )).filter(entry=>entry.token!==JSON.stringify(['own_write_committed',id])).map(entry=>read(entry.resource,{reason:'own_write_committed',id},entry.load)));
-  appliedWrites.set(id,completion);return completion;
+  )).filter(entry=>entry.token!==JSON.stringify(['own_write_committed',id])).map(entry=>read(entry.resource,{reason:'own_write_committed',id},entry.load))).then(results=>{const failed=results.find(result=>result.status==='rejected');if(failed?.status==='rejected')throw failed.reason;return results.map(result=>result.status==='fulfilled'?result.value:undefined)});
+  const settled=completion.finally(()=>Promise.allSettled([...writeListeners].map(listener=>listener())));
+  appliedWrites.set(id,settled);return settled;
  }
  function ownWriteCommitted(id:string,dependencies:readonly PageDependency[]):Promise<unknown[]>{
   activate();
@@ -109,7 +119,7 @@ export function createPageData(scope:PageScope){
   return active()?(entries.get(key(resource))?.state as PageDataState<T>|undefined)??loading:closedState;
  }
  const registration:LiveOwner={epoch,scope,invalidate:invalidateLocal};
- const owner={key,read,state,subscribe,seed,ownWriteCommitted,unknownOutcome,close,epoch,scope};
+ const owner={key,read,state,subscribe,seed,ownWriteCommitted,unknownOutcome,subscribeWrites,close,epoch,scope};
  return owner;
 }
 function valueState<T>(value:PageValue<T>):PageDataState<T>{
@@ -129,7 +139,7 @@ export function requestPageData<T>(owner:PageData,resource:PageResource,intent:F
   headers.set('Cache-Control','no-cache');
   headers.set('X-YX-Fetch-Intent',activeIntent.reason);
   headers.set('X-YX-Fetch-Generation','id' in activeIntent?activeIntent.id:owner.scope.openId);
-  const body=await api<unknown>(resource.endpoint+(query.size?'?'+query:''),{...init,method:'GET',body:undefined,signal,headers,etag:true,cache:['initial_open','user_query_change'].includes(activeIntent.reason)?'no-cache':'reload',cacheScope:owner.key(resource)},current);
+  const body=await api<unknown>(resource.endpoint+(query.size?'?'+query:''),{...init,method:'GET',body:undefined,signal,headers,etag:true,cache:['initial_open','user_query_change'].includes(activeIntent.reason)?'no-cache':'reload',cacheScope:JSON.stringify([owner.epoch,owner.scope.workspace,owner.scope.identityFingerprint,resource.endpoint,normalizeQuery(resource.query)])},current);
   return decode(body);
  });
 }

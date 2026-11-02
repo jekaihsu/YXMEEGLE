@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {readFile,writeFile,unlink} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {assignmentFixture} from './fixtures/node-assignments.mjs';
-const bundle = await build({stdin:{contents:"export {prefetchProjectProgress} from './src/useProjectProgress'; export {invalidateSessionEpoch} from './src/api'; export * from './src/projectProgressApi'; export * from './src/projectProgressView'; export {parseRoute} from './src/api'; export {sopActionLabel,canConfirmSop} from './src/startSop';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
+const bundle = await build({stdin:{contents:"export {createPageData} from './src/pageData';export {prefetchProjectProgress} from './src/useProjectProgress'; export {invalidateSessionEpoch} from './src/api'; export * from './src/projectProgressApi'; export * from './src/projectProgressView'; export {parseRoute} from './src/api'; export {sopActionLabel,canConfirmSop} from './src/startSop';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
 const temp=new URL('./.project-progress-test.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const m=await import(temp.href);await unlink(temp);
 const fixture = JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));
 test('parser accepts real backend synthetic fixture and preserves exact decimal quantities',()=>{const d=m.parseProjectProgress(fixture);assert.equal(d.production.field.planned.qty,'65');assert.equal(d.identity.is_c_prefix,true);assert.equal(d.production.field.actual.known,false)});
@@ -30,18 +30,18 @@ test('the parser keeps the item progress and statuses and an older payload witho
 
 
 test('forced progress reads bypass pending requests and older completions cannot replace fresh data',async()=>{
- m.invalidateSessionEpoch();
+ m.invalidateSessionEpoch();const owner=m.createPageData({workspace:'test',identityFingerprint:'test',openId:'test'});
  let release,calls=0;
  const old=structuredClone(fixture),fresh=structuredClone(fixture);fresh.as_of='2026-10-26T08:00:00Z';
  const wait=new Promise(resolve=>release=resolve);
  globalThis.fetch=async()=>{calls++;const index=calls;if(index===1)await wait;return new Response(JSON.stringify(index===1?old:fresh),{headers:{'Content-Type':'application/json'}})};
- const first=m.prefetchProjectProgress(fixture.project_id);
+ const first=m.prefetchProjectProgress(fixture.project_id,false,undefined,undefined,owner);
  const cancelled=first.catch(error=>{assert.equal(error.name,'AbortError')});
  await new Promise(r=>setTimeout(r,0));
- const retry=m.prefetchProjectProgress(fixture.project_id,true);
+ const retry=m.prefetchProjectProgress(fixture.project_id,true,undefined,undefined,owner);
  await new Promise(r=>setTimeout(r,0));
  const independent=calls===2;release();assert.equal(independent,true,'retry starts an independent HTTP read');
  assert.equal((await retry).as_of,fresh.as_of);
  release();await cancelled;
- assert.equal((await m.prefetchProjectProgress(fixture.project_id)).as_of,fresh.as_of);
+ assert.equal((await m.prefetchProjectProgress(fixture.project_id,false,undefined,undefined,owner)).as_of,fresh.as_of);
 });

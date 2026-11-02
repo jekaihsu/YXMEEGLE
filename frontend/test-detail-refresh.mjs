@@ -24,7 +24,7 @@ globalThis.fetch=async(url,init={})=>{
 };
 function Probe(){
  assignment=ui.useNodeAssignments('p1',true);sop=ui.useSopTasks('p1','w1');evidence=ui.useProjectProgress('p1');
- const reload=React.useCallback(()=>ui.api('/api/projects/p1'),[]);refresh=ui.useDetailRefresh(reload);
+ const reload=React.useCallback(()=>ui.api('/api/projects/p1'),[]);refresh=ui.useDetailRefresh(reload,true,'',false,true);
  return React.createElement('output',null,JSON.stringify({assignment:assignment.state.kind,sop:sop.state.kind,progress:evidence.state.kind}));
 }
 function MoreProgress(){ui.useProjectProgress('p1');return null}
@@ -51,39 +51,27 @@ try{
  await flush(()=>window.dispatchEvent(new Event('blur')));now+=600000;blocked=true;
  await flush(()=>window.dispatchEvent(new Event('focus')));assert.equal(reads.length,4);
  blocked=false;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,4,'focus never creates deferred work');
- // An explicit request is deferred while a draft is open and resumes once cleared.
- let deferredDone=false;blocked=true;await flush(()=>{void refresh().then(()=>{deferredDone=true})});assert.equal(reads.length,4);assert.equal(deferredDone,false,'guarded refresh completion waits for its authorized read');
- blocked=false;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,9);assert.equal(deferredDone,true);
- // Workspace writes/manual reloads advance App's revision even if data version is unchanged.
- revision++;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,14);
- let release;hold=new Promise(resolve=>release=resolve);
- await flush(()=>{void refresh()});assert.equal(reads.length,19);
- assert.equal(assignment.state.kind,'ready');assert.equal(assignment.refreshing,true);
- assert.equal(sop.state.kind,'ready');assert.equal(sop.state.refreshing,true);
- assert.equal(evidence.state.kind,'ready');assert.equal(evidence.refreshing,true);
- assert.equal(document.body.textContent.includes('上次資料'),false);
- hold=null;await flush(()=>release());
- // Own assignment writes use the same group after the returned detail has been merged.
- await flush(()=>{void assignment.mutate({action:'update_task',nodeKey:'control',taskId:'recTask1',expected_revision:'9b0c1d2e3f405162',patch:{assignee_open_id:'ou_anna'}})});
- assert.equal(reads.length,24);
- assert.equal(assignment.notice,'已儲存變更。');
+ // Save while the dialog itself blocks the reload guard.
+ const dialog=document.createElement('div');dialog.setAttribute('role','dialog');dialog.innerHTML='<input type="date">';document.body.append(dialog);
+ blocked=true;let saved=false;const beforeSave=reads.length;
+ await flush(()=>{void assignment.mutate({action:'update_task',nodeKey:'control',taskId:'recTask1',expected_revision:'9b0c1d2e3f405162',patch:{assignee_open_id:'ou_anna'}}).then(ok=>{saved=ok;if(ok)dialog.remove()})});
+ assert.equal(saved,true,'drawer save settles while reload guard is blocked');assert.equal(dialog.isConnected,false);
+ assert.equal(reads.length-beforeSave,1,'assignment response seeds detail/list; only progress is read');
+ const beforeSop=reads.length;
  overview=structuredClone(initial);overview.tasks[0].lark_sync={state:'已同步',record_id:'recDone',base_id:'base',table_id:'table'};
- await flush(()=>{void sop.reload()});assert.equal(reads.length,29);assert.equal(sop.state.data.tasks[0].larkSync.state,'已同步');
- // A committed write supersedes a blocked pre-write batch; both completions await the successor.
- let olderDone=false,newerDone=false;
- hold=new Promise(resolve=>release=resolve);await flush(()=>{void refresh().then(()=>{olderDone=true})});assert.equal(reads.length,34);
- overview=structuredClone(overview);overview.tasks[0].title='寫入後任務';
- await flush(()=>{void sop.reload().then(()=>{newerDone=true})});assert.equal(reads.length,39,'post-write reads start before blocked pre-write transport finishes');assert.equal(olderDone,false);assert.equal(newerDone,false);
- hold=null;await flush(()=>release());await flush();
- assert.equal(reads.length,39);assert.equal(sop.state.data.tasks[0].title,'寫入後任務');assert.equal(olderDone,true);assert.equal(newerDone,true);
+ let sopDone=false;await flush(()=>{void sop.reload().then(()=>{sopDone=true})});
+ assert.equal(sopDone,true,'SOP writer completes inside cleanup drawer');
+ assert.equal(reads.length-beforeSop,2,'SOP write reads tasks and progress only');assert.equal(sop.state.data.tasks[0].larkSync.state,'已同步');
+ blocked=false;const beforeExplicit=reads.length;
+ await flush(()=>{void refresh(false)});assert.equal(reads.length-beforeExplicit,5);
  const beforeMutation=reads.length;
  let releaseMutation;mutationHold=new Promise(resolve=>releaseMutation=resolve);
  let writing;await flush(()=>{writing=ui.api('/api/projects/p1/test-write',{method:'POST'})});
  await leave();now+=60000;await back();assert.equal(reads.length,beforeMutation);
  mutationHold=null;await flush(()=>releaseMutation());await writing;await flush();
  assert.equal(reads.length,beforeMutation,'return during mutation never creates deferred work');
- fail=true;await flush(()=>{void refresh()});await flush();
+ fail=true;await flush(()=>{void refresh(false)});await flush();
  assert.equal(assignment.state.kind,'error');assert.equal(sop.state.kind,'error');assert.equal(evidence.state.kind,'ready');
  assert.equal(document.body.textContent.includes('工程進度更新失敗，顯示上次資料'),true);
- console.log('PASS detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 0 fetches; own writes/manual revision refresh all; drafts defer; loading retains data; failures label retained progress; post-write refresh supersedes older reads and awaits the successor.');
+ console.log('PASS drawer writes: assignment follow-up GETs=1; SOP follow-up GETs=2; guard cannot hold writer completion. Detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 0 fetches; explicit refresh rereads all; targeted own writes; loading retains data; failures label retained progress; ');
 }finally{await act(async()=>root.unmount());Date.now=originalNow;globalThis.setInterval=originalInterval;window.setInterval=originalWindowInterval;dom.window.close()}

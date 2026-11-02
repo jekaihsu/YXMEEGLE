@@ -1,4 +1,4 @@
-import {api} from './api';
+import {api,ApiError} from './api';
 
 export const attendanceStatuses=['loading','ok','incomplete','stale','needs-permission','not-connected','read-failed'] as const;
 export type AttendanceStatus=typeof attendanceStatuses[number];
@@ -46,3 +46,10 @@ export async function fetchPeopleAttendance({week,signal,current}:{week?:string;
  return parsePeopleAttendance(await api<unknown>('/api/people/attendance'+query,{signal},current));
 }
 export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊快照，更新中', 'needs-permission':'缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};
+
+export function attendanceReadPresentation(error:unknown,data?:PeopleAttendance){
+ const denied=error instanceof ApiError&&error.status===403;
+ return {view:denied?parsePeopleAttendance({status:'needs-permission'}):data,
+  error:!error||denied?'':`出勤資料暫時無法更新。${data?`已保留上次資料。資料時間：${data.as_of??'未提供'}`:''}`,
+  canRetry:!!error&&!denied};
+}

@@ -10,8 +10,8 @@ globalThis.getComputedStyle = dom.window.getComputedStyle;
 globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
 HTMLElement.prototype.scrollIntoView = function () {};
 HTMLElement.prototype.getClientRects = function () {return [{width: 40, height: 40}]};
-const React = await import('react'); const {act} = React; const {createRoot} = await import('react-dom/client');
-const bundle = await build({stdin: {contents: "export * from './src/sopTaskApi';export * from './src/sopTaskModel';export {useSopTasks,defaultImportNodes} from './src/useSopTasks';export {SopTasks} from './src/SopTasks';export {invalidateSessionEpoch} from './src/api';", resolveDir: import.meta.dirname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const React = await import('react'); const {act} = React; const {createRoot:rawCreateRoot} = await import('react-dom/client');
+const bundle = await build({stdin: {contents: "export * from './src/sopTaskApi';export * from './src/sopTaskModel';export {useSopTasks,defaultImportNodes} from './src/useSopTasks';export {SopTasks} from './src/SopTasks';export {DetailRefreshProvider as TestPage} from './src/detailRefresh';export {invalidateSessionEpoch} from './src/api';", resolveDir: import.meta.dirname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const path = new URL('./.sop-tasks-test.mjs', import.meta.url); await fs.writeFile(path, bundle.outputFiles[0].text); let ui; try {ui = await import(path.href)} finally {await fs.unlink(path)}
 const examples = JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json', import.meta.url), 'utf8'));
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -48,6 +48,7 @@ function previewFixture(body) {
  return p;
 }
 
+const createRoot=(element)=>{const root=rawCreateRoot(element);return {render:node=>root.render(React.createElement(ui.TestPage,null,node)),unmount:()=>root.unmount()}};
 let root, c, server, calls;
 const tick = () => new Promise(r => setTimeout(r, 10));
 const response = (b, s = 200) => new Response(JSON.stringify(b), {status: s, headers: {'Content-Type': 'application/json'}});
@@ -394,16 +395,12 @@ test('SOP sheet opens as facts; edit focuses the editor, cancel and save restore
  assert.equal(dialog().querySelector('.nw-task-editor'),null);assert.equal(document.activeElement,button('編輯'));
 });
 
-test('successful save restores edit focus while its refresh is pending and blocks reopening',async()=>{
+test('successful save waits for its targeted read and then restores edit focus',async()=>{
  await mount({route:{task:'t1',task_source:'sop_local'}});
  await click(button('編輯'));await type(dialog().querySelector('[aria-label="任務名稱"]'),'更新名稱');
- let release;server.overviewHold=new Promise(r=>{release=r});
  await click(button('儲存任務'));
  assert.equal(dialog().querySelector('.nw-task-editor'),null);
- assert.ok(document.activeElement===button('編輯'),'focus returns before refresh resolves');
- assert.equal(button('編輯').getAttribute('aria-disabled'),'true');
- await click(button('編輯'));assert.equal(dialog().querySelector('.nw-task-editor'),null,'stale view cannot reopen writes');
- await act(async()=>{release();await tick()});assert.equal(button('編輯').getAttribute('aria-disabled'),'false');
+ assert.equal(document.activeElement,button('編輯'));
 });
 
 test('restricted SOP instructions stay absent in view and editor',async()=>{

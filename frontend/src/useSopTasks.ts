@@ -1,28 +1,32 @@
+import {SessionCache} from './sessionCache';
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {getSessionEpoch} from './api';
-import type {PageData} from './pageData';
-import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import {api, getSessionEpoch} from './api';
+import type {PageData, FetchIntent} from './pageData';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh, useCaseWrite} from './detailRefresh';
 import {requestId} from './nodeAssignmentApi';
-import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
+import {SOP_NODE_KEYS, parseOverview, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
+function loadOverview(id:string,current:()=>boolean,intent:FetchIntent,signal:AbortSignal){
+ return api(`/api/projects/${encodeURIComponent(id)}/sop-tasks`,{signal,cache:'no-store',headers:{'X-YX-Fetch-Intent':intent.reason,'X-YX-Fetch-Generation':'id' in intent?intent.id:'initial'}},current).then(parseOverview).catch(error=>{if(error&&typeof error==='object'&&'status' in error)throw new SopError(Number(error.status),'code' in error?String(error.code):'request_failed');throw error});
+}
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview; retrying?: boolean} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
-const cache = new Map<string,SopOverview>();
+const cache = new SessionCache<string,SopOverview>();
 export function seedSopTasks(id:string,workspace:string,data:SopOverview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol) {
  const resource=`${workspace}:${id}:tasks`;cache.set(caseKey(owner,resource),data);
- seedCase(owner,resource,data,current=>sopApi.overview(id,current),true,meta,batch);
+ seedCase(owner,resource,data,(current,intent,signal)=>loadOverview(id,current,intent,signal),true,meta,batch);
 }
 export function canReadSop(user:{active?:boolean}|null|undefined){return !!user&&user.active!==false}
 export function prefetchSopTasks(projectId:string,workspace:string,force:boolean|symbol=false,_join=false,owner?:PageData){
  const resource=`${workspace}:${projectId}:tasks`;
- return readCase(owner,resource,force,current=>sopApi.overview(projectId,current)).then(data=>{const key=caseKey(owner,resource),prior=cache.get(key);if(!prior||prior.checklistRevision<=data.checklistRevision)cache.set(key,data);return cache.get(key)!});
+ return readCase(owner,resource,force,(current,intent,signal)=>loadOverview(projectId,current,intent,signal)).then(data=>{const key=caseKey(owner,resource),prior=cache.get(key);if(!prior||prior.checklistRevision<=data.checklistRevision)cache.set(key,data);return cache.get(key)!});
 }
 export function prefetchSopAssignees(projectId:string,workspace:string,force:boolean|symbol=false,owner?:PageData){
  return readCase(owner,`${workspace}:${projectId}:assignees`,force,current=>sopApi.assignees(projectId,current));
 }
 
 export function useSopTasks(projectId: string, workspace: string, enabled=true) {
- const owner=useCaseData();
+ const owner=useCaseData(),commit=useCaseWrite();
  const key = caseKey(owner,`${workspace}:${projectId}:tasks`);
  const [assignees,setAssignees]=useState<SopAssignee[]>([]);
  const [assigneeError,setAssigneeError]=useState('');
@@ -73,10 +77,12 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
    if(scope===life.current&&scope.active&&scope.epoch===getSessionEpoch()){setAssignees(people);setAssigneeError('')}
   }).catch(error=>{if(scope===life.current&&scope.active&&scope.epoch===getSessionEpoch())setAssigneeError(sopErrorText(error))})]);
  }, [readback,projectId,workspace,owner]);
- const refreshDetail = useDetailRefresh(reloadAll, enabled);
+ useDetailRefresh(reloadAll, enabled);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
  const sameScope=life.current.key===key&&life.current.epoch===getSessionEpoch();
- return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload: refreshDetail ? (afterWrite=true,_join=false)=>refreshDetail(afterWrite) : reload, readback, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
+ const snapshot=owner.state<SopOverview>({endpoint:`${workspace}:${projectId}:tasks`});
+ const dataTime='value' in snapshot?snapshot.value.fetchedAt:'previous' in snapshot?snapshot.previous?.fetchedAt:null;
+ return {dataTime,state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload: (afterWrite=true,join=false)=>join||!afterWrite?reload(true,join):commit([{endpoint:`${workspace}:${projectId}:tasks`},{endpoint:`progress:${projectId}`},{endpoint:`start:${projectId}`}]), readback, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
 }
 
 export type ImportStep = 'version'|'select'|'confirm'|'receipt';

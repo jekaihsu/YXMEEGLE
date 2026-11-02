@@ -1,24 +1,43 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {getSessionEpoch} from './api';
-import type {PageData} from './pageData';
-import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
-import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetchNodeAssignmentDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
+import {getSessionEpoch, onSessionEpochChange} from './api';
+import type {PageData, FetchIntent} from './pageData';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh, useCaseWrite, caseIntent} from './detailRefresh';
+import {assignmentErrorMessage, assignmentsDisabled, assignmentRequest, parseNodeAssignments, overviewDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
 
-const lists = new Map<string, NodeAssignmentList>();
-const details = new Map<string, {data:NodeAssignmentDetail;readAt:number}>();
-export function prefetchNodeAssignmentDetail(projectId:string,nodeKey:string,expectedRevision?:string|null,force=false,owner?:PageData):Promise<NodeAssignmentDetail> {
+const intentHeaders=(intent:FetchIntent)=>({'X-YX-Fetch-Intent':intent.reason,'X-YX-Fetch-Generation':'id' in intent?intent.id:'initial'});
+const assignmentPath=(id:string)=>`/api/projects/${encodeURIComponent(id)}/node-assignments`;
+function loadList(id:string,current:()=>boolean,intent:FetchIntent,signal:AbortSignal){return assignmentRequest(assignmentPath(id),{signal,cache:'no-store',headers:intentHeaders(intent)},current).then(parseNodeAssignments)}
+async function loadDetail(id:string,nodeKey:string,current:()=>boolean,intent:FetchIntent,signal:AbortSignal){
+ const raw=await assignmentRequest(`${assignmentPath(id)}/nodes/${encodeURIComponent(nodeKey)}`,{signal,cache:'no-store',headers:intentHeaders(intent)},current);
+ if(!raw||typeof raw!=='object')throw new NodeAssignmentError(0,'節點資料格式待核對');
+ const body=raw as Record<string,unknown>;
+ const list=parseNodeAssignments({...body,stale:false,code:'',nodes:[body.node],can:{[nodeKey]:body.can},node_details:{[nodeKey]:{tasks:body.tasks,assignable_people:body.assignable_people}}});
+ if(list.nodes[0].key!==nodeKey)throw new NodeAssignmentError(0,'節點資料不符');
+ return overviewDetail(list,list.nodes[0])!;
+}
+export const ASSIGNMENT_CACHE_LIMIT=100;
+class AssignmentCache<T> extends Map<string,T>{
+ override get(key:string){const value=super.get(key);if(value!==undefined){super.delete(key);super.set(key,value)}return value}
+ override set(key:string,value:T){super.delete(key);super.set(key,value);while(this.size>ASSIGNMENT_CACHE_LIMIT)super.delete(this.keys().next().value!);return this}
+}
+const lists = new AssignmentCache<NodeAssignmentList>();
+const details = new AssignmentCache<{data:NodeAssignmentDetail;readAt:number}>();
+onSessionEpochChange(()=>{lists.clear();details.clear()});
+export const assignmentCacheSizes=()=>({lists:lists.size,details:details.size});
+export function prefetchNodeAssignmentDetail(projectId:string,nodeKey:string,expectedRevision?:string|null,force:boolean|FetchIntent=false,owner?:PageData):Promise<NodeAssignmentDetail> {
  const key=caseKey(owner,`${projectId}/${nodeKey}`);
  const stored=details.get(key);
  const changed=!!stored&&expectedRevision!==undefined&&stored.data.node.revision!==expectedRevision;
- return readCase(owner,`${projectId}/${nodeKey}`,force||changed,(current,_intent,signal)=>fetchNodeAssignmentDetail(projectId,nodeKey,signal,current)).then(data=>{details.set(key,{data,readAt:Date.now()});return data}).catch(error=>{if(error instanceof NodeAssignmentError&&[401,403,404].includes(error.status))details.delete(key);throw error});
+ return readCase(owner,`${projectId}/${nodeKey}`,force||changed,(current,intent,signal)=>loadDetail(projectId,nodeKey,current,intent,signal)).then(data=>{details.set(key,{data,readAt:Date.now()});return data}).catch(error=>{if(error instanceof NodeAssignmentError&&[401,403,404].includes(error.status))details.delete(key);throw error});
 }
 function cached(projectId:string,owner?:PageData){return lists.get(caseKey(owner,projectId))}
 export function prefetchNodeAssignments(projectId:string,force:boolean|symbol=false,owner?:PageData):Promise<NodeAssignmentList> {
- return readCase(owner,projectId,force,(current,_intent,signal)=>fetchNodeAssignments(projectId,signal,current)).then(data=>{lists.set(caseKey(owner,projectId),data);return data});
+ return readCase(owner,projectId,force,(current,intent,signal)=>loadList(projectId,current,intent,signal)).then(data=>{lists.set(caseKey(owner,projectId),data);return data});
 }
-export function seedNodeAssignments(id:string,data:NodeAssignmentList,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){lists.set(caseKey(owner,id),data);seedCase(owner,id,data,(current,_intent,signal)=>fetchNodeAssignments(id,signal,current),true,meta,batch)}
+export function seedNodeAssignments(id:string,data:NodeAssignmentList,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){lists.set(caseKey(owner,id),data);seedCase(owner,id,data,(current,intent,signal)=>loadList(id,current,intent,signal),true,meta,batch)}
 export type AssignmentListState = {kind: 'loading'} | {kind: 'disabled'} | {kind: 'ready'; data: NodeAssignmentList} | {kind: 'error'; message: string; data?: NodeAssignmentList};
 export function useNodeAssignments(projectId: string, enabled: boolean) {
+  const commit=useCaseWrite();
   const owner=useCaseData(), key=caseKey(owner,projectId);
   const [state, setState] = useState<AssignmentListState>(() => {const data = enabled ? cached(projectId,owner) : undefined; return !enabled ? {kind: 'disabled'} : data ? {kind: 'ready', data} : {kind: 'loading'}});
   const [refreshing, setRefreshing] = useState(false);
@@ -62,8 +81,21 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     const controller = lifecycle.current.controller;
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);
-  const reloadDetail = useCallback((batch:symbol)=>reload(false,batch),[reload]);
+  const reloadDetail = useCallback((batch:symbol)=>reload(caseIntent(batch).reason==='own_write_committed',batch),[reload]);
   const refreshDetail = useDetailRefresh(reloadDetail, enabled);
+  const applyDetail=(nodeKey:string,detail:NodeAssignmentDetail)=>{
+      listRequest.current++;
+      const detailKey = caseKey(owner,`${projectId}/${nodeKey}`);
+      details.set(detailKey, {data: detail, readAt: Date.now()});
+      seedCase(owner,`${projectId}/${nodeKey}`,detail,(current,intent,signal)=>loadDetail(projectId,nodeKey,current,intent,signal),false);
+      const prior=lists.get(key);
+      if(prior){
+        const data={...prior,writes_enabled:detail.writes_enabled,writes_disabled_reason:detail.writes_disabled_reason,roster:detail.roster,warnings:detail.warnings,summary:detail.summary,can:{...prior.can,[nodeKey]:detail.can},nodes:prior.nodes.map(n=>n.key===nodeKey?detail.node:n),node_details:{...prior.node_details,[nodeKey]:{tasks:detail.tasks,assignable_people:detail.assignable_people}}};
+        seedNodeAssignments(projectId,data,owner);
+        setState({kind:'ready',data});
+      }
+  };
+  const verifyNode=async(nodeKey:string)=>{const detail=await prefetchNodeAssignmentDetail(projectId,nodeKey,undefined,{reason:'own_write_outcome_unknown_recovery',id:requestId()},owner);if(current())applyDetail(nodeKey,detail);return detail};
   const mutate = async (mutation: AssignmentMutation, onFailure?: (message:string, failure:unknown)=>void): Promise<boolean> => {
     if (mutating.current || !current()) return false;
     const scope = lifecycle.current;
@@ -75,17 +107,8 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       const detail = await mutateNodeAssignment(projectId, mutation, scope.controller.signal, mutationCurrent, attempt.id);
       retryAttempt.current = null;
       if (!mutationCurrent()) return false;
-      listRequest.current++;
-      const detailKey = caseKey(owner,`${projectId}/${mutation.nodeKey}`);
-      details.set(detailKey, {data: detail, readAt: Date.now()});
-      seedCase(owner,`${projectId}/${mutation.nodeKey}`,detail,(current,_intent,signal)=>fetchNodeAssignmentDetail(projectId,mutation.nodeKey,signal,current),false);
-      const prior=lists.get(key);
-      if(prior){
-        const data={...prior,writes_enabled:detail.writes_enabled,writes_disabled_reason:detail.writes_disabled_reason,roster:detail.roster,warnings:detail.warnings,summary:detail.summary,can:{...prior.can,[mutation.nodeKey]:detail.can},nodes:prior.nodes.map(n=>n.key===mutation.nodeKey?detail.node:n),node_details:{...prior.node_details,[mutation.nodeKey]:{tasks:detail.tasks,assignable_people:detail.assignable_people}}};
-        seedNodeAssignments(projectId,data,owner);
-        setState({kind:'ready',data});
-      }
-      setNotice('已儲存變更。'); if (refreshDetail) await refreshDetail(); return true;
+      applyDetail(mutation.nodeKey,detail);
+      setNotice('已儲存變更。'); await commit([{endpoint:`progress:${projectId}`}]); return true;
     } catch (failure) {
       const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;
@@ -101,7 +124,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       return false;
     } finally {mutating.current = false; if (mutationCurrent()) setPending('')}
   };
-  return {state:lifecycle.current.key===key&&lifecycle.current.epoch===getSessionEpoch()?state:{kind:'loading'} as AssignmentListState, refreshing, revision, pending, notice, error, reload: refreshDetail || reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
+  return {state:lifecycle.current.key===key&&lifecycle.current.epoch===getSessionEpoch()?state:{kind:'loading'} as AssignmentListState, refreshing, revision, pending, notice, error, reload: refreshDetail || reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), owner, verifyNode, reloadList: reload, clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
 }
 export function cachedNodeAssignmentDetail(projectId: string, nodeKey: string, owner?:PageData): NodeAssignmentDetail | undefined {
   return details.get(caseKey(owner,`${projectId}/${nodeKey}`))?.data;
