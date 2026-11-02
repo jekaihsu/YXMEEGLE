@@ -138,8 +138,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .database_startup import initialize
     def initialize_database():
         Base.metadata.create_all(engine)
-        from .read_index_migration import ensure_read_indexes
-        ensure_read_indexes(engine)
         ai_ledger.ensure_schema(engine)
         migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
     initialize(initialize_database)
