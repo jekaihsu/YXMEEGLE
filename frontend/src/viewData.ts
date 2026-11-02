@@ -7,6 +7,12 @@ import './design/skeleton.css';
 export type ViewDataFetcher<T>=(signal:AbortSignal,isCurrent:()=>boolean)=>Promise<T>;
 type ViewState<T>={key:string;epoch:number;data?:T;loading:boolean;error:string};
 
+/** @deprecated Migration units must use usePageOwner + usePageResource.
+ * This legacy adapter and companyDashboardCache are not a second source of truth:
+ * migrate each resource once, remove its legacy cache/refresh path, and share the
+ * page owner between consumers. Do not feed reloadVersion/ticks into new owners.
+ * Home must freeze clock-derived ranges for each open generation.
+ */
 // Include c.reloadVersion ?? c.w.version in deps. For conditional requests use:
 // useViewData(key, (signal, current) => api(url, {signal, etag:true}, current), deps).
 // Consumers render a .skeleton while loading && !data; refreshes retain data.
@@ -55,3 +61,5 @@ export function usePageResource<T>(owner:import('./pageData').PageData,resource:
  useEffect(()=>{const {resource,intent,loader}=latest.current;void owner.read(resource,intent,loader).catch(()=>{})},[owner,key,intentKey]);
  return state;
 }
+
+export {usePageOwner} from './pageData';
