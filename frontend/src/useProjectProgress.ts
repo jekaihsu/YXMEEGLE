@@ -1,75 +1,52 @@
-import {useDetailRefresh} from './detailRefresh';
+import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import type {PageData} from './pageData';
 import {refreshSources} from './refreshSources';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {ApiError,getSessionEpoch,onSessionEpochChange} from './api';
 import {fetchProjectProgress, type ProjectProgress} from './projectProgressApi';
 const fresh=(data:ProjectProgress)=>['ready','fresh','partial'].includes(data.sources.source_status??'') && !!data.sources.source_synced_at;
-type State = {kind: 'loading'}|{kind: 'ready'; data: ProjectProgress}|{kind: 'error'; message: string; status?:number; lastGoodAt?:string|null};
-let epoch = getSessionEpoch();
-const cache = new Map<string, {data: ProjectProgress; at: number}>();
-const pending = new Map<string, {request:Promise<ProjectProgress>;signal?:AbortSignal;batch?:symbol}>();
-export function prefetchProjectProgress(id: string, force = false, signal?:AbortSignal, batch?:symbol) {
- if (epoch !== getSessionEpoch()) {cache.clear(); pending.clear(); epoch = getSessionEpoch()}
- const currentEpoch = epoch;
- const running=pending.get(id);
- // Mounted overview and flow readers share a refresh batch, but never a read from before the write.
- if ((!force || batch && running?.batch===batch) && running && !running.signal?.aborted) return running.request;
- const stored = cache.get(id);
- if (!force && stored && Date.now() - stored.at < 60000) return Promise.resolve(stored.data);
- const request = fetchProjectProgress(id, () => currentEpoch === getSessionEpoch(),signal).then(data => {if (currentEpoch === getSessionEpoch() && pending.get(id)?.request === request) cache.set(id, {data, at: Date.now()}); return data}).finally(() => {if (pending.get(id)?.request === request) pending.delete(id)});
- pending.set(id, {request,signal,batch});
- return request;
+type State = {kind:'loading'}|{kind:'ready';data:ProjectProgress}|{kind:'error';message:string;status?:number;lastGoodAt?:string|null};
+const cache=new Map<string,ProjectProgress>();
+export function prefetchProjectProgress(id:string,force=false,signal?:AbortSignal,batch?:symbol,owner?:PageData){
+ return readCase(owner,`progress:${id}`,batch||force,current=>fetchProjectProgress(id,current,signal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
-/** The progress read for `id` if some tab already loaded it. Never fetches. */
-export function peekProjectProgress(id:string):ProjectProgress|undefined{return epoch===getSessionEpoch()?cache.get(id)?.data:undefined}
-export function seedProjectProgress(id:string,data:ProjectProgress) {if(epoch!==getSessionEpoch()){cache.clear();pending.clear();epoch=getSessionEpoch()}cache.set(id,{data,at:Date.now()})}
-export function useProjectProgress(id: string, enabled = true) {
- const [state, setState] = useState<State>({kind: 'loading'});
- const [refreshError,setRefreshError]=useState('');
- const [refreshing,setRefreshing]=useState(false);
- const [version, setVersion] = useState(0);
- const reading = useRef(false);
- const queued=useRef(false);
- const readBatch=useRef<symbol>();
- const synchronize=useRef<string|null>(null);
- const canRefresh=state.kind==='ready'?state.data.sources.can_refresh_sources===true:cache.has(id)?cache.get(id)?.data.sources.can_refresh_sources===true:false;
- const canRetryRead=state.kind==='error' && state.status!==401 && state.status!==403;
- const retry = useCallback(() => {
-  if (!enabled || (!canRefresh && !canRetryRead) || reading.current) return;
-  reading.current = true;
-  synchronize.current=canRefresh?id:null;
-  setState({kind: 'loading'});
-  setVersion(v => v + 1);
- }, [id,enabled,canRefresh,canRetryRead]);
- const reload=useCallback(()=>{
+export function peekProjectProgress(id:string,owner?:PageData){return cache.get(caseKey(owner,id))}
+export function seedProjectProgress(id:string,data:ProjectProgress,owner?:PageData){cache.set(caseKey(owner,id),data);seedCase(owner,`progress:${id}`,data,current=>fetchProjectProgress(id,current))}
+export function useProjectProgress(id:string,enabled=true){
+ const owner=useCaseData(),key=caseKey(owner,id);
+ const [state,setState]=useState<State>({kind:'loading'});
+ const [refreshError,setRefreshError]=useState(''),[refreshing,setRefreshing]=useState(false);
+ const life=useRef({key,epoch:getSessionEpoch(),active:true,seq:0,controller:new AbortController()});
+ const canRefresh=state.kind==='ready'&&state.data.sources.can_refresh_sources===true;
+ const canRetryRead=state.kind==='error'&&state.status!==401&&state.status!==403;
+ const load=useCallback(async(force=false,batch?:symbol,sync=false)=>{
   if(!enabled)return;
-  if(reading.current){queued.current=true;return}
-  reading.current=true;
-  synchronize.current=null;
-  setVersion(v=>v+1);
- },[enabled]);
- const reloadDetail=useCallback((batch:symbol)=>{readBatch.current=batch;reload()},[reload]);
- useDetailRefresh(reloadDetail, enabled, state.kind==='ready'?refreshError:'', refreshing);
- useEffect(() => {
-  if (!enabled) return;
-  let active = true;
-  const controller=new AbortController();
-  const abort=()=>controller.abort();
-  const unsubscribe=onSessionEpochChange(abort);
-  reading.current = true;
-  const currentEpoch = getSessionEpoch();
-  const batch=readBatch.current;readBatch.current=undefined;
-  const sync=version>0 && synchronize.current===id;
-  const timer=sync?setTimeout(()=>controller.abort(),90000):undefined;
-  const lastGoodAt=cache.get(id)?.data.sources.source_synced_at;
-  setRefreshing(true); setRefreshError('');
-  setState(previous => previous.kind==='ready' && previous.data.project_id===id ? previous : {kind:'loading'});
-  void (async()=>{if(sync && cache.get(id)?.data.sources.can_refresh_sources===true)await refreshSources('sources',undefined,controller.signal);if(!active || currentEpoch!==getSessionEpoch())return null;return prefetchProjectProgress(id,version>0,controller.signal,batch)})().then(data => {
-   if(!data || !active || currentEpoch!==getSessionEpoch())return;
-   if(sync && !fresh(data))setState({kind:'error',message:'來源仍待更新，請重試',lastGoodAt:data.sources.source_synced_at || lastGoodAt});
+  const scope=life.current,seq=++scope.seq;
+  const current=()=>scope===life.current&&scope.active&&scope.epoch===getSessionEpoch()&&scope.seq===seq;
+  const lastGoodAt=cache.get(key)?.sources.source_synced_at;
+  setRefreshing(true);setRefreshError('');
+  const unsubscribe=onSessionEpochChange(()=>scope.controller.abort());
+  try{
+   if(sync)await refreshSources('sources',undefined,AbortSignal.any([scope.controller.signal,AbortSignal.timeout(90000)]));
+   if(!current())return;
+   const data=await prefetchProjectProgress(id,force,undefined,batch,owner);
+   if(!current())return;
+   if(sync&&!fresh(data))setState({kind:'error',message:'來源仍待更新，請重試',lastGoodAt:data.sources.source_synced_at||lastGoodAt});
    else setState({kind:'ready',data});
-  }).catch(error => {if (active && currentEpoch === getSessionEpoch()) {const message=controller.signal.aborted ? '資料仍在更新，請稍後重試' : error instanceof Error ? error.message : '工程進度暫不可用。';setRefreshError(message);setState(previous=>previous.kind==='ready'&&previous.data.project_id===id&&!(error instanceof ApiError&&[401,403,404].includes(error.status))?previous:{kind:'error',message,lastGoodAt,...(error instanceof ApiError ? {status:error.status} : {})})}}).finally(() => {clearTimeout(timer);if (active){setRefreshing(false);reading.current=false;if(queued.current){queued.current=false;synchronize.current=null;setVersion(v=>v+1)}}});
-  return () => {active = false;queued.current=false; clearTimeout(timer);controller.abort();unsubscribe()};
- }, [id, enabled, version]);
- return {state, refreshing, refreshError, retry, reload, canRefresh, canRetryRead};
+  }catch(error){if(current()){
+   const message=error instanceof Error?error.message:'工程進度暫不可用。';setRefreshError(message);
+   setState(previous=>previous.kind==='ready'&&!(error instanceof ApiError&&[401,403,404].includes(error.status))?previous:{kind:'error',message,lastGoodAt,...(error instanceof ApiError?{status:error.status}:{})});
+  }}finally{unsubscribe();if(current())setRefreshing(false)}
+ },[id,key,enabled,owner]);
+ useEffect(()=>{
+  const scope={key,epoch:getSessionEpoch(),active:true,seq:0,controller:new AbortController()};life.current=scope;
+  const stored=cache.get(key);setState(stored?{kind:'ready',data:stored}:{kind:'loading'});
+  void load();return()=>{scope.active=false;scope.controller.abort()};
+ },[key,load]);
+ const reload=useCallback(()=>load(true),[load]);
+ const reloadDetail=useCallback((batch:symbol)=>load(true,batch),[load]);
+ useDetailRefresh(reloadDetail,enabled,state.kind==='ready'?refreshError:'',refreshing);
+ const retrying=useRef<Promise<void>|null>(null);
+ const retry=useCallback(()=>{if(retrying.current)return retrying.current;if(!enabled||!canRefresh&&!canRetryRead)return Promise.resolve();const request=load(true,undefined,canRefresh).finally(()=>{if(retrying.current===request)retrying.current=null});retrying.current=request;return request},[enabled,canRefresh,canRetryRead,load]);
+ return {state:life.current.key===key&&life.current.epoch===getSessionEpoch()?state:{kind:'loading'} as State,refreshing,refreshError,retry,reload,canRefresh,canRetryRead};
 }

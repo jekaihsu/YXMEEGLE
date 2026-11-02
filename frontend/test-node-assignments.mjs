@@ -8,7 +8,7 @@ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
 for(const key of ['window','document','Event','HTMLElement'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export * from './src/useNodeAssignments'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
+const bundle=await build({stdin:{contents:"export * from './src/useNodeAssignments'; export {DetailRefreshProvider} from './src/detailRefresh'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
 const temp=new URL('./.node-assignments-test.mjs',import.meta.url);await fs.writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await fs.unlink(temp);
 let root,latest,calls,fixture,status,hold,release;
 const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
@@ -46,8 +46,8 @@ test('session change clears cached list and details before the next mount',async
 test('round2 forced detail replaces a pending read and keeps newest cached result',async()=>{
  await mount();let releaseOld;const old=structuredClone(fixture.detail);old.tasks[0].assignee={open_id:'old',name:'舊負責人'};
  let count=0;globalThis.fetch=async()=>{count++;if(count===1){await new Promise(r=>releaseOld=r);return response(old)}return response(fixture.detail)};
- const first=ui.prefetchNodeAssignmentDetail('p1','control');const forced=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true);releaseOld();const fresh=await forced;
- assert.equal(fresh.tasks[0].assignee.name,'陳威廷');assert.equal(count,2);releaseOld();await first;
+ const first=ui.prefetchNodeAssignmentDetail('p1','control');const cancelled=first.catch(error=>{assert.equal(error.name,'AbortError')});await new Promise(r=>setTimeout(r,0));const forced=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true);releaseOld();const fresh=await forced;
+ assert.equal(fresh.tasks[0].assignee.name,'陳威廷');assert.equal(count,2);releaseOld();await cancelled;
  assert.equal((await ui.prefetchNodeAssignmentDetail('p1','control')).tasks[0].assignee.name,'陳威廷');
 });
 test('browsing and visibility changes never schedule assignment polling',async()=>{
@@ -60,8 +60,20 @@ test('forced list read bypasses a read started before a write and keeps the newe
  const old=structuredClone(fixture.list),fresh=structuredClone(fixture.list);fresh.code='A115002-01';
  globalThis.fetch=async()=>{const index=++count;if(index===1)await new Promise(resolve=>releaseOld=resolve);return response(index===1?old:fresh)};
  const first=ui.prefetchNodeAssignments('p1',true);
+ const cancelled=first.catch(error=>{assert.equal(error.name,'AbortError')});await new Promise(r=>setTimeout(r,0));
  const next=await ui.prefetchNodeAssignments('p1',true);
  assert.equal(next.code,'A115002-01');assert.equal(count,2);
- releaseOld();await first;
+ releaseOld();await cancelled;
  assert.equal((await ui.prefetchNodeAssignments('p1')).code,'A115002-01');
+});
+
+test('case owner is StrictMode safe, pins tab remounts for ten minutes, and reopens in a fresh generation',async()=>{
+ await mount();await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));calls=[];
+ const tree=(key,show=true)=>React.createElement(React.StrictMode,null,React.createElement(ui.DetailRefreshProvider,{key},show?React.createElement(Probe):null));
+ await act(async()=>root.render(tree('open-1')));assert.equal(calls.length,1);assert.equal(latest.state.kind,'ready');
+ await act(async()=>root.render(tree('open-1',false)));
+ const now=Date.now;Date.now=()=>now()+600000;
+ try{await act(async()=>root.render(tree('open-1')));assert.equal(calls.length,1,'ten minute tab remount adds zero reads')}finally{Date.now=now}
+ await act(async()=>root.render(tree('open-2')));assert.equal(calls.length,2,'reopening the same case starts one new read');
+ assert.equal(latest.state.kind,'ready');
 });

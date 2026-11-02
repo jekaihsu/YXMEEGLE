@@ -46,17 +46,18 @@ try{
  assert.equal(reads.length-baseline,0);
  await flush(()=>{window.dispatchEvent(new Event('focus'));visibility('visible')});assert.equal(reads.length,4);
  await leave();now+=59999;await back();assert.equal(reads.length,4);
- await leave();now+=60000;await back();assert.equal(reads.length,9);
- assert.deepEqual(reads.slice(4).sort(),['/api/projects/p1','/api/projects/p1/node-assignments','/api/projects/p1/progress','/api/projects/p1/sop-assignees','/api/projects/p1/sop-tasks']);
- await flush(()=>window.dispatchEvent(new Event('focus')));assert.equal(reads.length,9);
- // A window-only return also counts, and a draft defers the entire group.
- await flush(()=>window.dispatchEvent(new Event('blur')));now+=60000;blocked=true;
- await flush(()=>window.dispatchEvent(new Event('focus')));assert.equal(reads.length,9);
- blocked=false;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,14);
+ await leave();now+=60000;await back();assert.equal(reads.length,4,'>=60s return stays at four initial reads');
+ await flush(()=>window.dispatchEvent(new Event('focus')));assert.equal(reads.length,4);
+ await flush(()=>window.dispatchEvent(new Event('blur')));now+=600000;blocked=true;
+ await flush(()=>window.dispatchEvent(new Event('focus')));assert.equal(reads.length,4);
+ blocked=false;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,4,'focus never creates deferred work');
+ // An explicit request is deferred while a draft is open and resumes once cleared.
+ let deferredDone=false;blocked=true;await flush(()=>{void refresh().then(()=>{deferredDone=true})});assert.equal(reads.length,4);assert.equal(deferredDone,false,'guarded refresh completion waits for its authorized read');
+ blocked=false;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,9);assert.equal(deferredDone,true);
  // Workspace writes/manual reloads advance App's revision even if data version is unchanged.
- revision++;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,19);
+ revision++;await flush(()=>root.render(React.createElement(Tree)));assert.equal(reads.length,14);
  let release;hold=new Promise(resolve=>release=resolve);
- await leave();now+=60000;await back();assert.equal(reads.length,24);
+ await flush(()=>{void refresh()});assert.equal(reads.length,19);
  assert.equal(assignment.state.kind,'ready');assert.equal(assignment.refreshing,true);
  assert.equal(sop.state.kind,'ready');assert.equal(sop.state.refreshing,true);
  assert.equal(evidence.state.kind,'ready');assert.equal(evidence.refreshing,true);
@@ -64,24 +65,24 @@ try{
  hold=null;await flush(()=>release());
  // Own assignment writes use the same group after the returned detail has been merged.
  await flush(()=>{void assignment.mutate({action:'update_task',nodeKey:'control',taskId:'recTask1',expected_revision:'9b0c1d2e3f405162',patch:{assignee_open_id:'ou_anna'}})});
- assert.equal(reads.length,29);
+ assert.equal(reads.length,24);
  assert.equal(assignment.notice,'已儲存變更。');
  overview=structuredClone(initial);overview.tasks[0].lark_sync={state:'已同步',record_id:'recDone',base_id:'base',table_id:'table'};
- await flush(()=>{void sop.reload()});assert.equal(reads.length,34);assert.equal(sop.state.data.tasks[0].larkSync.state,'已同步');
+ await flush(()=>{void sop.reload()});assert.equal(reads.length,29);assert.equal(sop.state.data.tasks[0].larkSync.state,'已同步');
  // A write/reload during an older refresh must queue a fresh read, rather than join it.
- hold=new Promise(resolve=>release=resolve);await flush(()=>{void refresh()});assert.equal(reads.length,39);
+ hold=new Promise(resolve=>release=resolve);await flush(()=>{void refresh()});assert.equal(reads.length,34);
  await flush(()=>{void sop.reload()});
  overview=structuredClone(overview);overview.tasks[0].title='寫入後任務';
  hold=null;await flush(()=>release());await flush();
- assert.equal(reads.length,44);assert.equal(sop.state.data.tasks[0].title,'寫入後任務');
+ assert.equal(reads.length,39);assert.equal(sop.state.data.tasks[0].title,'寫入後任務');
  const beforeMutation=reads.length;
  let releaseMutation;mutationHold=new Promise(resolve=>releaseMutation=resolve);
  let writing;await flush(()=>{writing=ui.api('/api/projects/p1/test-write',{method:'POST'})});
  await leave();now+=60000;await back();assert.equal(reads.length,beforeMutation);
  mutationHold=null;await flush(()=>releaseMutation());await writing;await flush();
- assert.equal(reads.length,beforeMutation+5);
+ assert.equal(reads.length,beforeMutation,'return during mutation never creates deferred work');
  fail=true;await flush(()=>{void refresh()});await flush();
  assert.equal(assignment.state.kind,'error');assert.equal(sop.state.kind,'error');assert.equal(evidence.state.kind,'ready');
  assert.equal(document.body.textContent.includes('工程進度更新失敗，顯示上次資料'),true);
- console.log('PASS detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 5 fetches (one per resource); own writes/manual revision refresh all; drafts defer; loading retains data; failures label retained progress; post-write refresh queues behind older reads.');
+ console.log('PASS detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 0 fetches; own writes/manual revision refresh all; drafts defer; loading retains data; failures label retained progress; post-write refresh queues behind older reads.');
 }finally{await act(async()=>root.unmount());Date.now=originalNow;globalThis.setInterval=originalInterval;window.setInterval=originalWindowInterval;dom.window.close()}

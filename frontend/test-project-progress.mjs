@@ -36,9 +36,12 @@ test('forced progress reads bypass pending requests and older completions cannot
  const wait=new Promise(resolve=>release=resolve);
  globalThis.fetch=async()=>{calls++;const index=calls;if(index===1)await wait;return new Response(JSON.stringify(index===1?old:fresh),{headers:{'Content-Type':'application/json'}})};
  const first=m.prefetchProjectProgress(fixture.project_id);
+ const cancelled=first.catch(error=>{assert.equal(error.name,'AbortError')});
+ await new Promise(r=>setTimeout(r,0));
  const retry=m.prefetchProjectProgress(fixture.project_id,true);
+ await new Promise(r=>setTimeout(r,0));
  const independent=calls===2;release();assert.equal(independent,true,'retry starts an independent HTTP read');
  assert.equal((await retry).as_of,fresh.as_of);
- release();await first;
+ release();await cancelled;
  assert.equal((await m.prefetchProjectProgress(fixture.project_id)).as_of,fresh.as_of);
 });

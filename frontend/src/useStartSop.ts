@@ -1,37 +1,32 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import type {PageData} from './pageData';
+import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
 import {canConfirmSop, fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
-let epoch = getSessionEpoch();
-const cache = new Map<string, SopPreview>();
-const readAt = new Map<string, number>();
-const requests = new Map<string, Promise<SopPreview>>();
-export function prefetchStartSop(id: string, force = false) {
- if (epoch !== getSessionEpoch()) {cache.clear(); readAt.clear(); requests.clear(); epoch = getSessionEpoch()}
- const activeEpoch = epoch;
- const current = () => activeEpoch === getSessionEpoch();
- if (force) {cache.delete(id); readAt.delete(id)}
- const cached = cache.get(id);
- if (cached && Date.now() - (readAt.get(id) || 0) < 60000) return Promise.resolve(cached);
- const pending = requests.get(id);
- if (pending) return pending;
- const promise = fetchSop(id, current).then(data => {if (current()) {cache.set(id, data); readAt.set(id, Date.now())} return data}).finally(() => {if (requests.get(id) === promise) requests.delete(id)});
- requests.set(id, promise); return promise;
+const cache=new Map<string,SopPreview>();
+export function prefetchStartSop(id:string,force:boolean|symbol=false,owner?:PageData){
+ return readCase(owner,`start:${id}`,force,current=>fetchSop(id,current)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
-export function seedStartSop(id:string,data:SopPreview) {if(epoch!==getSessionEpoch()){cache.clear();readAt.clear();requests.clear();epoch=getSessionEpoch()}cache.set(id,data);readAt.set(id,Date.now())}
+export function seedStartSop(id:string,data:SopPreview,owner?:PageData){cache.set(caseKey(owner,id),data);seedCase(owner,`start:${id}`,data,current=>fetchSop(id,current))}
 export function useStartSop(id: string, enabled: boolean, refreshOverview: () => Promise<void>) {
+ const owner=useCaseData(),key=caseKey(owner,id);
  const [state, setState] = useState<State>({kind: 'hidden'});
  const [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
- const life = useRef({active: false, epoch: getSessionEpoch()});
+ const life = useRef({active: false, epoch: getSessionEpoch(),key});
  const pendingSync = useRef(false);
  const posting = useRef(false), attempt = useRef<{hash: string; id: string}|null>(null);
  const current = () => life.current.active && life.current.epoch === getSessionEpoch();
- const reload = useCallback(async (force = false) => {
-  try {const data = await prefetchStartSop(id, force); if (current()) setState({kind: 'ready', data: pendingSync.current ? {...data, already_started: false, eligible: data.can_start && !data.blockers.length} : data})}
-  catch (e) {if (current()) setState(e instanceof NodeAssignmentError && e.status === 403 ? {kind: 'forbidden', reason: assignmentErrorMessage(e)} : {kind: 'hidden'})}
- }, [id]);
- useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
+ const reload = useCallback(async (force: boolean | symbol = false) => {
+  const scope=life.current;
+  const valid=()=>scope===life.current&&scope.active&&scope.epoch===getSessionEpoch();
+  try {const data = await prefetchStartSop(id, force, owner); if (valid()) setState({kind: 'ready', data: pendingSync.current ? {...data, already_started: false, eligible: data.can_start && !data.blockers.length} : data})}
+  catch (e) {if (valid()) setState(e instanceof NodeAssignmentError && e.status === 403 ? {kind: 'forbidden', reason: assignmentErrorMessage(e)} : {kind: 'hidden'})}
+ }, [id,owner]);
+ useEffect(() => {life.current = {active: true, epoch: getSessionEpoch(),key}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && life.current.epoch === getSessionEpoch() && cache.has(key) ? {kind: 'ready', data: cache.get(key)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
+ const reloadDetail=useCallback((batch:symbol)=>reload(batch),[reload]);
+ const refreshDetail=useDetailRefresh(reloadDetail,enabled);
  const confirm = async (seed = false) => {
   if (posting.current || state.kind !== 'ready' || !canConfirmSop(state.data, seed)) return false;
   posting.current = true; setBusy(true); setNotice('');
@@ -44,7 +39,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
    attempt.current = null;
    pendingSync.current = result.results.some(node => node.sync === 'failed');
    setNotice(sopResultMessage(result, state.data, seed));
-   await refreshOverview(); await reload(true); return result.complete;
+   await refreshOverview(); if(!refreshDetail)await reload(true); return result.complete;
   } catch (e) {
    if (!valid()) return false;
    if (e instanceof NodeAssignmentError && e.code === 'preview_stale') {attempt.current = null; await reload(true); setNotice('計畫已變更，已重新讀取預覽，請確認後再啟動。')}
@@ -53,5 +48,5 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
    return false;
   } finally {posting.current = false; if (valid()) setBusy(false)}
  };
- return {state, busy, notice, confirm};
+ return {state:life.current.key===key&&life.current.epoch===getSessionEpoch()?state:{kind:'hidden'} as State, busy, notice, confirm};
 }
