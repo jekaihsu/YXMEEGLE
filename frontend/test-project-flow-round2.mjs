@@ -143,7 +143,8 @@ await check('removed node background and selected panel do not repeat stepper fa
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
  await mount({node:'control',detailHold:true});await click(button('指派'));const drawer=document.querySelector('.task-drawer[role=dialog]');await click(drawer.querySelector('.assignee-picker button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent.includes('林安娜')).click();await tick()});
  const pending=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true);
- await click([...drawer.querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));globalThis.releaseDetail();await act(async()=>{await pending;await tick()});
+ const cancelled=pending.catch(error=>{assert.equal(error.name,'AbortError')});
+ await click([...drawer.querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));globalThis.releaseDetail();await act(async()=>{await cancelled;await tick()});
  const row=document.querySelector('[data-assignment-task="recUnassigned"]');assert.match(row.textContent,/林安娜/);assert.doesNotMatch(row.textContent,/尚未指派/);
  assert.equal(calls.filter(c=>c.url.endsWith('/nodes/control')).length,1);assert.equal(calls.filter(c=>c.url.endsWith('/node-assignments')).length,1);
 });

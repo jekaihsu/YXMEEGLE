@@ -94,11 +94,13 @@ await mount({node:'control',embedded:false});assert.equal(document.querySelector
  const fetchNow=globalThis.fetch;let releaseDetail;const detailHold=new Promise(r=>releaseDetail=r);
  globalThis.fetch=async(url,init)=>{if(url.includes('/node-assignments/nodes/'))await detailHold;return fetchNow(url,init)};
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
- assert.equal(document.querySelectorAll('.pf-task-open').length,2,'revisit shows last-good task rows while revalidating');assert.equal(document.querySelector('[aria-label="任務載入中"]'),null);
+ assert.equal(document.querySelectorAll('.pf-task-open').length,2,'revisit keeps pinned task rows without revalidation');assert.equal(document.querySelector('[aria-label="任務載入中"]'),null);
  await act(async()=>{releaseDetail();await tick()});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
  detailStatus=403;Date.now=()=>realNow()+122000;
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
- assert.equal(document.querySelectorAll('.pf-task-open').length,0,'forbidden revalidation removes cached task rows');
+ assert.equal(document.querySelectorAll('.pf-task-open').length,2,'age alone does not revalidate task rows');
+ await click(button('更新節點與任務'));
+ assert.equal(document.querySelectorAll('.pf-task-open').length,0,'explicit forbidden revalidation removes cached task rows');
  assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);
  detailStatus=200;Date.now=realNow;
 }

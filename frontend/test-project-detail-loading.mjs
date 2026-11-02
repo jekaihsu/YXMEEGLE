@@ -16,8 +16,8 @@ const {project,user,workspace}=projectFixture();
 const c={w:{...workspace,scope:'shell'},s:{user,workspace_id:'offline',features:{node_assignment:true}},route:{view:'project',project:project.id},go(){},registerDrafts(){},notify(){}};
 const requests=[];
 globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));
-let root;
-const render=tab=>act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,route:{...c.route,tab}}})));
+let root,reloadVersion;
+const render=tab=>act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,reloadVersion,route:{...c.route,tab}}})));
 const settle=()=>{for(const request of requests)request.resolve(new Response('{"detail":"offline test complete"}',{status:503}));};
 try{
  root=createRoot(document.getElementById('root'));
@@ -48,6 +48,7 @@ try{
  await act(async()=>requests[0].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
  assert.match(document.body.textContent,/文件與交付/);
  assert.equal(requests.length,1,'rendering documents adds no workflow waterfall');
+ reloadVersion=1;
  await act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,reloadVersion:1,route:{...c.route,tab:'files'}}})));
  assert.equal(requests.length,2,'workspace reload explicitly refreshes the mounted snapshot');
  assert.match(document.body.textContent,/文件與交付/,'refresh keeps existing content');
@@ -57,9 +58,26 @@ try{
  try {
   await act(async()=>window.dispatchEvent(new Event('blur')));now+=60000;
   await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'))});
-  assert.equal(requests.length,3,'return refreshes the mounted snapshot once');
-  await act(async()=>requests[2].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
+  assert.equal(requests.length,2,'return after 60 seconds makes zero reads');
+  now+=600000;
+  await render('data');
+  assert.equal(requests.length,2,'non-overview tabs share the full snapshot');
+  await render('files');
+  assert.equal(requests.length,2,'ten minute tab round-trip makes zero duplicate reads');
  } finally {Date.now=originalNow}
+
+
+ const switchCase=id=>act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,reloadVersion,route:{view:'project',project:id,tab:'files'}}})));
+ await switchCase('p2');assert.equal(requests.length,3);assert.doesNotMatch(document.body.textContent,/更新後案件/,'case switch hides prior rows before the next read resolves');
+ await switchCase('p3');assert.equal(requests.length,4);
+ await act(async()=>requests[3].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,id:'p3',name:'THIRD_CASE_PRIVATE'}}))));
+ assert.match(document.body.textContent,/THIRD_CASE_PRIVATE/);
+ await act(async()=>requests[2].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,id:'p2',name:'OLD_CASE_PRIVATE'}}))));
+ assert.doesNotMatch(document.body.textContent,/OLD_CASE_PRIVATE/,'late prior-case response cannot expose its rows');
+ await act(async()=>ui.invalidateSessionEpoch());await switchCase('p3');assert.equal(requests.length,5);
+ assert.doesNotMatch(document.body.textContent,/THIRD_CASE_PRIVATE/,'same-case session switch clears previous session rows');
+ await act(async()=>requests[4].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,id:'p3',name:'NEW_SESSION_CASE'}}))));
+ assert.match(document.body.textContent,/NEW_SESSION_CASE/);
 
  await act(async()=>root.unmount());
  ui.invalidateSessionEpoch();requests.length=0;
@@ -79,5 +97,9 @@ try{
   await act(async()=>requests[1].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
   assert.match(document.body.textContent,/文件與交付/);
  } finally {globalThis.setTimeout=originalTimeout;globalThis.clearTimeout=originalClear}
+ await act(async()=>root.unmount());requests.length=0;root=createRoot(document.getElementById('root'));
+ const legacy=revision=>React.createElement(ui.ProjectDetailGate,{c:{...c,w:workspace,reloadVersion:revision,route:{...c.route,tab:'files'}}});
+ await act(async()=>root.render(legacy(0)));assert.equal(requests.length,0,'full-workspace file view does not start shell-only reads');
+ await act(async()=>root.render(legacy(1)));assert.equal(requests.length,0,'legacy refresh does not register unused shell endpoints');
  console.log('PASS project detail: aggregate status/tasks render together; seeded readers add no heavy requests; shared pending detail; document isolation');
 }finally{await act(async()=>{root.unmount();settle()});dom.window.close()}
