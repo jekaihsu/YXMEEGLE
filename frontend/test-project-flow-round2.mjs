@@ -287,6 +287,22 @@ await check('populated paused overview and flow retain one causal pause reason',
   assert.equal(document.querySelector('.project-detail').textContent.split('案件暫停中，等待林安娜處理。').length-1,1);
  }
 });
+await check('paused overview shows the case reason once when viewing a non-current stage',async()=>{
+ for(const enabled of [false,true])for(const currentHasTasks of [false,true]){
+  await mount({enabled,tab:'overview',node:enabled?'control':'node_control',configure(base,f){
+   base.project.status='paused';base.project.nodes[3].status='in_progress';base.project.nodes[4].status='pending';
+   base.project.nodes[3].tasks=currentHasTasks?[{id:'field',title:'目前外業任務',status:'in_progress',owner_id:'ou_anna'}]:[];
+   base.project.nodes[4].tasks=[{id:'control',title:'檢視控制任務',status:'pending',owner_id:'ou_anna'}];
+   f.list.summary.current_node='field';f.list.nodes[3].derived_status='進行中';f.list.nodes[4].derived_status='未開始';
+   f.list.node_details.field.tasks=currentHasTasks?[{...f.detail.tasks[0],id:'field'}]:[];
+  }});
+  assert.match(document.querySelector('.cs-selected').textContent,/正在檢視「控制」，不是目前階段/);
+  assert.match(document.querySelector('.cs-stage').textContent,/外業/);
+  const overview=document.querySelector('.project-overview');
+  assert.equal(overview.textContent.split('案件暫停中，等待林安娜處理。').length-1,1);
+  assert.match(overview.querySelector('.st-blocker-banner>p').textContent,/案件暫停中，等待林安娜處理。/);
+ }
+});
 await check('shared blockers disclose each secondary cause once',async()=>{
  for(const tab of ['overview','flow'])for(const cause of ['來源案件狀態待核對；未確認前不自動啟用工作','接案尚未轉正式案件','來源標示結案；工作台待核對，不自動重新啟用工作']){
   await mount({enabled:false,tab,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'a',title:'受阻工作',status:'pending',owner_id:'ou_anna',execution_blockers:['案件已暫停、結案或來源待核對',cause,'尚未排定開始日期']}]}});
