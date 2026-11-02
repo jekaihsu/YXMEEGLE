@@ -7,7 +7,6 @@ import ts from 'typescript';
 // These whole-file digests freeze the audited legacy sites, including indirect
 // callbacks. Migrations remove entries; changed survivors require a fresh audit.
 const legacy={
- "UnifiedHome.tsx": "4d5cf0321336c4b5588f607c664632afe62b9a2a53ed2bb3af4b13dc409f1894",
  "AssigneePicker.tsx": "2f3f8a6e8081097da460588d7957851de7e4b7bc84091a76da4af69569b16489",
  "App.tsx": "5bc89a2fd0f97dc04834c71d1870ed9ba0302a2910ff93c9518a1b157644192a",
  "CompletionCelebration.tsx": "f73bd9143729b0934efc35be418bb0b8d01ae4b7291389d022a5342af0adde7d",
@@ -22,13 +21,11 @@ const legacy={
  "ProjectsList.tsx": "4e04e846b5d132318070e7e3c74dc9a7a0761b3f60071a437477287107333501",
  "dispatchBoardRead.ts": "723c1765649ee9fa877267d754aa8d93fef8d66ee3f0166836b19abdf43a6163",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
- "useHomeReports.ts": "6fdd24349550a913ec1bae463d04167fc6ee2234752815ab3d01c345d4c7dd05",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
  "refreshSources.ts": "55675cabe14c1c03d37dfb62c528284b91c38ad4b3ed1e4b0cc34bf28ff61c0b",
  "TokenDashboard.tsx": "a01af58e64d817f35890b11339b712e2283fc9558c0b3c78e8571ca5af3942bb",
  "HomeDispatchCard.tsx": "74d8f6cff0919960f17c37dbd8dbc5ddc0b4089e4558ab3904421686c7a185b0",
  "useDialogFocus.ts": "b636c3476c8855862349e384da2886332caf2b28740e59a8eb69299b3be767ff",
- "useHomePanels.ts": "5aa68d997d7539e3a8ac708e3f4761bb27722152d578937fc7f8e4edfb7d0227",
  "DispatchPublishDialog.tsx": "28bc218ce2feb8aed4316350a97726aa6136a30210acda644ed03d7824479655",
  "routeLoader.ts": "5bff6b1339b36475ea28d559deb6190be55eba60970a08bbee5194543b10ce36",
  "TaskTimeline.tsx": "216aa59335a7c7c17cdf7a8b9681a40d00798b493b5f53ef1125a27743a26c71",

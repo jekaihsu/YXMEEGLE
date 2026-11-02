@@ -3,10 +3,8 @@ import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowDown,ArrowUp,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
 import {Button,Eyebrow,Skeleton} from './design';
 import {type Ctx,date} from './appCommon';
-import {useHomePanels,type PanelRead} from './useHomePanels';
-import {fetchPeopleAttendance,parsePeopleAttendance,taipeiWeek} from './peopleAttendance';
-import {useViewData} from './viewData';
-import {ApiError} from './api';
+import {HomeDataProvider,useHomeResource,homeValue,useHomePanels,type PanelRead} from './useHomePanels';
+import {parsePeopleAttendance,taipeiWeek} from './peopleAttendance';
 import {HOME_CARDS,HOME_VIEWS,homeSections,availableCardIds,availableViews,resolvePersona,defaultHomeLayout,parseHomeLayout,moveHomeCard,homeLayoutKey,taipeiToday,type HomeCardId,type HomeLayout,type HomeSettings,type HomeViewId} from './homeLayout';
 import {PeopleCard} from './homePeopleCards';
 import type {PeopleAttendance} from './peopleAttendance';
@@ -44,13 +42,13 @@ function CompanyView(props:ViewProps&{reports:HomeReportsRead}){
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
  useEffect(()=>{try{localStorage.removeItem('yx.home.preview')}catch{}},[]);
- return <HomeWorkspace key={key} c={c} storageKey={key} preview={null}/>;
+ return <HomeDataProvider c={c}><HomeWorkspace key={key} c={c} storageKey={key} preview={null}/></HomeDataProvider>;
 }
 function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:keyof typeof HOME_PREVIEWS|null}){
  const [previewView,setPreviewView]=useState<HomeViewId|null>(null);
  const [settings,setSettings]=useState<HomeSettings>(()=>{try{return parseHomeLayout(localStorage.getItem(storageKey))}catch{return parseHomeLayout(null)}});
  const [editing,setEditing]=useState(false),[saved,setSaved]=useState(true),[notice,setNotice]=useState('');
- const [today,setToday]=useState(taipeiToday);
+ const [today]=useState(taipeiToday);
  const [refreshing,setRefreshing]=useState(false),[refreshTick,setRefreshTick]=useState(0),[refreshError,setRefreshError]=useState('');
  const readGeneration=useRef((c.reloadVersion??c.w.version)+refreshTick);
  if(!refreshing)readGeneration.current=(c.reloadVersion??c.w.version)+refreshTick;
@@ -68,13 +66,8 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const needsConfirmation=visible.includes('confirmation');
  const needsAttendance=visible.some(id=>['leave','trips','absence','impact'].includes(id));
  const confirmation=useHomePanels(homeContext,{panel:'confirmation',scope:'mine',limit:100},needsConfirmation);
- const refresh=async()=>{readGeneration.current=(c.reloadVersion??c.w.version)+refreshTick+1;setRefreshTick(value=>value+1);setRefreshing(true);setRefreshError('');try{await c.refresh()}catch{setRefreshError('工作區重新讀取失敗；已保留上次資料，請稍後再試。')}finally{setRefreshing(false)}};
- useEffect(()=>{const timer=window.setInterval(()=>setToday(taipeiToday()),60000);return()=>window.clearInterval(timer)},[]);
- const attendance=useViewData(`home-attendance:${storageKey}:${taipeiWeek(today)}:${needsAttendance}`,async(signal,current)=>{
-  if(!needsAttendance)return undefined;
-  try{return await fetchPeopleAttendance({week:taipeiWeek(today),signal,current})}
-  catch(error){if(error instanceof ApiError&&error.status===403)return parsePeopleAttendance({status:'needs-permission'});throw error}
- },[homeContext.reloadVersion,today]);
+ const refresh=async()=>{setRefreshing(true);setRefreshError('');try{await c.refresh()}catch{setRefreshError('工作區重新讀取失敗；已保留上次資料，請稍後再試。')}finally{setRefreshTick(value=>value+1);setRefreshing(false)}};
+ const attendance=useHomeResource(homeContext,{endpoint:'/api/people/attendance',query:{week:taipeiWeek(today)}},raw=>homeValue(parsePeopleAttendance(raw)),needsAttendance);
  const persist=(next:HomeSettings,message:string)=>{
   setSettings(next);setNotice(message);
   try{localStorage.setItem(storageKey,JSON.stringify(next));setSaved(true)}catch{setSaved(false)}
@@ -92,11 +85,11 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const asOf=c.w.as_of;
  const freshnessDays=asOf?Math.floor((Date.parse(`${taipeiToday()}T00:00:00Z`)-Date.parse(`${asOf.slice(0,10)}T00:00:00Z`))/86400000):null;
  const stale=freshnessDays!==null&&freshnessDays>1;
- const attendanceCard=(id:'leave'|'trips')=><AttendanceCard key={id} id={id} view={attendance.data} loading={attendance.loading} error={attendance.error} today={today}/>;
+ const attendanceCard=(id:'leave'|'trips')=><AttendanceCard key={id} id={id} view={attendance.data} loading={attendance.loading} error={attendance.error?String(attendance.error):''} today={today}/>;
  const dispatchCard=()=><HomeDispatchCard key="dispatch" today={today} reloadVersion={homeContext.reloadVersion}/>;
  const attendanceUnavailable=!attendance.loading&&(!attendance.data||!['ok','incomplete','stale'].includes(attendance.data.status));
  const contentIds=availableVisible;
- const props:ViewProps={cases,dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
+ const props:ViewProps={cases,dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error?String(attendance.error):''},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
  const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
  const renderCard=(id:HomeCardId)=>id==='dispatch'?dispatchCard():id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
  return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>
@@ -117,7 +110,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
   {refreshError&&<Message>{refreshError}</Message>}
   {!saved&&<Message>瀏覽器無法儲存設定；目前配置在離開此頁後可能重設。</Message>}
   {!availableVisible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
-  {attendance.error&&<Button onClick={attendance.reload} disabled={attendance.loading}>重試出勤資料</Button>}
+  {!!attendance.error&&<Button onClick={attendance.retry} disabled={attendance.loading}>重試出勤資料</Button>}
   {attendanceUnavailable&&availableVisible.some(id=>['leave','trips','absence','impact'].includes(id))&&<p className="home-source-note" role="status">出勤資料尚未提供。 <a href="#view=people">查看人員與出勤</a></p>}
   <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={contentIds} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
  </div></div>;

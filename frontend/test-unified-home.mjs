@@ -62,10 +62,10 @@ await render(refreshContext);
 const beforeWorkspaceRefresh=calls.length;
 await act(async()=>button('重新讀取').click());
 await render({...refreshContext,reloadVersion:2,w:{...c.w,version:2}});
-assert.equal(calls.length,beforeWorkspaceRefresh+1,'home reads panels while workspace refresh is still pending');
-console.log('PASS refresh behavior: before 0 panel reads while global refresh pending; after 1 immediate panel read');
+assert.equal(calls.length,beforeWorkspaceRefresh,'home waits to issue one complete refresh batch');
+
 await act(async()=>finishRefresh());await settle();
-assert.equal(calls.length,beforeWorkspaceRefresh+2,'a new global generation still receives a fresh panel read');
+assert.equal(calls.length,beforeWorkspaceRefresh+1,'workspace completion produces exactly one panel read');
 attendanceStatus='not-connected';
 await render({...c,s:{...c.s,user:{id:'u2',name:'另一人',role:'pm'}}});
 assert.equal(document.querySelector('.unified-home').dataset.homeView,'mine','every role lands on personal work');

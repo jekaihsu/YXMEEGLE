@@ -29,7 +29,7 @@ try{
  assert.equal(read.data.as_of,'2026-10-27','transient failure retains snapshot');
  assert.equal(read.error,'公司資料讀取失敗，請重新讀取。');
  await act(async()=>read.retry());assert.equal(requests.length,3);
- assert.deepEqual(requests.map(item=>item.url),Array(3).fill('/api/company-dashboard?offset=0&limit=5'),'company retry never rereads session or workspace');
+ assert.deepEqual(requests.map(item=>item.url),Array(3).fill('/api/company-dashboard?limit=5&offset=0'),'company retry never rereads session or workspace');
  await reply(2,{as_of:'2026-10-28'});
  await act(async()=>root.render(null));await render({...c,reloadVersion:2});
  assert.equal(document.querySelector('p').textContent,'2026-10-28|stale|','revisit immediately renders the scoped snapshot');

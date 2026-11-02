@@ -1,6 +1,7 @@
-import {useEffect, useState} from 'react';
-import {ApiError, getSessionEpoch, getPendingMutations} from './api';
-import {readPanel} from './companyDashboardCache';
+import {createContext,createElement,useContext,useEffect,useRef,useState,useCallback,useSyncExternalStore,type ReactNode} from 'react';
+import {api,ApiError,getSessionEpoch} from './api';
+import {createPageData,type PageData,type PageValue,type PageResource,type FetchIntent} from './pageData';
+import {useDebounce} from './reports/useReport';
 import type {Ctx} from './appCommon';
 
 export const HOME_PANELS = ['assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local'] as const;
@@ -27,15 +28,6 @@ export type HomeResponse = {
 };
 export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null;retry?:()=>void};
 export type HomeQuery = {panel:HomePanel; scope?:'mine'|'team'; deadline?:string; q?:string; cursor?:string; kinds?:string; limit?:number};
-const snapshots = new Map<string,{body:HomeResponse;storedAt:number}>();
-function cachedSnapshot(key:string):HomeResponse|null {
- const saved=snapshots.get(key);
- if(!saved)return null;
- const sourceTime=saved.body.as_of ? Date.parse(saved.body.as_of) : saved.storedAt;
- if(Date.now()-Math.min(sourceTime,saved.storedAt)>900000){snapshots.delete(key);return null}
- return saved.body;
-}
-let cacheEpoch = -1;
 const object = (v:unknown):v is Record<string,unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nullableText = (v:unknown):v is string|null => v === null || typeof v === 'string';
 const count = (v:unknown):v is number|null => v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 0);
@@ -76,7 +68,7 @@ export function parseHomeResponse(v:unknown):HomeResponse {
  }
  return {...v, panel, scope:v.scope, readState:v.readState, snapshot_version:v.snapshot_version, as_of:v.as_of,
   freshness:{status:v.freshness.status,last_success_at:v.freshness.last_success_at,refreshing:v.freshness.refreshing},
-  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,sop_tasks:v.counts.sop_tasks===undefined?0:v.counts.sop_tasks,complete:v.counts.complete},
+  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,sop_tasks:v.counts.sop_tasks??null,complete:v.counts.complete},
   items:v.items,next_cursor:v.next_cursor,has_more:v.has_more,complete:v.complete,total_count:v.total_count,manager_view_available:v.manager_view_available};
 }
 export function homePanelUrl(query:HomeQuery, full=false) {
@@ -85,56 +77,66 @@ export function homePanelUrl(query:HomeQuery, full=false) {
  if (full && query.panel==='assigned') params.set('kinds',query.kinds ?? 'node_assignment,task,sop_task');
  return `${full ? '/api/my-work' : '/api/home-panels'}?${params}`;
 }
-export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):PanelRead {
- const [retryTick,setRetryTick]=useState(0);
- const retry=()=>setRetryTick(value=>value+1);
- const epoch = getSessionEpoch();
- if (cacheEpoch !== epoch) {snapshots.clear();cacheEpoch=epoch}
- const [search,setSearch]=useState(query.q);
- useEffect(()=>{const timer=window.setTimeout(()=>setSearch(query.q),250);return()=>window.clearTimeout(timer)},[query.q]);
- const url = homePanelUrl({...query,q:search,limit:query.limit ?? (full ? 50 : 25)},full || c.s.access_mode==='tenant-read');
- const scope=JSON.stringify([epoch,c.s.workspace_id,c.s.user,c.s.features,query.panel,query.scope,full]);
- const key = JSON.stringify([scope,url]);
- const [state,setState] = useState<{key:string;scope:string;read:PanelRead}>(() => ({key,scope,read:{body:cachedSnapshot(key),pending:true,error:null}}));
- useEffect(() => {
-  if (!enabled) return;
-  let disposed = false;
-  let controller:AbortController|undefined;
-  const load = () => {
-   if (document.visibilityState === 'hidden' || getPendingMutations() > 0) return;
-   controller?.abort();controller=new AbortController();
-   const signal=controller.signal;
-   setState(previous=>({key,scope,read:{body:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:true,error:null}}));
-   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:[c.reloadVersion??c.w.version,retryTick]}).then(parseHomeResponse).then(body => {
-    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
-    if (body.complete || body.items.length) {snapshots.set(key,{body,storedAt:Date.now()});if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
-    setState({key,scope,read:{body,pending:false,error:null}});
-   }).catch(error => {
-    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
-    const denied=error instanceof ApiError && (error.status===401 || error.status===403);
-    if (denied) snapshots.delete(key);
-    setState(previous=>({key,scope,read:{body:denied?null:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:false,error:error instanceof ApiError&&error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}}));
-   });
-  };
-  load();
-  let lastActivity=Date.now();
-  const active=()=>{const idle=Date.now()-lastActivity>=180000;lastActivity=Date.now();if(idle)load()};
-  let timer:number;
-  const schedule=()=>{timer=window.setTimeout(()=>{
-   if(Date.now()-lastActivity<180000)load();
-   if(!disposed)schedule();
-  },270000+Math.random()*60000)};
-  schedule();
-  const visible=()=>{if(document.visibilityState==='visible'){lastActivity=Date.now();load()}};
-  document.addEventListener('visibilitychange',visible);
-  for(const event of ['pointerdown','keydown','wheel'])window.addEventListener(event,active,{passive:true});
-  return ()=>{
-   disposed=true;controller?.abort();window.clearTimeout(timer);
-   document.removeEventListener('visibilitychange',visible);
-   for(const event of ['pointerdown','keydown','wheel'])window.removeEventListener(event,active);
-  };
- }, [key,url,scope,enabled,c.reloadVersion??c.w.version,retryTick]);
- if(!enabled)return {body:null,pending:false,error:null};
- const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
- return {...read,pending:query.q!==search||read.pending,retry};
+// One owner spans lazy Home views and Work queries for the lifetime of the page.
+const snapshots=new Map<string,unknown>();
+const initialRevisions=new WeakMap<PageData,unknown>();
+const HomeDataContext=createContext<PageData|null>(null);
+function useHomeOwner(c:Ctx){
+ const shared=useContext(HomeDataContext);
+ const identity=JSON.stringify([getSessionEpoch(),c.s.workspace_id,c.w?.workspace_id,c.s.mode,c.s.access_mode,c.s.user,c.s.features]);
+ // Temporary K adapter: swap this helper to K2 usePageOwner when integrated.
+ const slot=useRef<{identity:string;shared:PageData|null;owner:PageData}>();
+ if(!slot.current||slot.current.identity!==identity||slot.current.shared!==shared){
+  slot.current={identity,shared,owner:shared??createPageData({workspace:c.s.workspace_id||c.w?.workspace_id||'',identityFingerprint:identity,openId:crypto.randomUUID()})};
+ }
+ const owner=slot.current.owner;
+ const lifetime=useRef(0);
+ useEffect(()=>{const generation=++lifetime.current;return()=>{queueMicrotask(()=>{if(!shared&&(generation===lifetime.current||owner!==latest.current))owner.close()})}},[owner,shared]);
+ const latest=useRef(owner);latest.current=owner;
+ return owner;
+}
+export function HomeDataProvider({c,children}:{c:Ctx;children:ReactNode}){
+ const owner=useHomeOwner(c);
+ return createElement(HomeDataContext.Provider,{value:owner},children);
+}
+export function homeValue<T>(data:T,complete=true,asOf:string|null=null):PageValue<T>{
+ return {data,snapshotId:null,fetchedAt:asOf,verifiedAt:asOf,changedAt:null,completeness:complete?'complete':'partial',localRevision:null,empty:false,stale:false};
+}
+export function useHomeResource<T>(c:Ctx,resource:PageResource,decode:(raw:unknown)=>PageValue<T>,enabled=true,retainSnapshot=true){
+ const owner=useHomeOwner(c),[retryTick,setRetryTick]=useState(0);
+ const savedKey=JSON.stringify([getSessionEpoch(),owner.scope.workspace,owner.scope.identityFingerprint,resource]);
+ const revision=c.reloadVersion??c.w?.version??0;
+ if(!initialRevisions.has(owner))initialRevisions.set(owner,revision);
+ const initial=initialRevisions.get(owner);
+ const firstResource=useRef(owner.key(resource));
+ const intent:FetchIntent=retryTick?{reason:'explicit_refresh',id:`retry:${owner.key(resource)}:${revision}:${retryTick}`}:
+  revision===initial?{reason:firstResource.current===owner.key(resource)?'initial_open':'user_query_change'}:{reason:'explicit_refresh',id:`workspace:${revision}`};
+ const selected=enabled?resource:{endpoint:'home:disabled'};
+ const key=owner.key(selected),intentKey=JSON.stringify(intent);
+ const subscribe=useCallback((notify:()=>void)=>owner.subscribe(selected,notify),[owner,key]);
+ const snapshot=useCallback(()=>owner.state<T>(selected),[owner,key]);
+ const state=useSyncExternalStore(subscribe,snapshot,snapshot);
+ useEffect(()=>{void owner.read(selected,intent,async(signal,current,activeIntent)=>{
+  if(!enabled)return homeValue(undefined as T);
+  const params=new URLSearchParams();
+  for(const [name,value] of Object.entries(resource.query??{}).sort(([a],[b])=>a.localeCompare(b)))if(value!==null)params.set(name,String(value));
+  const raw=await api<unknown>(resource.endpoint+(params.size?'?'+params:''),{signal,timeoutMs:35000,cache:'reload',cacheScope:owner.key(resource),headers:{'Cache-Control':'no-cache','X-YX-Fetch-Intent':activeIntent.reason,'X-YX-Fetch-Generation':'id' in activeIntent?activeIntent.id:owner.scope.openId}},current);
+  const value=decode(raw);
+  if(current()&&retainSnapshot){snapshots.set(savedKey,value.data);if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
+  return value;
+ }).catch(()=>{})},[owner,key,intentKey]);
+ const last=useRef<{key:string;data:T}>();
+ const resourceKey=owner.key(resource);
+ if(enabled&&'value' in state)last.current={key:resourceKey,data:state.value.data};
+ if(state.kind==='Denied'){last.current=undefined;snapshots.delete(savedKey)}
+ const data=enabled&&'value' in state?state.value.data:last.current?.key===resourceKey?last.current.data:(retainSnapshot?snapshots.get(savedKey):undefined) as T|undefined;
+ return {data,loading:enabled&&state.kind==='Loading',error:enabled&&'error' in state?state.error:null,retry:()=>setRetryTick(value=>value+1),owner};
+}
+export function useHomePanels(c:Ctx,query:HomeQuery,enabled=true,full=false):PanelRead{
+ const search=useDebounce(query.q??'');
+ const url=new URL(homePanelUrl({...query,q:search},full||c.s.access_mode==='tenant-read'),'http://home');
+ const resource={endpoint:url.pathname,query:Object.fromEntries(url.searchParams)};
+ const read=useHomeResource(c,resource,raw=>{const body=parseHomeResponse(raw);return homeValue(body,body.complete,body.as_of)},enabled);
+ const denied=read.error instanceof ApiError&&(read.error.status===401||read.error.status===403);
+ return {body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':'更新失敗':null,retry:read.retry};
 }
