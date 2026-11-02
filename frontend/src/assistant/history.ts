@@ -13,7 +13,7 @@ export function denyAssistantScope(projectId?:string){
  for(const listener of scopeListeners)listener();
 }
 const stale=()=>new DOMException('Assistant scope changed','AbortError');
-async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal):Promise<T>{
+async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal,denyScope=true):Promise<T>{
  const version=assistantScopeVersion(projectId);
  try{
   const result=await api<T>(url,{signal,cache:'no-store'});
@@ -21,12 +21,12 @@ async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal):P
   return result;
  }catch(error){
   if(version!==assistantScopeVersion(projectId)||signal?.aborted)throw stale();
-  if(error instanceof ApiError&&error.status===403)denyAssistantScope(projectId);
+  if(denyScope&&error instanceof ApiError&&error.status===403)denyAssistantScope(projectId);
   throw error;
  }
 }
 export type HistoryScope={scope:'global';project_id?:never}|{scope:'project';project_id:string};
-export type ConversationSummary={id:string;title:string;scope:'global'|'project';project_id:string|null;updated_at:string;turns:number};
+export type ConversationSummary={id:string;title:string;scope:'global'|'project';project_id:string|null;updated_at:string;turns:number;authorization_basis?:'recorded'|'legacy_workspace'};
 export type ConversationDetail=Omit<ConversationSummary,'updated_at'|'turns'>&{messages:{role:'user'|'assistant';content:string;at:string;usage_id:string|null}[]};
 export type HistoryPage={history_available:boolean;items:ConversationSummary[];next_cursor:string|null};
 export function listConversations(scope:HistoryScope,before?:string,signal?:AbortSignal){
@@ -36,7 +36,7 @@ export function listConversations(scope:HistoryScope,before?:string,signal?:Abor
   return page;
  });
 }
-export function openConversation(id:string,signal?:AbortSignal,projectId?:string){return scopedRead<ConversationDetail>(`/api/ai/conversations/${encodeURIComponent(id)}`,projectId,signal)}
+export function openConversation(id:string,signal?:AbortSignal,projectId?:string){return scopedRead<ConversationDetail>(`/api/ai/conversations/${encodeURIComponent(id)}`,projectId,signal,false)}
 export async function deleteConversation(id:string,signal?:AbortSignal,projectId?:string){
  const epoch=getSessionEpoch(),version=assistantScopeVersion(projectId);
  const response=await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`,{method:'DELETE',credentials:'same-origin',signal});

@@ -7,7 +7,7 @@ import {ConversationHistory} from './ConversationHistory';
 import {historyMessages,assistantScopeVersion,subscribeAssistantScope,denyAssistantScope,type ConversationDetail} from './history';
 import {assistantRemarkPlugins} from './markdown';
 import {Button} from '../design';
-import {api,ApiError} from '../api';
+import {api,ApiError,getSessionEpoch} from '../api';
 import {createChatAdapter,errorText} from './runtime';
 import {ModelSelector,type ModelCatalog} from './ModelSelector';
 import {createFeedbackController,FeedbackActions,FeedbackContext} from './feedback';
@@ -84,13 +84,13 @@ function MessageLog({children}:{children:ReactNode}){
  </>;
 }
 
-function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete,cancelResponse}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void;cancelResponse:MutableRefObject<()=>Promise<void>>}){
+function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete,cancelResponse,onDeniedConversation}:AssistantChatProps&{catalog:ModelCatalog;onDeniedConversation:()=>void;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void;cancelResponse:MutableRefObject<()=>Promise<void>>}){
  const modalityRoot=useInputModality();
  const [forbidden,setForbidden]=useState(false);
  const conversation=useRef(selected.id);
  const settled=useRef<Promise<void>>(Promise.resolve());
  const adapter=useMemo(()=>{
-  const base=createChatAdapter(()=>conversation.current,()=>setForbidden(true),projectId,onComplete);
+  const base=createChatAdapter(()=>conversation.current,(conversationOnly)=>{if(conversationOnly)onDeniedConversation();else setForbidden(true)},projectId,onComplete);
   return {async *run(...args:Parameters<typeof base.run>){
    let finish!:()=>void;
    settled.current=new Promise<void>(resolve=>{finish=resolve});
@@ -113,6 +113,7 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact,se
   <div ref={modalityRoot} className={`assistant-chat${compact?' assistant-chat-compact':''}`}>
    <ThreadPrimitive.Root data-slot="aui_thread-root" className="assistant-thread">
     <Button variant="plain" className="assistant-new" onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button>
+    {selected.detail?.authorization_basis==='legacy_workspace'&&<p role="note">舊對話：依工作區權限保存，未記錄案件來源。</p>}
     <MessageLog>
      <ThreadPrimitive.Empty>
       <div data-slot="empty-state" className="assistant-empty">
@@ -141,13 +142,15 @@ export function AssistantChat(props:AssistantChatProps){
 }
 function AuthorizedWorkspace(props:AssistantChatProps){
  const version=useSyncExternalStore(subscribeAssistantScope,()=>assistantScopeVersion(props.projectId));
- const [openedVersion]=useState(version);
- if(version!==openedVersion)return <div className="assistant-chat"><p role="alert">{errorText('ai_forbidden')}</p></div>;
+ const [opened,setOpened]=useState(()=>({version,epoch:getSessionEpoch()}));
+ if(version!==opened.version&&getSessionEpoch()!==opened.epoch)return <div className="assistant-chat"><p role="status">對話已重設。</p><Button onClick={()=>setOpened({version,epoch:getSessionEpoch()})}>重新開啟助理</Button></div>;
+ if(version!==opened.version)return <div className="assistant-chat"><p role="alert">{errorText('ai_forbidden')}</p></div>;
  return <AssistantChatWorkspace {...props}/>;
 }
 function AssistantChatWorkspace(props:AssistantChatProps){
  const [selected,setSelected]=useState<{id:string;detail?:ConversationDetail}>(()=>({id:crypto.randomUUID()}));
  const cancelResponse=useRef<()=>Promise<void>>(async()=>{});
+ const [deniedConversation,setDeniedConversation]=useState(false);
  const [revision,setRevision]=useState(0),[generation,setGeneration]=useState(0);
  const completed=useCallback(()=>setRevision(n=>n+1),[]);
  const [catalog,setCatalog]=useState<ModelCatalog|undefined>(props.catalog);
@@ -165,8 +168,8 @@ function AssistantChatWorkspace(props:AssistantChatProps){
   ?error==='forbidden'?<p role="alert">{errorText('ai_forbidden')}</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>setAttempt(n=>n+1)}>重試</Button></p>
   :<p role="status">正在載入 AI 助理…</p>}
  </div>;
- const fresh=()=>{setGeneration(n=>n+1);setSelected({id:crypto.randomUUID()})};
- return <ConversationHistory projectId={props.projectId} compact={props.compact} revision={revision} activeId={selected.id} beforeDelete={()=>cancelResponse.current()} onNew={fresh} onOpen={detail=>{setGeneration(n=>n+1);setSelected({id:detail.id,detail})}}>
-  <Conversation key={`${selected.id}:${generation}`} {...props} catalog={catalog} cancelResponse={cancelResponse} selected={selected} onComplete={completed} newConversation={fresh}/>
- </ConversationHistory>;
+ const fresh=()=>{setDeniedConversation(false);setGeneration(n=>n+1);setSelected({id:crypto.randomUUID()})};
+ return <>{deniedConversation&&<p role="alert">你已沒有權限開啟這段對話。</p>}<ConversationHistory projectId={props.projectId} compact={props.compact} revision={revision} activeId={selected.id} beforeDelete={()=>cancelResponse.current()} onNew={fresh} onDenied={id=>{if(id===selected.id)fresh()}} onOpen={detail=>{setDeniedConversation(false);setGeneration(n=>n+1);setSelected({id:detail.id,detail})}}>
+  <Conversation key={`${selected.id}:${generation}`} {...props} catalog={catalog} onDeniedConversation={()=>{fresh();setDeniedConversation(true)}} cancelResponse={cancelResponse} selected={selected} onComplete={completed} newConversation={fresh}/>
+ </ConversationHistory></>;
 }
