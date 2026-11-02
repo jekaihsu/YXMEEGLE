@@ -137,7 +137,7 @@ export function CaseDetail({
   currentSort,
 }: CaseDetailProps) {
   const instanceId = useId();
-  const sectionId = (key: string) => `${instanceId}-section-${key}`;
+  const sectionId = (key: string) => `confirmation-section-${key}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const prevDrawerKeyRef = useRef<string | null>(view.drawer?.row.key ?? null);
@@ -360,6 +360,7 @@ export function CaseDetail({
       <section
         key={section.key}
         id={sectionId(section.key)}
+        tabIndex={-1}
         className="p2-card p2-section-card"
         aria-label={section.title}
       >
@@ -683,13 +684,23 @@ export function CaseDetail({
         <ul className="p2-inpage-nav-list">
           {view.sections.map(section => (
             <li key={`nav-${section.key}`} className="p2-inpage-nav-item">
-              <a
-                href={`#${sectionId(section.key)}`}
+              <button
+                type="button"
+                onClick={() => {
+                  const target = rootRef.current?.querySelector<HTMLElement>(`#${sectionId(section.key)}`);
+                  let disclosure = target?.parentElement?.closest('details');
+                  while (disclosure) {
+                    disclosure.open = true;
+                    disclosure = disclosure.parentElement?.closest('details') ?? null;
+                  }
+                  target?.scrollIntoView({block: 'start'});
+                  target?.focus({preventScroll: true});
+                }}
                 className="p2-inpage-nav-link"
                 aria-label={`前往 ${section.title} 章節`}
               >
                 {section.title}
-              </a>
+              </button>
             </li>
           ))}
         </ul>
