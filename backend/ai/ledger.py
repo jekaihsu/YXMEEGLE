@@ -443,7 +443,7 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
     # Rank only retained, authorized exchanges so a deleted/expired first turn
     # cannot supply a title. One statement also keeps titles and counts consistent.
     ranked = stmt.with_only_columns(
-        u.conversation_id.label('id'), u.scope, u.project_id, e.question,
+        u.conversation_id.label('id'), u.scope, u.project_id, u.id.label('usage_id'),
         func.max(u.created_at).over(partition_by=u.conversation_id).label('updated_at'),
         func.count().over(partition_by=u.conversation_id).label('turns'),
         func.row_number().over(partition_by=u.conversation_id,
@@ -453,8 +453,12 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
     if cursor:
         page = page.where(or_(ranked.c.updated_at < cursor[0], and_(
             ranked.c.updated_at == cursor[0], ranked.c.id < cursor[1])))
+    bounded = page.limit(limit + 1).subquery()
+    statement = select(bounded, e.question).join(e, and_(
+        e.usage_id == bounded.c.usage_id, e.workspace_id == workspace_id, e.actor_id == actor_id)
+    ).order_by(bounded.c.updated_at.desc(), bounded.c.id.desc())
     with sessions() as db:
-        rows = db.execute(page.limit(limit + 1)).mappings().all()
+        rows = db.execute(statement).mappings().all()
         for row in rows[:limit]:
             result['items'].append(dict(id=row['id'], title=conversation_title(row['question']), scope=row['scope'],
                 project_id=row['project_id'], updated_at=iso(row['updated_at']), turns=row['turns']))
