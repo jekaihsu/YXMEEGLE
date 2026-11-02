@@ -1,3 +1,4 @@
+import {ChevronRight} from 'lucide-react';
 import {Select as FormSelect} from './design/Select';
 import {Skeleton} from './design';
 import {buildFlowModel,type FlowNode} from './flowModel';
@@ -36,7 +37,7 @@ export function ProjectPeople({c,p,assignments,selectedKey,onParticipants}:Props
   <div className="section-heading"><div><h3>案件參與人員</h3><p>各節點負責人作為子任務預設指派；個別改派保留。</p></div><Primary disabled={!lead} disabledReason="需由本案專案經理或主管調整" onClick={onParticipants}>統一設定人員</Primary></div>
   {state.kind==='error'&&<p role="alert">{state.message}</p>}{state.kind==='loading'&&<Skeleton lines={4}/>}
   <div className="table-scroll"><table className="data-table people-table"><thead><tr><th>節點</th><th>負責人</th><th>協作與任務人員</th><th>節點期限</th><th>來源</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td data-label="節點">{r.node}</td><td data-label="負責人">{r.owners.length?r.owners.map(o=><span className="person-cell" key={o.id}><Avatar small user={o.user as never}/>{o.name}</span>):'尚未指派'}</td><td data-label="協作與任務人員">{r.others||<span className="muted">尚未設定</span>}</td><td data-label="節點期限">{r.deadline}</td><td data-label="來源">{r.source}</td></tr>)}</tbody></table></div>
-  {(local||(canWriteDispatch(c.s)&&!!productionKey(node.key)))&&<details className="people-manage"><summary>調整節點排班與人員</summary>
+  {(local||(canWriteDispatch(c.s)&&!!productionKey(node.key)))&&<details className="people-manage"><summary><ChevronRight size={16} aria-hidden="true"/>調整節點排班與人員</summary>
    <label>節點<FormSelect value={node.key} onChange={e=>c.go({view:'project',project:p.id,tab:'people',node:e.target.value})}>{model.nodes.map(n=><option key={n.key} value={n.key}>{n.label}</option>)}</FormSelect></label>
    <FlowSchedule key={node.key} project={p} node={node} session={c.s} onPublished={()=>void assignments.reload()}/>{local&&<ProjectRoleAssignment c={c} p={p} n={local} flat/>}</details>}</section>;
 }

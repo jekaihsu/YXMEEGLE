@@ -223,23 +223,34 @@ const SCHEDULE_ACTIVATION='已依排程啟用';
 export function progressWorkItems(progress?:Pick<ProjectProgress,'production'>|null):{id:string;title:string}[]{
  return (['field','control','mapping','report'] as const).flatMap(key=>progress?.production?.[key]?.items||[]).flatMap(item=>{const title=item.name||item.code;return item.item_id&&title?[{id:item.item_id,title}]:[]});
 }
-/** 工項 fact for the sheet. Titles resolve against whichever loaded list holds the id (never guessed). An id that cannot be resolved shows 「來源工項待核對」 only while the task is still open, so finished sheets carry no noise; empty when truly unlinked. */
-export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown,progressItems:{id:string;title:string}[]=[],finished=false):string{
+/** Resolve loaded titles without guessing. Only wholly dangling contract-item links warrant a review fact. */
+export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown,progressItems:{id:string;title:string}[]=[]):string{
  const list=[...(Array.isArray(items)?items as {id?:string;title?:string}[]:[]),...progressItems];
  const ids=Array.isArray(t.contract_item_ids)?t.contract_item_ids.map(String):[];
- const titleOf=(id:string)=>list.find(item=>item.id===id)?.title;
+ const titleOf=(id:string)=>list.find(item=>item.id===id&&item.title)?.title;
  const titles=ids.map(titleOf).filter((title):title is string=>!!title);
- const unresolved=finished?[]:['來源工項待核對'];
- if(!titles.length&&t.work_item_id){const own=titleOf(t.work_item_id);if(own)return own}
- if(titles.length)return [...new Set(titles),...(titles.length<ids.length?unresolved:[])].join('、');
- return ids.length||t.work_item_id?unresolved.join('、'):'';
+ if(titles.length)return [...new Set(titles)].join('、');
+ const own=t.work_item_id&&titleOf(t.work_item_id);
+ return own|| (ids.length?'來源工項待核對':'');
+}
+
+/** Match the backend's positive evidence for a design-change pause; an unrelated approval never proves the cause. */
+export function taskPauseKind(p:Project,n:Node,t:Task,events:Workspace['events'],changes:Approval[]):'change'|'case'|'unknown'|undefined{
+ if(t.status==='paused'){
+  const event=events.some(e=>e.project_id===p.id&&e.node_id===n.id&&e.task_id===t.id&&e.action==='task_pause_for_change'&&e.message.trim());
+  const approval=changes.some(a=>(a as Approval&{frozen?:boolean}).frozen===true&&a.task_ids.includes(t.id)&&a.reason.trim());
+  if(event||approval)return 'change';
+ }
+ if(p.execution_status==='paused')return 'case';
+ return t.status==='paused'?'unknown':undefined;
 }
 export function TaskInspector({c,row,onClose,onExtension}:{c:Ctx;row:TaskRow;onClose:()=>void;onExtension:()=>void}){
  const{p,n,t}=row;const relatedChanges=c.w.approvals.filter(a=>a.project_id===p.id&&a.type==='change'&&((a as Approval&{affected_task_ids?:string[]}).affected_task_ids||a.task_ids).includes(t.id));const[output,setOutput]=useDraft(draftKey(c.s,c.w,`task:${p.id}:${t.id}:v${t.revision}`),t.output||'');const[reason,setReason]=useState('');const[returning,setReturning]=useState(false);const[editing,setEditing]=useState(false);const[tab,setTab]=useState(c.route.comment?'comments':'details');useEffect(()=>{if(c.route.comment)setTab('comments')},[c.route.comment]);const scope={project_id:p.id,node_id:n.id,task_id:t.id};const canAssign=executionAllowed(p,c.w)&&(c.s.user?.can_business_override===true||p.pm_id===c.s.user?.id||n.owner_id===c.s.user?.id);const canAct=isTaskActor(t,c);
  const fields=editorFields({title:canAssign,assignee:canAssign,due:canAssign&&!t.due_date,notes:canAssign,status:false},'無編輯權限');
  const save=async(draft:TaskDraft)=>{const payload:Record<string,unknown>={};if(draft.title!==t.title)payload.title=draft.title.trim();if(draft.assignee!==t.owner_id)payload.owner_id=draft.assignee;if(draft.notes!==t.description)payload.description=draft.notes;if(!t.due_date&&draft.due)payload.due_date=draft.due;if(draft.start_date!==(t.start_date?.slice(0,10)||'')&&draft.start_date!==undefined)payload.start_date=draft.start_date;if(draft.points!==undefined&&draft.points!==(t.points==null?'':String(t.points)))payload.points=draft.points===''?null:Number(draft.points);const ok=Boolean(await c.run('task_update',payload,scope));if(ok)setEditing(false);return ok};
  const editRef=useRestoreEditFocus(editing);const history=c.w.events.filter(e=>e.task_id===t.id);const unrecordedActivation=t.activation_source==='schedule'&&!!t.activated_at&&!history.some(e=>e.action==='task_activate');const finished=t.status==='completed'||t.status==='superseded';const canEdit=canAssign&&!finished;
- const works=taskWorkFact(t,c.w.contract_items,progressWorkItems(peekProjectProgress(p.id)),finished);
+ const works=taskWorkFact(t,c.w.contract_items,progressWorkItems(peekProjectProgress(p.id)));
+ const pause=taskPauseKind(p,n,t,c.w.events,relatedChanges);
  const schedule=t.start_date&&t.due_date?{label:'開始 → 期限',value:<>{date(t.start_date)}<ArrowRight size={13} aria-label="至"/>{date(t.due_date)}</>}:t.due_date?{label:'期限',value:date(t.due_date)}:t.start_date?{label:'開始',value:date(t.start_date)}:null;
  const facts=[{label:'負責人',value:<><Avatar small user={c.w.users.find(u=>u.id===t.owner_id)}/>{nameOf(c.w,t.owner_id)}</>},...(schedule?[schedule]:[]),...(works?[{label:'工項',value:works}]:[]),...(t.points==null?[]:[{label:'營業額點數',value:`${points(t.points)} 點`}])];
  const tabs=<div className="tabbar inspector-tabs" aria-label="任務內容"><button aria-pressed={tab==='details'} className={tab==='details'?'active':''} onClick={()=>setTab('details')}>任務詳情</button><button aria-pressed={tab==='comments'} className={tab==='comments'?'active':''} onClick={()=>setTab('comments')}>評論{(t.comments?.length||0)>0&&<span>{t.comments?.length}</span>}</button><button aria-pressed={tab==='history'} className={tab==='history'?'active':''} onClick={()=>setTab('history')}>歷程</button></div>;
@@ -253,7 +264,7 @@ export function TaskInspector({c,row,onClose,onExtension}:{c:Ctx;row:TaskRow;onC
  {tab==='details'&&<>{editing?<section className="task-drawer-section"><InlineTaskEditor hideLocked busy={c.busy} onCancel={()=>setEditing(false)} model={{draft:{title:t.title,assignee:t.owner_id,due:t.due_date?.slice(0,10)||'',notes:t.description,status:t.status,reason:'',start_date:t.start_date?.slice(0,10)||'',points:t.points==null?'':String(t.points)},legacy:{points:canAssign,start_date:canAssign&&!t.start_date},fields,people:c.w.users.filter(u=>u.active!==false),statuses:[{id:t.status,label:STATUS[t.status]||t.status}],maxTitle:500,maxNotes:20000,dueReason:false}} onSave={save}/></section>
  :<><section className="task-drawer-section"><div className="task-drawer-section-head"><h3>任務資訊</h3>{canEdit&&<button ref={editRef} type="button" className="text-button" onClick={()=>setEditing(true)}>編輯</button>}</div><DrawerFacts facts={facts}/></section>
  {t.description&&<section className="task-drawer-section"><h3>任務說明</h3><p className="task-drawer-text">{t.description}</p></section>}</>}
- {t.status==='paused'&&<section className="task-drawer-section info-callout amber"><Pause size={18}/><p>設計變更暫停中{relatedChanges.map(a=><button key={a.id} className="text-button" onClick={()=>c.go({view:'project',project:p.id,tab:'approvals',approval:a.id})}>查看「{a.title}」<ArrowUpRight size={14}/></button>)}{!relatedChanges.length&&<button className="text-button" onClick={()=>c.go({view:'project',project:p.id,tab:'approvals'})}>查看案件關聯審批<ArrowUpRight size={14}/></button>}</p></section>}
+ {pause&&<section className="task-drawer-section info-callout amber"><Pause size={18}/><p>{pause==='change'?'設計變更暫停中':pause==='case'?'案件暫停中，任務目前無法執行':'任務暫停中'}{relatedChanges.map(a=><button key={a.id} className="text-button" onClick={()=>c.go({view:'project',project:p.id,tab:'approvals',approval:a.id})}>查看「{a.title}」<ArrowUpRight size={14}/></button>)}{!relatedChanges.length&&<button className="text-button" onClick={()=>c.go({view:'project',project:p.id,tab:'approvals'})}>查看案件關聯審批<ArrowUpRight size={14}/></button>}</p></section>}
  {!editing&&<section className="task-drawer-section"><h3><Download size={14}/>作業資料</h3>{t.input&&<p className="task-drawer-text">{t.input}</p>}<button className="text-button" onClick={()=>c.go({...c.route,node:n.id,tab:'files',task:undefined,task_source:undefined,comment:undefined})}>查看節點檔案<ArrowUpRight size={14}/></button></section>}
  {!editing&&(completing?<section className="task-drawer-section"><h3><Upload size={14}/>成果與交接</h3><textarea aria-label="成果與交接說明" value={output} onChange={e=>setOutput(e.target.value)} rows={4} placeholder="成果、檔案位置、交接事項"/>{needsOutput&&<p id="task-output-hint" className="task-drawer-hint" role="status">完成任務前請先填寫成果。</p>}</section>:t.output?<section className="task-drawer-section"><h3><Upload size={14}/>成果與交接</h3><p className="task-drawer-text">{t.output}</p></section>:null)}
  {returning&&<section className="task-drawer-section return-form"><Field label="退回原因"><textarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder="需補充或修正的部分"/></Field><div className="inline-actions"><button className="button" onClick={()=>setReturning(false)}>取消</button><Primary busy={c.busy} disabled={!reason.trim()} onClick={()=>void c.run('task_return',{reason},scope).then(r=>{if(r)setReturning(false)})}>確認退回修正</Primary></div></section>}</>}

@@ -19,9 +19,9 @@ const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 const task=(id,patch={})=>({id,title:`任務 ${id}`,owner_id:'',status:'in_progress',required:true,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,points:null,work_item_id:'',description:'',input:'',output:'',comments:[],revision:1,can_execute:true,...patch});
-async function mount(id,patch,{actor,features={},items,events,progress}={}){
+async function mount(id,patch,{actor,features={},items,events,progress,project,approvals}={}){
  if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];if(progress)ui.seedProjectProgress('p1',progress);
- const base=projectFixture();
+ const base=projectFixture();Object.assign(base.project,project);if(approvals)base.workspace.approvals=approvals;
  const node=base.project.nodes.find(n=>n.key==='sales');node.tasks=[task(id,{owner_id:base.user.id,...patch})];
  if(items)base.workspace.contract_items=items;if(events)base.workspace.events=events;
  location.hash=`view=project&project=p1&tab=flow&node=${node.id}&task=${id}`;await tick();
@@ -120,17 +120,17 @@ await check('known facts only: schedule range, work item and points appear when 
  assert.deepEqual([...drawer().querySelectorAll('.task-drawer-facts dt')].map(d=>d.textContent),['負責人']);
 });
 const facts=()=>Object.fromEntries([...drawer().querySelectorAll('.task-drawer-facts > div')].map(d=>[d.querySelector('dt').textContent,d.querySelector('dd').textContent]));
-await check('工項 fact: resolved titles only, 「來源工項待核對」 for unresolved links, omitted when unlinked',async()=>{
+await check('工項 fact: known titles; review only for wholly dangling contract links',async()=>{
  await mount('t1',{work_item_id:'p1-survey'});
- assert.equal(facts()['工項'],'來源工項待核對','a work_item_id link that cannot be resolved still shows');
+ assert.equal(facts()['工項'],undefined,'an unresolved work_item_id alone is omitted');
  await mount('t1',{contract_item_ids:['ci-gone']});
  assert.equal(facts()['工項'],'來源工項待核對','an unresolved contract-item link still shows');
  await mount('t1',{contract_item_ids:['ci-1','ci-gone']},{items:[{id:'ci-1',title:'控制點測量'}]});
- assert.equal(facts()['工項'],'控制點測量、來源工項待核對','resolved titles are shown, the unresolved rest is flagged');
+ assert.equal(facts()['工項'],'控制點測量','a partly resolved contract link shows only the known title');
  await mount('t1',{work_item_id:'wi-9'},{items:[{id:'wi-9',title:'水準測量'}]});
  assert.equal(facts()['工項'],'水準測量','a work item that resolves shows its real title');
  await mount('t1',{work_item_id:'p1-survey'},{items:[{id:'other',title:'不相干工項'}]});
- assert.equal(facts()['工項'],'來源工項待核對','the title is never guessed from an unrelated item');
+ assert.equal(facts()['工項'],undefined,'the title is never guessed from an unrelated item');
  await mount('t1');
  assert.equal(facts()['工項'],undefined,'truly unlinked: omitted');
 });
@@ -145,9 +145,34 @@ await check('工項 fact resolves against the loaded progress work items and sta
  await mount('t1',{work_item_id:'p1-survey',status:'superseded'});
  assert.equal(facts()['工項'],undefined,'cancelled task: no 來源工項待核對 row');
  await mount('t1',{work_item_id:'p1-survey'});
- assert.equal(facts()['工項'],'來源工項待核對','an open task keeps the flag');
+ assert.equal(facts()['工項'],undefined,'an open work-item-only task also stays quiet');
  assert.deepEqual(ui.progressWorkItems({production:{field:{items:[{item_id:'a',name:null,code:'C1'},{item_id:'b',name:null,code:null}]}}}),[{id:'a',title:'C1'}]);
- assert.equal(ui.taskWorkFact({contract_item_ids:['x','y']},[{id:'x',title:'控制點'}],[],true),'控制點','finished: resolved titles only');
+ assert.equal(ui.taskWorkFact({contract_item_ids:['x','y']},[{id:'x',title:'控制點'}],[]),'控制點','partially resolved links show known titles only');
+});
+await check('contract links review regardless of task state, with resolution in either loaded list',async()=>{
+ for(const status of ['in_progress','completed','superseded']){
+  await mount('t1',{status,contract_item_ids:['missing']});
+  assert.equal(facts()['工項'],'來源工項待核對');
+ }
+ assert.equal(ui.taskWorkFact({contract_item_ids:['missing'],work_item_id:'known'},[],[{id:'known',title:'已載入工項'}]),'已載入工項');
+ assert.equal(ui.taskWorkFact({contract_item_ids:['known','known','missing']},[],[{id:'known',title:'已載入工項'}]),'已載入工項');
+ assert.equal(ui.taskWorkFact({contract_item_ids:[],work_item_id:'missing'},[]),'');
+});
+await check('pause wording follows loaded design-change evidence, case pause, then generic fallback',async()=>{
+ const callout=()=>drawer().querySelector('.info-callout')?.textContent;
+ const event={id:'pause',project_id:'p1',node_id:projectFixture().project.nodes.find(n=>n.key==='sales').id,task_id:'t1',actor_id:'system',action:'task_pause_for_change',message:'設計調整',created_at:'2026-10-01'};
+ await mount('t1',{status:'paused'},{events:[event]});assert.match(callout(),/^設計變更暫停中/);
+ const approval={id:'change',project_id:'p1',type:'change',task_ids:['t1'],reason:'設計調整',frozen:true,title:'變更審批'};
+ await mount('t1',{status:'paused'},{approvals:[approval],events:[]});assert.match(callout(),/^設計變更暫停中/);
+ assert.ok(button('查看「變更審批」'),'the related approval remains reachable');
+ await mount('t1',{status:'paused'},{events:[],approvals:[{...approval,frozen:false}]});assert.match(callout(),/^任務暫停中/);assert.doesNotMatch(callout(),/設計變更暫停中/);
+ await mount('t1',{status:'paused'},{events:[],approvals:[],project:{execution_status:'paused'}});assert.match(callout(),/^案件暫停中，任務目前無法執行/);
+ await mount('t1',{status:'in_progress'},{events:[],approvals:[approval],project:{execution_status:'paused'}});assert.match(callout(),/^案件暫停中/,'a related approval alone does not make an active task change-paused');
+ await mount('t1',{status:'paused'},{events:[event],project:{execution_status:'paused'}});assert.match(callout(),/^設計變更暫停中/,'positive task evidence takes priority');
+ for(const wrong of [{node_id:'other'},{project_id:'other'},{task_id:'other'},{message:''},{action:'task_start'}]){
+  await mount('t1',{status:'paused'},{events:[{...event,...wrong}],approvals:[]});assert.match(callout(),/^任務暫停中/,'foreign or empty evidence must not invent a cause');
+ }
+ await mount('t1',{status:'in_progress'},{events:[event],approvals:[approval]});assert.equal(callout(),undefined);
 });
 await check('keyboard: 編輯 moves focus to the first field; cancel and save return it to 編輯',async()=>{
  await mount('t1',{description:'依確認單施作'});
