@@ -1961,6 +1961,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.get('/api/projects/{project_id}/first-screen')
     def project_first_screen(request:Request, project_id:str):
         from .read_snapshots import capture
+        from .snapshot_contract import attach_first_screen, explicit_refresh
         require(shell_enabled, '尚未啟用單一案件讀取', 404)
         data, user = identity(request)
         require(len(project_id) <= 200 and not request.query_params, '查詢參數錯誤', 422)
@@ -1973,6 +1974,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
             policy_revision = policy.revision if policy else None
             visibility_revision = snapshot_visibility(db, db.get(WorkspaceRow, data['wid']), project_id)
         key = ('case', data['wid'], signature, policy_revision, visibility_revision, project_id, json.dumps(data, sort_keys=True), snapshot_viewer(user))
+        expected_generation = (version, signature, policy_revision, visibility_revision)
+        def verify_generation():
+            with sessions() as db:
+                root = db.get(WorkspaceRow, data['wid'])
+                current = db.get(CaseState, (data['wid'], project_id))
+                policy = db.get(CasePolicy, (data['wid'], project_id))
+                actual = (root.version, (current.checklist_revision, current.identity_revision) if current else None,
+                          policy.revision if policy else None, snapshot_visibility(db, root, project_id))
+                require(actual == expected_generation, '資料已更新，請重新讀取', 409)
         readers = {r.path: r.endpoint for r in app.routes if 'GET' in (getattr(r, 'methods', None) or ())}
         def build():
             child = Request(dict(request.scope, state={}, phases={}, query_string=b''))
@@ -1981,11 +1991,13 @@ def create_app(overrides=None,*,dispatch_transport=None):
             fresh_data, fresh_user = fresh_identity
             require(fresh_data == data and snapshot_viewer(fresh_user) == snapshot_viewer(user),
                 '登入身分已變更，請重新整理後再操作', 409)
+            verify_generation()
             shared = dict(wid=data['wid'], project_id=project_id, identity=fresh_identity)
             token = capture.set(shared)
             try:
                 with sessions() as db:
                     shared['state'] = load(db, db.get(WorkspaceRow, data['wid']), project_ids=[project_id], case_sources='sop')
+                require(shared['state']['version'] == version, '資料已更新，請重新讀取', 409)
                 result = {'project': json.loads(project_detail(child, project_id, overview=True).body)}
                 for name, path in (
                     ('assignments', '/api/projects/{project_id}/node-assignments'),
@@ -2004,13 +2016,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     result['project'].pop(field, None)
                 # Older open tabs can also fall through to the deferred reader.
                 result['progress'] = {'status': 202, 'body': None}
+                attach_first_screen(result, shared['state'], expected_generation, app.state.live_read.status(data['wid']))
+                verify_generation()
                 from .request_timing import measure
                 with measure('snapshotencode'):
-                    return EncodedSnapshot.encode(JSONResponse(result).body)
+                    return EncodedSnapshot.encode(JSONResponse(result).body, as_of=result['snapshot']['as_of'])
             finally:
                 capture.reset(token)
         with phase(request, 'snapshot'):
-            body, status = read_snapshots.get(key, build, revision=version)
+            body, status = read_snapshots.get(key, build, revision=version, force=explicit_refresh(request))
+        verify_generation()
         return body.response(request, status)
 
     from .runtime_health import register as register_runtime_health
