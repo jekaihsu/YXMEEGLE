@@ -1,6 +1,7 @@
-import {useEffect, useState} from 'react';
-import {ApiError, getSessionEpoch, getPendingMutations} from './api';
-import {readPanel} from './companyDashboardCache';
+import {createContext,createElement,useContext,useEffect,useState,useCallback,useSyncExternalStore,type ReactNode} from 'react';
+import {ApiError} from './api';
+import {usePageOwner,requestPageData,type PageData,type PageValue,type PageResource,type FetchIntent} from './pageData';
+import {useDebounce} from './reports/useReport';
 import type {Ctx} from './appCommon';
 
 export const HOME_PANELS = ['assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local'] as const;
@@ -27,15 +28,6 @@ export type HomeResponse = {
 };
 export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null;retry?:()=>void};
 export type HomeQuery = {panel:HomePanel; scope?:'mine'|'team'; deadline?:string; q?:string; cursor?:string; kinds?:string; limit?:number};
-const snapshots = new Map<string,{body:HomeResponse;storedAt:number}>();
-function cachedSnapshot(key:string):HomeResponse|null {
- const saved=snapshots.get(key);
- if(!saved)return null;
- const sourceTime=saved.body.as_of ? Date.parse(saved.body.as_of) : saved.storedAt;
- if(Date.now()-Math.min(sourceTime,saved.storedAt)>900000){snapshots.delete(key);return null}
- return saved.body;
-}
-let cacheEpoch = -1;
 const object = (v:unknown):v is Record<string,unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nullableText = (v:unknown):v is string|null => v === null || typeof v === 'string';
 const count = (v:unknown):v is number|null => v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 0);
@@ -76,7 +68,7 @@ export function parseHomeResponse(v:unknown):HomeResponse {
  }
  return {...v, panel, scope:v.scope, readState:v.readState, snapshot_version:v.snapshot_version, as_of:v.as_of,
   freshness:{status:v.freshness.status,last_success_at:v.freshness.last_success_at,refreshing:v.freshness.refreshing},
-  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,sop_tasks:v.counts.sop_tasks===undefined?0:v.counts.sop_tasks,complete:v.counts.complete},
+  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,sop_tasks:v.counts.sop_tasks??null,complete:v.counts.complete},
   items:v.items,next_cursor:v.next_cursor,has_more:v.has_more,complete:v.complete,total_count:v.total_count,manager_view_available:v.manager_view_available};
 }
 export function homePanelUrl(query:HomeQuery, full=false) {
@@ -85,56 +77,50 @@ export function homePanelUrl(query:HomeQuery, full=false) {
  if (full && query.panel==='assigned') params.set('kinds',query.kinds ?? 'node_assignment,task,sop_task');
  return `${full ? '/api/my-work' : '/api/home-panels'}?${params}`;
 }
-export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):PanelRead {
- const [retryTick,setRetryTick]=useState(0);
- const retry=()=>setRetryTick(value=>value+1);
- const epoch = getSessionEpoch();
- if (cacheEpoch !== epoch) {snapshots.clear();cacheEpoch=epoch}
- const [search,setSearch]=useState(query.q);
- useEffect(()=>{const timer=window.setTimeout(()=>setSearch(query.q),250);return()=>window.clearTimeout(timer)},[query.q]);
- const url = homePanelUrl({...query,q:search,limit:query.limit ?? (full ? 50 : 25)},full || c.s.access_mode==='tenant-read');
- const scope=JSON.stringify([epoch,c.s.workspace_id,c.s.user,c.s.features,query.panel,query.scope,full]);
- const key = JSON.stringify([scope,url]);
- const [state,setState] = useState<{key:string;scope:string;read:PanelRead}>(() => ({key,scope,read:{body:cachedSnapshot(key),pending:true,error:null}}));
- useEffect(() => {
-  if (!enabled) return;
-  let disposed = false;
-  let controller:AbortController|undefined;
-  const load = () => {
-   if (document.visibilityState === 'hidden' || getPendingMutations() > 0) return;
-   controller?.abort();controller=new AbortController();
-   const signal=controller.signal;
-   setState(previous=>({key,scope,read:{body:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:true,error:null}}));
-   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:[c.reloadVersion??c.w.version,retryTick]}).then(parseHomeResponse).then(body => {
-    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
-    if (body.complete || body.items.length) {snapshots.set(key,{body,storedAt:Date.now()});if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
-    setState({key,scope,read:{body,pending:false,error:null}});
-   }).catch(error => {
-    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
-    const denied=error instanceof ApiError && (error.status===401 || error.status===403);
-    if (denied) snapshots.delete(key);
-    setState(previous=>({key,scope,read:{body:denied?null:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:false,error:error instanceof ApiError&&error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}}));
-   });
-  };
-  load();
-  let lastActivity=Date.now();
-  const active=()=>{const idle=Date.now()-lastActivity>=180000;lastActivity=Date.now();if(idle)load()};
-  let timer:number;
-  const schedule=()=>{timer=window.setTimeout(()=>{
-   if(Date.now()-lastActivity<180000)load();
-   if(!disposed)schedule();
-  },270000+Math.random()*60000)};
-  schedule();
-  const visible=()=>{if(document.visibilityState==='visible'){lastActivity=Date.now();load()}};
-  document.addEventListener('visibilitychange',visible);
-  for(const event of ['pointerdown','keydown','wheel'])window.addEventListener(event,active,{passive:true});
-  return ()=>{
-   disposed=true;controller?.abort();window.clearTimeout(timer);
-   document.removeEventListener('visibilitychange',visible);
-   for(const event of ['pointerdown','keydown','wheel'])window.removeEventListener(event,active);
-  };
- }, [key,url,scope,enabled,c.reloadVersion??c.w.version,retryTick]);
- if(!enabled)return {body:null,pending:false,error:null};
- const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
- return {...read,pending:query.q!==search||read.pending,retry};
+// Lazy Home views and normalized Work queries share the mounted page owner.
+const generations=new WeakMap<PageData,Map<string,{revision:number;retries:Set<string>}>>();
+const HomeDataContext=createContext<PageData|null>(null);
+function useHomeOwner(c:Ctx){
+ const shared=useContext(HomeDataContext);
+ const [openId]=useState(()=>crypto.randomUUID());
+ const user=c.s.user;
+ const identityFingerprint=JSON.stringify([c.s.mode,c.s.environment,c.s.access_mode,user?.id,user?.name,user?.role,user?.department,user?.default_workspace,user?.active,user?.authz_version,user?.can_business_override,user?.can_mention,[...(user?.capabilities??[])].sort(),Object.entries(c.s.features??{}).sort(([a],[b])=>a.localeCompare(b))]);
+ const owner=usePageOwner({workspace:c.s.workspace_id||c.w?.workspace_id||'',identityFingerprint,openId});
+ return shared??owner;
+}
+export function HomeDataProvider({c,children}:{c:Ctx;children:ReactNode}){
+ const owner=useHomeOwner(c);
+ return createElement(HomeDataContext.Provider,{value:owner},children);
+}
+export function homeValue<T>(data:T,complete=true,asOf:string|null=null):PageValue<T>{
+ return {data,snapshotId:null,fetchedAt:asOf,verifiedAt:asOf,changedAt:null,completeness:complete?'complete':'partial',localRevision:null,empty:false,stale:false};
+}
+export function useHomeResource<T>(c:Ctx,resource:PageResource,decode:(raw:unknown)=>PageValue<T>,enabled=true){
+ const owner=useHomeOwner(c),[retryId,setRetryId]=useState('');
+ const revision=c.reloadVersion??c.w?.version??0;
+ const key=owner.key(resource),generation=JSON.stringify([revision,retryId]);
+ const subscribe=useCallback((notify:()=>void)=>owner.subscribe(resource,notify),[owner,key]);
+ const snapshot=useCallback(()=>owner.state<T>(resource),[owner,key]);
+ const state=useSyncExternalStore(subscribe,snapshot,snapshot);
+ useEffect(()=>{
+  if(!enabled)return;
+  let seen=generations.get(owner);if(!seen){seen=new Map();generations.set(owner,seen)}
+  const previous=seen.get(key);
+  const retry=!!retryId&&!previous?.retries.has(retryId);
+  const intent:FetchIntent=previous===undefined?{reason:'initial_open'}:previous.revision===revision&&!retry?{reason:'user_query_change'}:{reason:'explicit_refresh',id:retry?retryId:`workspace:${revision}`};
+  const retries=previous?.retries??new Set<string>();if(retryId)retries.add(retryId);
+  seen.set(key,{revision,retries});
+  void requestPageData(owner,resource,intent,decode,{timeoutMs:35000}).catch(()=>{});
+ },[owner,key,generation,enabled]);
+ const value='value' in state?state.value:'previous' in state?state.previous:undefined;
+ const visible=enabled&&state.kind!=='Closed'&&state.kind!=='Denied';
+ return {data:visible?value?.data:undefined,dataTime:visible?value?.fetchedAt??null:null,loading:enabled&&(state.kind==='Loading'||state.kind==='Stale'),error:enabled&&'error' in state?state.error:null,retry:()=>setRetryId(crypto.randomUUID()),owner};
+}
+export function useHomePanels(c:Ctx,query:HomeQuery,enabled=true,full=false):PanelRead{
+ const search=useDebounce(query.q??'');
+ const url=new URL(homePanelUrl({...query,q:search},full||c.s.access_mode==='tenant-read'),'http://home');
+ const resource={endpoint:url.pathname,query:Object.fromEntries(url.searchParams)};
+ const read=useHomeResource(c,resource,raw=>{const body=parseHomeResponse(raw);return homeValue(body,body.complete,body.as_of)},enabled);
+ const denied=read.error instanceof ApiError&&(read.error.status===401||read.error.status===403);
+ return {body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':`更新失敗${read.data?`；保留上次資料。資料時間：${read.dataTime??'未提供'}`:''}`:null,retry:read.retry};
 }

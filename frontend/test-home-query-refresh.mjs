@@ -22,15 +22,16 @@ try{
  assert.equal(requests.length,1,'typing waits for the debounce');
  assert.equal(document.querySelector('p').textContent,'17','previous body stays visible');
  await act(async()=>clock.advance(1));assert.equal(requests.length,2);assert.match(requests[1].url,/q=ab/);assert.equal(read.pending,true);
- await render('abc');await act(async()=>clock.advance(250));assert.equal(requests[1].signal.aborted,true,'superseded request aborts');
+ await render('abc');await act(async()=>clock.advance(250));assert.equal(requests[1].signal.aborted,false,'page owner keeps each queried resource pinned for a return visit');
  await act(async()=>requests[2].resolve(reply(23)));assert.equal(document.querySelector('p').textContent,'23');
  await render('abc',2);assert.equal(document.querySelector('p').textContent,'23','workspace version never blanks the body');
+ await act(async()=>requests[1].resolve(reply(29)));
  const beforeIdle=requests.length;
  await act(async()=>clock.advance(600000));
  assert.equal(requests.length,beforeIdle,'an unattended visible home page does not keep reading');
  await act(async()=>window.dispatchEvent(new Event('pointerdown')));
- assert.equal(requests.length,beforeIdle+1,'resuming interaction refreshes immediately');
- await act(async()=>requests.at(-1).resolve(reply(29)));
+ assert.equal(requests.length,beforeIdle,'resuming interaction never refreshes');
+ await render('ab');await act(async()=>clock.advance(250));assert.equal(requests.length,3,'return to an in-flight query joins its original request');
  assert.equal(document.querySelector('p').textContent,'29');
  console.log('PASS home query debounce, cancellation, retained body and workspace version');
 }finally{await act(async()=>root.unmount());clock.restore()}

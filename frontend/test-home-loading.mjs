@@ -29,10 +29,10 @@ try{
  assert.equal(read.data.as_of,'2026-10-27','transient failure retains snapshot');
  assert.equal(read.error,'公司資料讀取失敗，請重新讀取。');
  await act(async()=>read.retry());assert.equal(requests.length,3);
- assert.deepEqual(requests.map(item=>item.url),Array(3).fill('/api/company-dashboard?offset=0&limit=5'),'company retry never rereads session or workspace');
+ assert.deepEqual(requests.map(item=>item.url),Array(3).fill('/api/company-dashboard?limit=5&offset=0'),'company retry never rereads session or workspace');
  await reply(2,{as_of:'2026-10-28'});
  await act(async()=>root.render(null));await render({...c,reloadVersion:2});
- assert.equal(document.querySelector('p').textContent,'2026-10-28|stale|','revisit immediately renders the scoped snapshot');
+ assert.equal(document.querySelector('p').textContent,'skeleton|stale|','a new page open reads its own data without a competing snapshot cache');
  await reply(3,{},403);assert.equal(read.data,undefined,'authorization loss clears displayed snapshot');
  await act(async()=>root.render(null));await render({...c,reloadVersion:2});
  assert.equal(document.querySelector('p').textContent,'skeleton|stale|','authorization loss evicts revisit snapshot');
@@ -58,13 +58,18 @@ try{
  const cardIds=()=>[...document.querySelectorAll('[data-home-card]')].map(el=>el.dataset.homeCard);
  assert.deepEqual(cardIds(),['cases','groups','statuses'],'company skeleton reserves the final sections and card order');
  assert.equal(document.querySelectorAll('[aria-label="公司資料讀取中"]').length,3);
- await reply(9,{as_of:'2026-10-28',source:{status:'ready'},totals:{execution_status_counts:{in_progress:3}},groups:[],cases:[],complete:true});
+ await reply(9,{as_of:'2026-10-28',source:{status:'ready',last_success_at:'2026-10-28T02:42:00Z'},totals:{execution_status_counts:{in_progress:3}},groups:[],cases:[],complete:true});
  assert.deepEqual(cardIds(),['cases','groups','statuses']);
  await act(async()=>root.render(React.createElement(m.CompanyView,{...props,c:{...c,reloadVersion:2}})));
  assert.match(document.body.textContent,/舊快照 · 公司資料更新中/);
  assert.match(document.body.textContent,/授權公司快照 · 2026-10-28/);
- await reply(10,{},403);
+ await reply(10,{},500);
+ assert.match(document.body.textContent,/更新失敗，保留上次公司快照。資料時間：2026-10-28T02:42:00Z/);
+ assert.match(document.body.textContent,/授權公司快照 · 2026-10-28/,'failed refresh renders K2 retained data');
+ await act(async()=>[...document.querySelectorAll('button')].find(button=>button.textContent==='重試公司資料').click());
+ assert.equal(requests.length,12,'retry is one company read');
+ await reply(11,{},403);
  assert.deepEqual(cardIds(),['cases','groups','statuses'],'unavailable company cards retain their positions');
  assert.doesNotMatch(document.body.textContent,/授權公司快照 · 2026-10-28/,'denied snapshot disappears');
- console.log('PASS home company refresh/revisit snapshots, scoped isolation, authorization/session clearing, local retries, loading announcements and stable company card order (11 requests)');
+ console.log('PASS home company refresh/revisit snapshots, scoped isolation, authorization/session clearing, local retries, loading announcements and stable company card order (12 requests)');
 }finally{await act(async()=>root.unmount());dom.window.close()}

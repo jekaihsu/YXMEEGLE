@@ -12,7 +12,7 @@ import {buildMyWorkView} from './myWorkView.ts';
 import {buildSourceHealthView} from './sourceHealthView.ts';
 import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInput, withFilters} from './integrationRoutes.ts';
 import {Segmented} from './design';
-import {HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
+import {HomeDataProvider,HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
 import {Button} from './design';
 import './ProjectCalm.css';
 import type {Ctx} from './appCommon';
@@ -99,7 +99,7 @@ export function SourceHealthPage({c}: {c: Ctx}) {
 }
 
 
-export function WorkPage({c}:{c:Ctx}) {return c.s?.features && ('change_extension' in c.s.features || 'node_assignment' in c.s.features) ? <AssignmentWorkPage c={c}/> : <LegacyWorkPage c={c}/>}
+export function WorkPage({c}:{c:Ctx}) {return c.s?.features && ('change_extension' in c.s.features || 'node_assignment' in c.s.features) ? <HomeDataProvider c={c}><AssignmentWorkPage c={c}/></HomeDataProvider> : <LegacyWorkPage c={c}/>}
 function AssignmentWorkPage({c}:{c:Ctx}) {
  const panel=HOME_PANELS.find(p=>p===c.route.tab) ?? 'assigned';
  const params=new URLSearchParams(c.route.ctx);
