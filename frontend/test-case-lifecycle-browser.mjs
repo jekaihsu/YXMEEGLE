@@ -38,14 +38,16 @@ try{
  await page.goto('http://localhost:5192/unit-case-fixture');await page.locator('.cs-summary').waitFor();await page.waitForFunction(()=>!document.body.textContent.includes('正在更新案件資料'));
  assert.equal(reads.length,3,'first-screen plus assignees and progress, once each under StrictMode');
  await page.getByRole('button',{name:'流程與任務',exact:true}).click();await page.getByRole('button',{name:'更新節點與任務',exact:true}).waitFor({timeout:3000}).catch(async e=>{console.log({errors,reads,text:await page.locator('body').innerText()});throw e});
- const initial=reads.length;assert.equal(initial,3);
+ await page.getByRole('button',{name:'文件與交付',exact:true}).click();await page.getByRole('button',{name:'流程與任務',exact:true}).click();await page.waitForFunction(()=>!document.body.textContent.includes('正在載入案件詳細內容'));
+ const initial=reads.length;assert.equal(initial,4,'full project is lazily loaded once and shares the case owner');
  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('blur'))});
  await page.clock.fastForward(600000);
  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});for(const event of ['visibilitychange','focus','online']){window.dispatchEvent(new Event(event));document.dispatchEvent(new Event(event))}});
  await page.getByRole('button',{name:'總覽',exact:true}).click();await page.getByRole('button',{name:'流程與任務',exact:true}).click();
  assert.equal(reads.length,initial,'ten minute away/tab round-trip makes zero duplicate reads');
  await page.getByRole('button',{name:'更新節點與任務',exact:true}).click();await page.waitForFunction(()=>!document.body.textContent.includes('正在更新案件資料'));
- const refresh=reads.slice(initial);assert.equal(refresh.length,6,'one batch refreshes each loaded resource once');assert.equal(new Set(refresh).size,6,'no duplicate resource in refresh batch');
+ const refresh=reads.slice(initial);assert.equal(refresh.length,4,'one aggregate, full project, assignees and progress refreshes each loaded resource once');assert.equal(new Set(refresh).size,4,'no duplicate resource in refresh batch');
+ const refreshed=reads.length;await page.getByRole('button',{name:'文件與交付',exact:true}).click();await page.getByRole('button',{name:'流程與任務',exact:true}).click();assert.equal(reads.length,refreshed,'inactive full-project resource was refreshed in the same batch');
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({status:'passed',initialReads:initial,afterTenMinutes:initial,idleReads:0,explicitRefreshBatches:1,refreshReads:refresh}));
 }finally{await browser.close()}

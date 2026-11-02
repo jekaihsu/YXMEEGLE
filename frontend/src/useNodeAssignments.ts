@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import type {PageData} from './pageData';
-import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetchNodeAssignmentDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
 
 const lists = new Map<string, NodeAssignmentList>();
@@ -10,13 +10,13 @@ export function prefetchNodeAssignmentDetail(projectId:string,nodeKey:string,exp
  const key=caseKey(owner,`${projectId}/${nodeKey}`);
  const stored=details.get(key);
  const changed=!!stored&&expectedRevision!==undefined&&stored.data.node.revision!==expectedRevision;
- return readCase(owner,`${projectId}/${nodeKey}`,force||changed,current=>fetchNodeAssignmentDetail(projectId,nodeKey,new AbortController().signal,current)).then(data=>{details.set(key,{data,readAt:Date.now()});return data}).catch(error=>{if(error instanceof NodeAssignmentError&&[401,403,404].includes(error.status))details.delete(key);throw error});
+ return readCase(owner,`${projectId}/${nodeKey}`,force||changed,(current,_intent,signal)=>fetchNodeAssignmentDetail(projectId,nodeKey,signal,current)).then(data=>{details.set(key,{data,readAt:Date.now()});return data}).catch(error=>{if(error instanceof NodeAssignmentError&&[401,403,404].includes(error.status))details.delete(key);throw error});
 }
 function cached(projectId:string,owner?:PageData){return lists.get(caseKey(owner,projectId))}
 export function prefetchNodeAssignments(projectId:string,force:boolean|symbol=false,owner?:PageData):Promise<NodeAssignmentList> {
- return readCase(owner,projectId,force,current=>fetchNodeAssignments(projectId,new AbortController().signal,current)).then(data=>{lists.set(caseKey(owner,projectId),data);return data});
+ return readCase(owner,projectId,force,(current,_intent,signal)=>fetchNodeAssignments(projectId,signal,current)).then(data=>{lists.set(caseKey(owner,projectId),data);return data});
 }
-export function seedNodeAssignments(id:string,data:NodeAssignmentList,owner?:PageData){lists.set(caseKey(owner,id),data);seedCase(owner,id,data,current=>fetchNodeAssignments(id,new AbortController().signal,current))}
+export function seedNodeAssignments(id:string,data:NodeAssignmentList,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){lists.set(caseKey(owner,id),data);seedCase(owner,id,data,(current,_intent,signal)=>fetchNodeAssignments(id,signal,current),true,meta,batch)}
 export type AssignmentListState = {kind: 'loading'} | {kind: 'disabled'} | {kind: 'ready'; data: NodeAssignmentList} | {kind: 'error'; message: string; data?: NodeAssignmentList};
 export function useNodeAssignments(projectId: string, enabled: boolean) {
   const owner=useCaseData(), key=caseKey(owner,projectId);
@@ -78,7 +78,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       listRequest.current++;
       const detailKey = caseKey(owner,`${projectId}/${mutation.nodeKey}`);
       details.set(detailKey, {data: detail, readAt: Date.now()});
-      seedCase(owner,`${projectId}/${mutation.nodeKey}`,detail,current=>fetchNodeAssignmentDetail(projectId,mutation.nodeKey,new AbortController().signal,current),false);
+      seedCase(owner,`${projectId}/${mutation.nodeKey}`,detail,(current,_intent,signal)=>fetchNodeAssignmentDetail(projectId,mutation.nodeKey,signal,current),false);
       const prior=lists.get(key);
       if(prior){
         const data={...prior,writes_enabled:detail.writes_enabled,writes_disabled_reason:detail.writes_disabled_reason,roster:detail.roster,warnings:detail.warnings,summary:detail.summary,can:{...prior.can,[mutation.nodeKey]:detail.can},nodes:prior.nodes.map(n=>n.key===mutation.nodeKey?detail.node:n),node_details:{...prior.node_details,[mutation.nodeKey]:{tasks:detail.tasks,assignable_people:detail.assignable_people}}};

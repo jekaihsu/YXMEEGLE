@@ -69,12 +69,13 @@ try{
  assert.equal(assignment.notice,'已儲存變更。');
  overview=structuredClone(initial);overview.tasks[0].lark_sync={state:'已同步',record_id:'recDone',base_id:'base',table_id:'table'};
  await flush(()=>{void sop.reload()});assert.equal(reads.length,29);assert.equal(sop.state.data.tasks[0].larkSync.state,'已同步');
- // A write/reload during an older refresh must queue a fresh read, rather than join it.
- hold=new Promise(resolve=>release=resolve);await flush(()=>{void refresh()});assert.equal(reads.length,34);
- await flush(()=>{void sop.reload()});
+ // A committed write supersedes a blocked pre-write batch; both completions await the successor.
+ let olderDone=false,newerDone=false;
+ hold=new Promise(resolve=>release=resolve);await flush(()=>{void refresh().then(()=>{olderDone=true})});assert.equal(reads.length,34);
  overview=structuredClone(overview);overview.tasks[0].title='寫入後任務';
+ await flush(()=>{void sop.reload().then(()=>{newerDone=true})});assert.equal(reads.length,39,'post-write reads start before blocked pre-write transport finishes');assert.equal(olderDone,false);assert.equal(newerDone,false);
  hold=null;await flush(()=>release());await flush();
- assert.equal(reads.length,39);assert.equal(sop.state.data.tasks[0].title,'寫入後任務');
+ assert.equal(reads.length,39);assert.equal(sop.state.data.tasks[0].title,'寫入後任務');assert.equal(olderDone,true);assert.equal(newerDone,true);
  const beforeMutation=reads.length;
  let releaseMutation;mutationHold=new Promise(resolve=>releaseMutation=resolve);
  let writing;await flush(()=>{writing=ui.api('/api/projects/p1/test-write',{method:'POST'})});
@@ -84,5 +85,5 @@ try{
  fail=true;await flush(()=>{void refresh()});await flush();
  assert.equal(assignment.state.kind,'error');assert.equal(sop.state.kind,'error');assert.equal(evidence.state.kind,'ready');
  assert.equal(document.body.textContent.includes('工程進度更新失敗，顯示上次資料'),true);
- console.log('PASS detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 0 fetches; own writes/manual revision refresh all; drafts defer; loading retains data; failures label retained progress; post-write refresh queues behind older reads.');
+ console.log('PASS detail refresh: 10 idle minutes = 0 extra fetches; <60s away = 0; >=60s + visibility/focus = 0 fetches; own writes/manual revision refresh all; drafts defer; loading retains data; failures label retained progress; post-write refresh supersedes older reads and awaits the successor.');
 }finally{await act(async()=>root.unmount());Date.now=originalNow;globalThis.setInterval=originalInterval;window.setInterval=originalWindowInterval;dom.window.close()}

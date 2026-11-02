@@ -8,10 +8,10 @@ const fresh=(data:ProjectProgress)=>['ready','fresh','partial'].includes(data.so
 type State = {kind:'loading'}|{kind:'ready';data:ProjectProgress}|{kind:'error';message:string;status?:number;lastGoodAt?:string|null};
 const cache=new Map<string,ProjectProgress>();
 export function prefetchProjectProgress(id:string,force=false,signal?:AbortSignal,batch?:symbol,owner?:PageData){
- return readCase(owner,`progress:${id}`,batch||force,current=>fetchProjectProgress(id,current,signal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
+ return readCase(owner,`progress:${id}`,batch||force,(current,_intent,ownedSignal)=>fetchProjectProgress(id,current,signal?AbortSignal.any([signal,ownedSignal]):ownedSignal)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
 export function peekProjectProgress(id:string,owner?:PageData){return cache.get(caseKey(owner,id))}
-export function seedProjectProgress(id:string,data:ProjectProgress,owner?:PageData){cache.set(caseKey(owner,id),data);seedCase(owner,`progress:${id}`,data,current=>fetchProjectProgress(id,current))}
+export function seedProjectProgress(id:string,data:ProjectProgress,owner?:PageData){cache.set(caseKey(owner,id),data);seedCase(owner,`progress:${id}`,data,(current,_intent,signal)=>fetchProjectProgress(id,current,signal))}
 export function useProjectProgress(id:string,enabled=true){
  const owner=useCaseData(),key=caseKey(owner,id);
  const [state,setState]=useState<State>({kind:'loading'});
@@ -27,7 +27,7 @@ export function useProjectProgress(id:string,enabled=true){
   setRefreshing(true);setRefreshError('');
   const unsubscribe=onSessionEpochChange(()=>scope.controller.abort());
   try{
-   if(sync)await refreshSources('sources',undefined,AbortSignal.any([scope.controller.signal,AbortSignal.timeout(90000)]));
+   if(sync)await refreshSources('sources',undefined,scope.controller.signal);
    if(!current())return;
    const data=await prefetchProjectProgress(id,force,undefined,batch,owner);
    if(!current())return;

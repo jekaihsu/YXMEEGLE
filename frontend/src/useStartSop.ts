@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {PageData} from './pageData';
-import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
 import {canConfirmSop, fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
@@ -9,7 +9,7 @@ const cache=new Map<string,SopPreview>();
 export function prefetchStartSop(id:string,force:boolean|symbol=false,owner?:PageData){
  return readCase(owner,`start:${id}`,force,current=>fetchSop(id,current)).then(data=>{cache.set(caseKey(owner,id),data);return data});
 }
-export function seedStartSop(id:string,data:SopPreview,owner?:PageData){cache.set(caseKey(owner,id),data);seedCase(owner,`start:${id}`,data,current=>fetchSop(id,current))}
+export function seedStartSop(id:string,data:SopPreview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol){cache.set(caseKey(owner,id),data);seedCase(owner,`start:${id}`,data,current=>fetchSop(id,current),true,meta,batch)}
 export function useStartSop(id: string, enabled: boolean, refreshOverview: () => Promise<void>) {
  const owner=useCaseData(),key=caseKey(owner,id);
  const [state, setState] = useState<State>({kind: 'hidden'});

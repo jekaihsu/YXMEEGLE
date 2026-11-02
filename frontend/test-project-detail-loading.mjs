@@ -74,7 +74,7 @@ try{
  assert.match(document.body.textContent,/THIRD_CASE_PRIVATE/);
  await act(async()=>requests[2].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,id:'p2',name:'OLD_CASE_PRIVATE'}}))));
  assert.doesNotMatch(document.body.textContent,/OLD_CASE_PRIVATE/,'late prior-case response cannot expose its rows');
- ui.invalidateSessionEpoch();await switchCase('p3');assert.equal(requests.length,5);
+ await act(async()=>ui.invalidateSessionEpoch());await switchCase('p3');assert.equal(requests.length,5);
  assert.doesNotMatch(document.body.textContent,/THIRD_CASE_PRIVATE/,'same-case session switch clears previous session rows');
  await act(async()=>requests[4].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,id:'p3',name:'NEW_SESSION_CASE'}}))));
  assert.match(document.body.textContent,/NEW_SESSION_CASE/);
@@ -97,5 +97,9 @@ try{
   await act(async()=>requests[1].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
   assert.match(document.body.textContent,/文件與交付/);
  } finally {globalThis.setTimeout=originalTimeout;globalThis.clearTimeout=originalClear}
+ await act(async()=>root.unmount());requests.length=0;root=createRoot(document.getElementById('root'));
+ const legacy=revision=>React.createElement(ui.ProjectDetailGate,{c:{...c,w:workspace,reloadVersion:revision,route:{...c.route,tab:'files'}}});
+ await act(async()=>root.render(legacy(0)));assert.equal(requests.length,0,'full-workspace file view does not start shell-only reads');
+ await act(async()=>root.render(legacy(1)));assert.equal(requests.length,0,'legacy refresh does not register unused shell endpoints');
  console.log('PASS project detail: aggregate status/tasks render together; seeded readers add no heavy requests; shared pending detail; document isolation');
 }finally{await act(async()=>{root.unmount();settle()});dom.window.close()}

@@ -1,16 +1,16 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import type {PageData} from './pageData';
-import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
+import {type CaseSnapshot, useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import {requestId} from './nodeAssignmentApi';
 import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview; retrying?: boolean} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
 const cache = new Map<string,SopOverview>();
-export function seedSopTasks(id:string,workspace:string,data:SopOverview,owner?:PageData) {
+export function seedSopTasks(id:string,workspace:string,data:SopOverview,owner?:PageData,meta?:CaseSnapshot,batch?:symbol) {
  const resource=`${workspace}:${id}:tasks`;cache.set(caseKey(owner,resource),data);
- seedCase(owner,resource,data,current=>sopApi.overview(id,current));
+ seedCase(owner,resource,data,current=>sopApi.overview(id,current),true,meta,batch);
 }
 export function canReadSop(user:{active?:boolean}|null|undefined){return !!user&&user.active!==false}
 export function prefetchSopTasks(projectId:string,workspace:string,force:boolean|symbol=false,_join=false,owner?:PageData){
