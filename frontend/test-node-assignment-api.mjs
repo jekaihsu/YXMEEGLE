@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {test} from 'node:test';
+import {test, mock} from 'node:test';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {assignmentFixture, documentedAssignmentFixture} from './fixtures/node-assignments.mjs';
@@ -137,4 +137,24 @@ test('auto_done is carried as rule and reason, null stays null and a malformed o
   assert.equal(parsed('field').auto_done, undefined);
   at('sales').auto_done = {rule: 1};
   await assert.rejects(api.fetchNodeAssignments('p1', signal, () => true));
+});
+
+test('a slow write is given time to answer and a stalled one is not reported as a read timeout', async () => {
+  const realFetch = globalThis.fetch;
+  const slow = ms => (url, init) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(new Response(JSON.stringify(response.body), {status: 200, headers: {'Content-Type': 'application/json'}})), ms);
+    init.signal?.addEventListener('abort', () => {clearTimeout(timer); reject(new DOMException('aborted', 'AbortError'))});
+  });
+  const write = () => api.mutateNodeAssignment('p1', {action: 'update_task', nodeKey: 'control', taskId: 'recTask1', expected_revision: '9b0c1d2e3f405162', patch: {status: '已完成'}}, signal, () => true);
+  mock.timers.enable({apis: ['setTimeout']});
+  try {
+    response = {status: 200, body: assignmentFixture().detail};
+    globalThis.fetch = slow(30000);
+    const ok = write(); mock.timers.tick(30000);
+    await assert.doesNotReject(ok);
+    globalThis.fetch = slow(10 * 60000);
+    const stalled = assert.rejects(write(), error => error.code === 'client_timeout' && !error.message.includes('讀取') && /儲存/.test(error.message));
+    mock.timers.tick(10 * 60000);
+    await stalled;
+  } finally {mock.timers.reset(); globalThis.fetch = realFetch}
 });

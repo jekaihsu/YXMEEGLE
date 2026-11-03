@@ -2,12 +2,12 @@ import {useId,useRef,useState} from 'react';
 import {Button} from './design';
 import {AssigneePicker} from './AssigneePicker';
 import {TaskDrawer,DrawerFacts} from './TaskDrawer';
-import {FIELD_LABELS,changedFields,classifyFailure,draftOf,fieldOutcomes,patchOf,validateDraft,verdict,type AssignDraft,type AssignField} from './assignDrawerModel';
+import {FIELD_LABELS,changedFields,classifyFailure,draftOf,failureCause,fieldOutcomes,patchOf,validateDraft,verdict,type AssignDraft,type AssignField} from './assignDrawerModel';
 import {taskStatusText} from './stageModel';
 import type {AssignablePerson,AssignmentMutation,AssignmentTask} from './nodeAssignmentApi';
 import './AssignDrawer.css';
 
-type Phase={k:'edit'}|{k:'discard'}|{k:'saving'}|{k:'conflict'}|{k:'unknown';verifying:boolean;note:string;canRetry:boolean}|{k:'revoked'}|{k:'partial';latest:AssignDraft};
+type Phase={k:'edit'}|{k:'discard'}|{k:'saving'}|{k:'conflict'}|{k:'unknown';verifying:boolean;note:string;cause?:string;canRetry:boolean}|{k:'revoked'}|{k:'partial';latest:AssignDraft};
 type Props={task:AssignmentTask|undefined;nodeKey:string;nodeLabel:string;caseLabel:string;people:AssignablePerson[];unavailableReason:string;mutate:(m:AssignmentMutation,onFailure?:(message:string,failure:unknown)=>void)=>Promise<boolean>;retry:()=>Promise<boolean>;verify:()=>Promise<AssignmentTask|undefined>;refresh:()=>void;onClose:(saved:boolean)=>void};
 const valueText=(draft:AssignDraft,field:AssignField,people:AssignablePerson[],task?:AssignmentTask)=>field==='due'?draft.due||'未排期限':draft.assignee?people.find(p=>p.open_id===draft.assignee)?.name||(task?.assignee?.open_id===draft.assignee?task.assignee.name:'')||'目前負責人':'尚未指派';
 
@@ -34,7 +34,7 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
   const result=classifyFailure(failure.current);
   if(result.kind==='conflict'){setPhase({k:'conflict'});void verify().then(setFetched).catch(()=>{})}
   else if(result.kind==='revoked'){refresh();setPhase({k:'revoked'})}
-  else if(result.kind==='unknown')setPhase({k:'unknown',verifying:false,note:'尚無法確認儲存結果。請先查詢最新結果，確認未套用後才能重試。',canRetry:false});
+  else if(result.kind==='unknown')setPhase({k:'unknown',verifying:false,note:'尚無法確認儲存結果。請先查詢最新結果，確認未套用後才能重試。',cause:failureCause(failure.current),canRetry:false});
   else{setErrors(result.fields);setPhase({k:'edit'})}
  };
  const check=async()=>{
@@ -48,12 +48,12 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
    if(result==='partial'){setPhase({k:'partial',latest:saved});return}
    if(result==='moved'){setPhase({k:'conflict'});return}
    setPhase({k:'unknown',verifying:false,note:'已確認此次變更尚未套用，可以重試同一操作。',canRetry:true});
-  }catch{setPhase({k:'unknown',verifying:false,note:'仍無法確認結果，請稍後再查詢。為避免重複送出，暫不允許重試。',canRetry:false})}
+  }catch(e){setPhase({k:'unknown',verifying:false,note:'仍無法確認結果，請稍後再查詢。為避免重複送出，暫不允許重試。',cause:failureCause(e),canRetry:false})}
  };
  const resend=async()=>{
   setPhase({k:'saving'});failure.current=null;
   if(await retry()){onClose(true);return}
-  setPhase({k:'unknown',verifying:false,note:'重試後仍無法確認結果，請再次查詢最新結果。',canRetry:false});
+  setPhase({k:'unknown',verifying:false,note:'重試後仍無法確認結果，請再次查詢最新結果。',cause:failureCause(failure.current),canRetry:false});
  };
  const rebase=()=>{if(live){setBase(live);setFetched(undefined);setErrors({});setPhase({k:'edit'})}};
  const messages=Object.entries(errors).filter(([,v])=>v) as [AssignField,string][];
@@ -66,7 +66,7 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
   <DrawerFacts facts={[{label:'案件',value:caseLabel},{label:'節點',value:nodeLabel},{label:'目前執行人',value:`${(fetched||base)?.assignee?.name||'尚未指派'}${unconfirmedMark}`},{label:'最新讀取版本',value:`${(fetched||base)?.revision.slice(0,12)||'—'}${unconfirmedMark}`}]}/>
   {phase.k==='discard'&&<div className="ad-panel" role="alertdialog" aria-labelledby={`${id}-discard`}><h3 id={`${id}-discard`}>放棄尚未儲存的變更？</h3><p>放棄後不會送出任何請求，重新開啟時會讀取最新資料。</p><div className="ad-actions"><Button onClick={()=>setPhase({k:'edit'})}>保留編輯</Button><Button variant="destructive" onClick={()=>onClose(false)}>放棄變更</Button></div></div>}
   {phase.k==='conflict'&&live&&<div className="ad-panel" role="alert"><h3>此任務已被他人修改</h3><p>你的草稿已保留，尚未送出。請確認最新值後明確再送出，系統不會覆蓋他人的變更。</p>{diff((Object.keys(FIELD_LABELS) as AssignField[]).map(k=>({label:FIELD_LABELS[k],mine:valueText(draft,k,people,live),theirs:valueText(latestDraft,k,people,live)})))}<small>最新讀取版本 {live.revision.slice(0,12)}</small></div>}
-  {phase.k==='unknown'&&<div className="ad-panel" role="alert"><h3>儲存結果不明</h3><p>{phase.note}</p></div>}
+  {phase.k==='unknown'&&<div className="ad-panel" role="alert"><h3>儲存結果不明</h3><p>{phase.note}</p>{phase.cause&&<p className="ad-cause">原因：{phase.cause}</p>}</div>}
   {phase.k==='partial'&&<div className="ad-panel" role="alert"><h3>只有部分欄位已儲存</h3><ul>{(Object.entries(fieldOutcomes(baseDraft,draft,phase.latest)) as [AssignField,string][]).filter(([,o])=>o!=='unchanged').map(([k,o])=><li key={k}>{FIELD_LABELS[k]}：{o==='saved'?'已儲存':'尚未儲存'}</li>)}</ul><p>此次不算完整成功，已重新讀取最新資料。</p></div>}
   {phase.k==='revoked'&&<div className="ad-panel" role="alert"><h3>權限已變更</h3><p>伺服器拒絕了這次變更，已停止送出並重新讀取你的權限。草稿未送出。</p></div>}
   {blockReason&&phase.k==='edit'&&<p className="ad-reason" role="status">{blockReason}</p>}

@@ -39,3 +39,11 @@ test('T13 a single-field change that landed counts as applied so it is not sent 
  const draft={assignee:'ou_b',due:base.due};
  assert.equal(m.verdict(base,draft,draft,'r1','r2'),'applied');
 });
+test('an uncertain failure names its cause instead of hiding it',()=>{
+ const E=(status,message,code)=>new m.NodeAssignmentError(status,message,code);
+ assert.match(m.failureCause(E(502,'Lark 寫入結果未知；請以同一 request_id 重送以核對結果','outcome_unknown')),/Lark 寫入結果未知/);
+ assert.match(m.failureCause(E(408,'等待伺服器回應逾時','client_timeout')),/等待伺服器回應逾時/);
+ assert.match(m.failureCause(E(409,'寫入後讀回內容不一致，可能有人同時修改；請重新整理核對','readback_mismatch')),/讀回內容不一致/);
+ assert.match(m.failureCause(new TypeError('Failed to fetch')),/無法連線/);
+ assert.equal(m.failureCause(null),'');
+});

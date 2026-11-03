@@ -28,6 +28,11 @@ export function classifyFailure(error:unknown):{kind:FailureKind;fields:Partial<
  if(error.status===408||error.status>=500||['client_timeout','outcome_unknown','readback_mismatch','busy'].includes(code))return {kind:'unknown',fields:{}};
  return {kind:'other',fields:{}};
 }
+export function failureCause(error:unknown):string {
+ if(error==null)return '';
+ if(error instanceof NodeAssignmentError)return error.message||(error.code?`錯誤代碼：${error.code}`:'');
+ return '無法連線到伺服器，請檢查網路後再查詢最新結果。';
+}
 export type FieldOutcome='saved'|'unsaved'|'unchanged';
 export function fieldOutcomes(base:AssignDraft,draft:AssignDraft,latest:AssignDraft):Record<AssignField,FieldOutcome> {
  const one=(k:AssignField):FieldOutcome=>base[k]===draft[k]?'unchanged':latest[k]===draft[k]?'saved':'unsaved';

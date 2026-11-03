@@ -178,10 +178,14 @@ export function overviewDetail(list: NodeAssignmentList, n: AssignmentNode): Nod
   return {...list, ...payload, node: {...n, assigned_by: named(n.assigned_by), approver: named(n.approver)}, record_id: n.record_id, can: list.can[n.key] || {}, tasks: payload.tasks.map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)}))};
 }
 const basePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/node-assignments`;
+// Server write path: 10s lock wait + 25s Lark budget + 15s write call. Give up only after it must have answered.
+const WRITE_TIMEOUT_MS = 60000;
 export async function assignmentRequest(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
-  try {return await api<unknown>(url, {...init, timeoutMs: 20000}, isCurrent)}
+  const write = (init.method || 'GET').toUpperCase() !== 'GET';
+  try {return await api<unknown>(url, {...init, timeoutMs: write ? WRITE_TIMEOUT_MS : 20000}, isCurrent)}
   catch (error) {
     if (!(error instanceof ApiError)) throw error;
+    if (write && error.code === 'client_timeout') throw new NodeAssignmentError(408, '等待伺服器回應逾時，尚無法確認是否已儲存。', 'client_timeout');
     const fields: Record<string, string> = {};
     let message = error.message;
     if (error.status === 422) {
