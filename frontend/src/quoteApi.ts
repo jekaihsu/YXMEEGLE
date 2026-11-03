@@ -33,7 +33,7 @@ export function parseQuoteDraft(v:unknown):QuoteDraft {const d=record(v);return 
 export function parseQuoteReceipt(v:unknown):QuoteReceipt {const r=record(v);return {...parseCase(r),request_id:str(r.request_id),imported:r.import==null?null:parseReceipt(r.import)}}
 export async function quoteRequest(url:string, body?:unknown, current:()=>boolean=()=>true,signal?:AbortSignal):Promise<unknown> {
  try{return await api<unknown>(url,{cache:'no-store',timeoutMs:20000,signal,...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})},current)}
- catch(e){if(e instanceof ApiError) throw new SopError(e.status,e.code||'request_failed');if(e instanceof DOMException && e.name==='AbortError')throw e;throw new SopError(0,'network')}
+ catch(e){if(e instanceof ApiError) throw new SopError(e.status,e.code||'request_failed',undefined,e.requestSent);if(e instanceof DOMException && e.name==='AbortError')throw e;throw new SopError(0,'network')}
 }
 export const quoteKey = (q:Quote) => q.local_reference || q.quote_no;
 export const amountLabel = (q:Quote) => q.amount_restricted?'受限':q.contract_amount==null?'未設定':q.contract_amount.toLocaleString('zh-TW');
