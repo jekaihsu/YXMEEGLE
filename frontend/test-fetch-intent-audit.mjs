@@ -17,11 +17,12 @@ const legacy={
  // user history query changes (ProgressTab), and owner cleanup microtask.
  // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
  'AppShell.tsx': '8c1494ed7819f3c14f9e130dd1b79aeecc0e56f4a7caabb5c0d259d83ca35a4e',
- 'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
- 'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
+ // I3 round 1: explicit route-entry forms/focus only; existing rAF callbacks unchanged and no data read added.
+ 'FlowActions.tsx': '2d818daf7d733c63818d677ce8324829ea1d65d846599a2749cf2e1bb6e32fa1',
+ 'LocalNodeActions.tsx': '76b206ae2c41b4517b0b37b8688e20fd2809992e00d38d6fcd56024609f8fd02',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
  'ProjectFlow.tsx': '1558d1f95739dc2e8c944b253550bfb76f067ee9d051d4699b48dfa5dd8271c6',
- 'SopTasks.tsx': 'b94bd8c37440073d840f8e8a013d6a67c7e750da73b2cde3656d62959d42a712',
+ 'SopTasks.tsx': 'af500bcf4a7a87c91d89c13f628db7dcef76b2aa994181101369ab85aaaa3982',
  'assignRequests.ts': 'd75db3129c4e508d0cf9d68442372edbeec7d28a7611a1c8f7195f605dd148e6',
  'assistant/ModelSelector.tsx': 'b319065f8a628d109fa6b87f406f09ba3bc5e4fe393f4ab555b52be807c2ca09',
  'assistant/feedback.tsx': '4cd1a98c53d93890b93faf8cf5025bd9dadebd528908030a0f8cd43ff6ec5bbb',
