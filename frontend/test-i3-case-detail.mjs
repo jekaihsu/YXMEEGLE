@@ -108,7 +108,7 @@ for(const [requirements,evidence,expected] of [
  [[{key:'report',label:'完工報告'}],[{node_id:'node_control',key:'report',status:'returned'}],'0'],
  [undefined,[],'待確認'],
  [[{key:'report',label:'完工報告'}],undefined,'待確認']
-]){await mount({tab:'flow',configure(base){base.project.nodes.find(n=>n.key==='control').requirements=requirements;base.project.evidence=evidence}});await act(async()=>{await tick(80)});assert.equal(document.querySelector('.i3-stage-rows [data-section=review] small').textContent,'缺交付資料：'+expected)}
+]){await mount({tab:'flow',configure(base){base.project.nodes.find(n=>n.key==='control').requirements=requirements;base.project.evidence=evidence}});await act(async()=>{await tick(80)});assert.equal(document.querySelector('.i3-stage-rows [data-section=review] small').textContent,'缺交付資料：'+expected);if(requirements?.length&&evidence===undefined)assert.equal(document.querySelector('.delivery-checks .late-text').textContent,'待確認')}
 await mount({configure(base,f){f.list.nodes.find(n=>n.key==='control').owners=[];f.list.can.control.assign=false;f.list.can.control.claim=true}});
 assert.equal(document.querySelector('.po-next-action h3').textContent,'認領節點');await click(button('前往認領節點'));assert.equal(c.route.section,'node-claim');assert.equal(writes().length,0);assert.equal(document.activeElement.dataset.nodeAction,'claim');
 await mount({configure(base,f){f.list.nodes.find(n=>n.key==='control').owners=[]}});await click(button('前往指派負責人'));assert.ok(document.querySelector('.pf-node-actions form'));assert.equal(writes().length,0);
