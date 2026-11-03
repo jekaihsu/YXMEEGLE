@@ -486,3 +486,7 @@
 @media(min-width:768px){.pl-secondary-content{display:flex!important}.pl-header-secondary .pl-actions-trigger{display:none}.pl-secondary-content button{white-space:nowrap}}
 
 .pl-page .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.pl-inline-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px}.pl-inline-filters .pl-select{min-width:120px}.pl-inline-filters .ds-select>select{max-width:240px}.pl-group h2:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(min-width:768px){.pl-filter-trigger{display:none}}
+@media(max-width:767px){.pl-inline-filters{display:none}}

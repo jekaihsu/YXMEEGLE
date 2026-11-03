@@ -9,7 +9,7 @@ export type CaseState = '進行中'|'待審核'|'尚未開始'|'已完成'|'待�
 export type CaseRow = {project:PortfolioProject;nodes:FlowNode[];current:FlowNode|undefined;state:CaseState;mine:boolean;sop:boolean|null};
 export type GroupKey = 'sop'|'notStarted'|'done'|'other';
 export const GROUPS = [
- {key:'sop',label:'其他 SOP 納管案件'}, {key:'notStarted',label:'尚未開始'},
+ {key:'sop',label:'SOP 納管'}, {key:'notStarted',label:'尚未開始'},
  {key:'other',label:'其他案件'}, {key:'done',label:'已完成'},
 ] satisfies {key:GroupKey;label:string}[];
 export type CaseFilters = {q:string;client:string;owner:string;node:string;state:string;kind:string;attention:boolean;sort:string;direction:number};

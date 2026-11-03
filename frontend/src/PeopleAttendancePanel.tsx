@@ -2,7 +2,7 @@ import {createPortal} from 'react-dom';
 import {DataState,Sheet,Button} from './design';
 import {Select as FormSelect} from './design/Select';
 import {Avatar} from './Avatar';
-import {useState} from 'react';
+import {useLayoutEffect,useRef,useState} from 'react';
 import {Search,RefreshCw} from 'lucide-react';
 import {usePageOwner,usePageResource,ViewSkeleton} from './viewData';
 import {fetchPeopleAttendance,taipeiWeek,attendanceValue,attendanceStatusLabel,parsePeopleAttendance} from './peopleAttendance';
@@ -14,16 +14,19 @@ import './people-attendance.css';
 
 export function PeopleAttendancePanel({c}:{c:Context&{reloadVersion?:number}}){
  const [filterOpen,setFilterOpen]=useState(false),[weekly,setWeekly]=useState(false),[selectedDay,setSelectedDay]=useState(new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'})),[limits,setLimits]=useState<Record<string,number>>({});
- const [week,setWeek]=useState(taipeiWeek);
+ const [week,setWeek]=useState(taipeiWeek),[weekChanged,setWeekChanged]=useState(false);
+ const pendingReveal=useRef<HTMLElement|null>(null);
+ const [revealAnnouncement,setRevealAnnouncement]=useState({id:0,text:''});
+ useLayoutEffect(()=>{const section=pendingReveal.current;if(!section)return;pendingReveal.current=null;section.querySelector<HTMLElement>('h3')?.focus()},[limits]);
  const [query,setQuery]=useState('');
  const [group,setGroup]=useState('');
  const [employment,setEmployment]=useState('');
  const [tripKind,setTripKind]=useState('');
  const owner=usePageOwner({workspace:c.s.workspace_id||'',identityFingerprint:JSON.stringify([c.s.user?.id,c.s.user?.role,c.s.user?.authz_version,c.s.user?.capabilities]),openId:'people'});
- const [refreshId,setRefreshId]=useState(0);
- const result=usePageResource(owner,{endpoint:'/api/people/attendance',query:{week}},refreshId||c.reloadVersion?{reason:'explicit_refresh',id:`${c.reloadVersion??0}:${refreshId}`}:{reason:'user_query_change'},async(signal,current)=>{
+ const [refreshId,setRefreshId]=useState(0),[queryReloadVersion,setQueryReloadVersion]=useState(c.reloadVersion??0);
+ const result=usePageResource(owner,{endpoint:'/api/people/attendance',query:{week}},refreshId||(c.reloadVersion??0)!==queryReloadVersion?{reason:'explicit_refresh',id:`${c.reloadVersion??0}:${refreshId}`}:{reason:weekChanged?'user_query_change':'initial_open'},async(signal,current,intent)=>{
   let data;
-  try{data=await fetchPeopleAttendance({week,signal,current})}
+  try{data=await fetchPeopleAttendance({week,signal,current,intent})}
   catch(error){if(error instanceof ApiError&&error.status===403)data=parsePeopleAttendance({status:'needs-permission'});else throw error}
   return {data,snapshotId:null,fetchedAt:data.as_of,verifiedAt:null,changedAt:null,completeness:data.status==='loading'?'unknown':data.incomplete?'partial':'complete',localRevision:null,empty:data.people.length===0&&!data.incomplete&&data.status!=='loading',stale:data.status==='stale'};
  });
@@ -55,7 +58,7 @@ export function PeopleAttendancePanel({c}:{c:Context&{reloadVersion?:number}}){
   <section className="people-filterbar" aria-label="查找人員與週次">
    <div className="people-filters">
     <label className="people-search">搜尋人員或組別<div><Search size={17} aria-hidden="true"/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="輸入姓名或組別"/></div></label>
-    <label>週日期<input type="date" aria-label="出勤週日期" value={week} onChange={event=>{if(event.target.value){setWeek(taipeiWeek(event.target.value));setGroup('')}}}/></label>
+    <label>週日期<input type="date" aria-label="出勤週日期" value={week} onChange={event=>{if(event.target.value){const next=taipeiWeek(event.target.value);if(next!==week){setWeekChanged(true);setRefreshId(0);setQueryReloadVersion(c.reloadVersion??0)};setWeek(next);setGroup('')}}}/></label>
    </div>
    <Button onClick={e=>{e.currentTarget.focus();setFilterOpen(true)}}>更多篩選{group||employment?' · 已套用':''}</Button>{filterOpen&&createPortal(<Sheet title="人員篩選" onClose={()=>setFilterOpen(false)}><div className="people-filter-sheet">
     <div className="people-filters">
@@ -70,7 +73,8 @@ export function PeopleAttendancePanel({c}:{c:Context&{reloadVersion?:number}}){
    <div className="people-legend" aria-label="出勤狀態說明"><span className="attendance-status attendance-ok">到班／免打卡</span><span className="attendance-status attendance-away">請假／出差／外出</span><span className="attendance-status attendance-attention">遲到／早退／缺卡</span><span className="attendance-status attendance-unknown">— 待核對</span></div>
    <div className="people-day-controls"><label>出勤日期<FormSelect value={day} onChange={e=>setSelectedDay(e.target.value)}>{(view?.days??[week]).map(d=><option key={d}>{d}</option>)}</FormSelect></label><Button aria-pressed={weekly} onClick={()=>setWeekly(v=>!v)}>{weekly?'返回當日名單':'每週總覽'}</Button></div>
    {state.loading&&!view&&<ViewSkeleton/>}
-   {!unavailable&&visibleGroups.map(name=>{const members=people.filter(person=>person.group===name),key=name??'unknown',limit=limits[key]??25;return <div className="people-group" key={key}><h3>{name??'組別待核對'}<span>顯示 {Math.min(limit,members.length)} / {members.length} 筆</span></h3><div className={weekly?'people-week-view is-selected':'people-week-view'}><WeeklyAttendanceTable days={view?.days??[]} people={members.slice(0,limit)}/></div>{!weekly&&<ul className="people-day-list" aria-label={`${day} 出勤`}>{members.slice(0,limit).map(person=><li key={person.id}><div><strong>{person.name??'姓名待核對'}</strong><small>{person.in_service===null?'在職狀態待核對':person.in_service?'在職':'離職'}</small></div><span>{person.attendance[view?.days.indexOf(day)??0]??'待核對'}</span></li>)}</ul>}{limit<members.length&&<Button onClick={()=>setLimits(v=>({...v,[key]:limit+25}))}>顯示更多（再 25 筆）</Button>}</div>})}
+   {!unavailable&&visibleGroups.map(name=>{const members=people.filter(person=>person.group===name),key=name??'unknown',limit=limits[key]??25;return <div className="people-group" key={key}><h3 tabIndex={-1}>{name??'組別待核對'}<span>顯示 {Math.min(limit,members.length)} / {members.length} 筆</span></h3><div className={weekly?'people-week-view is-selected':'people-week-view'}><WeeklyAttendanceTable days={view?.days??[]} people={members.slice(0,limit)}/></div>{!weekly&&<ul className="people-day-list" aria-label={`${day} 出勤`}>{members.slice(0,limit).map(person=><li key={person.id}><div><strong>{person.name??'姓名待核對'}</strong><small>{person.in_service===null?'在職狀態待核對':person.in_service?'在職':'離職'}</small></div><span>{person.attendance[view?.days.indexOf(day)??0]??'待核對'}</span></li>)}</ul>}{limit<members.length&&<Button onClick={e=>{pendingReveal.current=limit+25>=members.length?e.currentTarget.closest('.people-group'):null;setLimits(v=>({...v,[key]:limit+25}));setRevealAnnouncement(a=>({id:a.id+1,text:`已顯示 ${Math.min(limit+25,members.length)} / ${members.length} 筆`}))}}>顯示更多（再 {Math.min(25,members.length-limit)} 筆）</Button>}</div>})}
+   <p className="people-reveal-status sr-only" role="status" aria-atomic="true"><span key={revealAnnouncement.id}>{revealAnnouncement.text}</span></p>
    {!state.loading&&!people.length&&!unavailable&&<DataState kind={view?.incomplete?'Partial':'Empty'} title={view?.incomplete?'已讀取名冊尚無符合項目':filtered?'沒有符合篩選的人員':'尚無名冊紀錄'} body={view?.incomplete?'資料不完整，不能判定全部結果。':'請調整或清除篩選，或重新讀取。'}/>}
   </section>
   {!!view?.trips.length&&<section className="people-surface" aria-labelledby="people-trips-title">
