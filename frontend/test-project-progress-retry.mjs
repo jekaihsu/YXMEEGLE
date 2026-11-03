@@ -4,7 +4,7 @@ import {readFile,writeFile,unlink} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export {useProjectProgress} from './src/useProjectProgress';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
+const bundle=await build({stdin:{contents:"export {DetailRefreshProvider} from './src/detailRefresh';export {useProjectProgress} from './src/useProjectProgress';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.project-progress-retry-test.mjs',import.meta.url);await writeFile(file,bundle.outputFiles[0].text);let ui;try{ui=await import(file.href)}finally{await unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
 for(const key of ['window','document','Event'])globalThis[key]=dom.window[key];
@@ -23,7 +23,7 @@ try{
  ]){
   await act(async()=>root.render(null));ui.invalidateSessionEpoch();calls=0;
   payload=structuredClone(fixture);Object.assign(payload.sources,{can_refresh_sources:true,source_status:sourceStatus,source_synced_at:'2026-10-26T00:00:00Z',reports_status:reportsStatus,reports_stale:reportsStale});
-  await act(async()=>root.render(React.createElement(Probe)));
+  await act(async()=>root.render(React.createElement(ui.DetailRefreshProvider,{scope:'fixture-workspace',identityFingerprint:'fixture-actor'},React.createElement(Probe))));
   assert.equal(read.state.kind,'ready');
   await act(async()=>read.retry());
   assert.equal(calls,2,'retry performs a fresh HTTP read');
@@ -33,17 +33,17 @@ try{
  }
  await act(async()=>root.render(null));ui.invalidateSessionEpoch();calls=0;
  payload=structuredClone(fixture);Object.assign(payload.sources,{can_refresh_sources:true,source_status:'fresh',source_synced_at:'2026-10-26T00:00:00Z'});
- await act(async()=>root.render(React.createElement(Probe)));
+ await act(async()=>root.render(React.createElement(ui.DetailRefreshProvider,{scope:'fixture-workspace',identityFingerprint:'fixture-actor'},React.createElement(Probe))));
  let release;
  globalThis.fetch=async url=>{if(url==='/api/live/refresh')return new Response(JSON.stringify(live));calls++;await new Promise(resolve=>release=resolve);return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}})};
  calls=0;
  const retry=read.retry;
- await act(async()=>{for(let i=0;i<5;i++)retry()});
- for(let i=0;i<5;i++)await act(async()=>retry());
+ await act(async()=>{for(let i=0;i<5;i++)void retry()});
+ for(let i=0;i<5;i++)await act(async()=>{void retry()});
  assert.equal(calls,1,'re-entrant retries start exactly one request until it settles');
  await act(async()=>release());
  assert.equal(read.state.kind,'ready');
- await act(async()=>retry());
+ await act(async()=>{void retry()});
  assert.equal(calls,2,'retry becomes available again after settlement');
  await act(async()=>release());
  console.log('PASS progress retry states keep source freshness independent from report availability');

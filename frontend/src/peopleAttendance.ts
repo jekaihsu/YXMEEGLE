@@ -1,4 +1,5 @@
 import {api,ApiError} from './api';
+import type {FetchIntent} from './pageData';
 
 export const attendanceStatuses=['loading','ok','incomplete','stale','needs-permission','not-connected','read-failed'] as const;
 export type AttendanceStatus=typeof attendanceStatuses[number];
@@ -41,9 +42,9 @@ export function parsePeopleAttendance(raw:unknown):PeopleAttendance{
  const available=field(raw,'leaves_available');
  return {status:state,week_start:string(field(raw,'week_start'))??'',week_end:string(field(raw,'week_end'))??'',days:strings(field(raw,'days')),people,trips,leaves,leaves_available:known?(typeof available==='boolean'?available:null):false,as_of:string(field(raw,'as_of')),missing_scopes:strings(field(raw,'missing_scopes')),refreshing:field(raw,'refreshing')===true,incomplete:field(raw,'incomplete')===true||state==='incomplete',summary:{people:known?count(field(summary,'people')):null,in_service:known?count(field(summary,'in_service')):null,on_leave:known?count(field(summary,'on_leave')):null,on_trip:known?count(field(summary,'on_trip')):null,trips:known?count(field(summary,'trips')):null}};
 }
-export async function fetchPeopleAttendance({week,signal,current}:{week?:string;signal?:AbortSignal;current?:()=>boolean}={}):Promise<PeopleAttendance>{
+export async function fetchPeopleAttendance({week,signal,current,intent}:{week?:string;signal?:AbortSignal;current?:()=>boolean;intent?:FetchIntent}={}):Promise<PeopleAttendance>{
  const query=week?'?'+new URLSearchParams({week}):'';
- return parsePeopleAttendance(await api<unknown>('/api/people/attendance'+query,{signal},current));
+ return parsePeopleAttendance(await api<unknown>('/api/people/attendance'+query,{signal,...(intent?{headers:{'X-YX-Fetch-Intent':intent.reason}}:{})},current));
 }
 export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊資料 · 資料待更新', 'needs-permission':'缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};
 

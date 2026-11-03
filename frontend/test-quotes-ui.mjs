@@ -164,7 +164,7 @@ test('unknown outcome retains preview, blocks dismissal and offers only same-req
  assert.ok(document.querySelector('[data-kind=UnknownOutcome]'));
  assert.match(document.querySelector('[role=dialog]').textContent,/確認報價/);
  assert.equal(button('確認建立'),undefined);assert.equal(button('上一步').disabled,true);
- await click(document.querySelector('[aria-label=關閉]'));assert.equal(closes,0);
+ const close=document.querySelector('[aria-label=關閉]');assert.equal(close.disabled,true);assert.equal(close.getAttribute('aria-disabled'),'true');assert.match(document.querySelector('[data-kind=UnknownOutcome]').textContent,/關閉與編輯暫停，待結果確認。/);await act(async()=>close.click());assert.equal(closes,0);
  await click(button('重新確認建立結果'));
  assert.equal(calls.filter(c=>c.url==='/api/quotes').length,1);
  const recovery=calls.filter(c=>c.url.includes('/requests/'));assert.equal(recovery.length,2);assert.equal(recovery[0].url,recovery[1].url);
@@ -185,4 +185,28 @@ test('explicit refresh retains quote rows with a Stale notice until the next sna
  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});pending=true;
  await click(button('重新讀取'));assert.equal(calls,2);assert.equal(document.querySelectorAll('tbody tr').length,1);assert.ok(document.querySelector('[data-kind=Stale]'));
  await act(async()=>{release(reply({total:1,items:[x.quotes.items[0]]}));await tick()});assert.equal(document.querySelector('[data-kind=Stale]'),null);assert.equal(document.querySelectorAll('tbody tr').length,1);
+});
+
+test('offline quote create is never sent, needs no recovery, retains form and permits dismissal',async()=>{
+ let closes=0;const calls=[];
+ await sheet(async(url,init={})=>{calls.push({url,method:init.method});if(url.endsWith('/preview'))return reply(x.quote_preview);throw Error('offline create must not fetch')},{onClose:()=>closes++});
+ await type(document.querySelector('input[required]'),'離線仍保留的報價草稿');await click(button('預覽'));const before=calls.length;
+ Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+ try{
+  window.dispatchEvent(new Event('offline'));await click(button('確認建立'));
+  assert.equal(calls.length,before,'neither create POST nor recovery GET reaches fetch');assert.equal(document.querySelector('[data-kind=UnknownOutcome]'),null);
+  assert.match(document.querySelector('[data-kind=Conflict]').textContent,/目前離線，無法儲存或送出/);assert.equal(button('上一步').disabled,false);
+  await click(button('上一步'));assert.equal(document.querySelector('input[required]').value,'離線仍保留的報價草稿');
+  await click(document.querySelector('[aria-label=關閉]'));assert.equal(closes,1);
+ }finally{Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'))}
+});
+
+test('offline retry after run-not-found preserves the original uncertain request key',async()=>{
+ const bodies=[];let creates=0;
+ await sheet(async(url,init={})=>{if(url.endsWith('/preview'))return reply(x.quote_preview);if(url.includes('/requests/'))return reply({code:'run_not_found'},404);if(url==='/api/quotes'){bodies.push(JSON.parse(init.body));return ++creates===1?reply({code:'unavailable'},503):reply(x.quote_create)}throw Error(url)});
+ await type(document.querySelector('input[required]'),'原請求仍須保留');await click(button('預覽'));await click(button('確認建立'));
+ Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+ try{await click(button('重試建立'));assert.equal(bodies.length,1);assert.match(document.body.textContent,/目前離線/);assert.ok(button('重試建立'));}
+ finally{Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'))}
+ await click(button('重試建立'));assert.equal(bodies.length,2);assert.equal(bodies[0].request_id,bodies[1].request_id);
 });

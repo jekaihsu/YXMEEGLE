@@ -132,6 +132,24 @@ def build_identity(root):
             'branch':git('rev-parse','--abbrev-ref','HEAD')}
 
 
+def frontend_stage_files(source):
+    """Ship frontend runtime inputs and attribution, never local docs or evidence."""
+    runtime_suffixes = {'.ts', '.tsx', '.css', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2'}
+    excluded_dirs = {'docs', 'evidence', 'impl-evidence', 'screenshots', 'design-notes', '__tests__', '__snapshots__', 'node_modules', 'dist'}
+    for path in source.rglob('*'):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(source)
+        if any(part.startswith('.') or part.lower() in excluded_dirs for part in relative.parts):
+            continue
+        if relative.as_posix() == 'assistant/fixtures.ts':
+            continue  # SSE examples imported only by frontend tests.
+        if path.name.startswith(('test-', 'test_', 'testing', 'preview.')) or '.test.' in path.name or '.spec.' in path.name:
+            continue
+        if path.suffix.lower() in runtime_suffixes or path.name == 'LICENSE.assistant-ui':
+            yield path
+
+
 def staging():
     validate_source_tables(ROOT/'deployment/source-tables.json')
     folder = RUNTIME / ('zeabur-stage-' + secrets.token_hex(4))
@@ -159,7 +177,11 @@ def staging():
     files += [p for p in (ROOT/'backend'/'reports').rglob('*.py') if not p.name.startswith(('test','dev_'))]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
-        if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]
+        if source.exists(): files += list(frontend_stage_files(source))
+    # Local benchmarks and their test worlds have no runtime importers.
+    test_helpers = {'conftest.py', 'ai_projection_test_support.py', 'partial_testing.py', 'perf_fixture.py', 'write_world.py'}
+    files = [p for p in files if not (p.is_relative_to(ROOT/'backend') and
+             (p.name in test_helpers or p.name.startswith('benchmark')))]
     manifest = []
     for source in sorted(set(files)):
         if not source.is_file(): raise SystemExit('Missing expected deployment source: ' + str(source.relative_to(ROOT)))

@@ -1,6 +1,7 @@
 import type {Route} from './types';
 import {normalizeRoute} from './api';
 import {isP2View} from './p2RouteNames';
+import {isLegacyTab} from './integrationRoutes';
 
 function shared<T>(load:()=>Promise<T>){
  let pending:Promise<T>|undefined;
@@ -8,6 +9,7 @@ function shared<T>(load:()=>Promise<T>){
 }
 
 export const routeLoaders={
+ Sources:shared(()=>import('./Sources')),
  Assistant:shared(()=>import('./Assistant')),
  HowToUse:shared(()=>import('./HowToUse').then(m=>({default:m.HowToUse}))),
  Projects:shared(()=>import('./ProjectsList').then(m=>({default:m.Projects}))),
@@ -31,7 +33,7 @@ export const routeLoaders={
 
 export function prefetchRoute(input:Route){
  const route=normalizeRoute(input);
- const name=route.view==='assistant'?'Assistant':route.view==='howto'?'HowToUse':route.view==='projects'?'Projects':route.view==='admin'?'AdministrationEntry':route.view==='routines'?'Routines':route.view==='dispatch'?'DispatchPage':route.view==='work'?'WorkPage':route.view==='sources'?'SourceHealthPage':route.view==='people'?'PeopleAttendancePanel':route.view==='quotes'?'Quotes':route.view==='reports'?'ReportsPage':route.view==='project'?(route.section==='assigned-sop'&&route.task_source==='sop_local'?'AssignedSopTaskPage':'ProjectDetailGate'):isP2View(route.view)?'P2Page':undefined;
+ const name=route.view==='assistant'?'Assistant':route.view==='howto'?'HowToUse':route.view==='projects'?'Projects':route.view==='admin'?'AdministrationEntry':route.view==='routines'?'Routines':route.view==='dispatch'?'DispatchPage':route.view==='work'?'WorkPage':route.view==='sources'?(isLegacyTab(route,'sources')?'Sources':'SourceHealthPage'):route.view==='people'?'PeopleAttendancePanel':route.view==='quotes'?'Quotes':route.view==='reports'?'ReportsPage':route.view==='project'?(route.section==='assigned-sop'&&route.task_source==='sop_local'?'AssignedSopTaskPage':'ProjectDetailGate'):isP2View(route.view)?'P2Page':undefined;
  if(name)void routeLoaders[name]().catch(()=>{});
 }
 

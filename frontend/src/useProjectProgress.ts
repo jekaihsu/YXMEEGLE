@@ -1,3 +1,4 @@
+import {taipeiTime} from './taipeiTime';
 import {SessionCache} from './sessionCache';
 import {useCaseData, caseKey, readCase, seedCase, useDetailRefresh} from './detailRefresh';
 import type {PageData} from './pageData';
@@ -46,7 +47,7 @@ export function useProjectProgress(id:string,enabled=true){
  },[key,load]);
  const reload=useCallback(()=>load(true),[load]);
  const reloadDetail=useCallback((batch:symbol)=>load(true,batch),[load]);
- useDetailRefresh(reloadDetail,enabled,state.kind==='ready'?refreshError:'',refreshing);
+ useDetailRefresh(reloadDetail,enabled,state.kind==='ready'&&refreshError?`${refreshError}；最近成功讀取 · ${taipeiTime(state.data.sources.source_synced_at,'尚無成功紀錄')}`:'',refreshing);
  const retrying=useRef<Promise<void>|null>(null);
  const retry=useCallback(()=>{if(retrying.current)return retrying.current;if(!enabled||!canRefresh&&!canRetryRead)return Promise.resolve();const request=load(true,undefined,canRefresh).finally(()=>{if(retrying.current===request)retrying.current=null});retrying.current=request;return request},[enabled,canRefresh,canRetryRead,load]);
  return {state:life.current.key===key&&life.current.epoch===getSessionEpoch()?state:{kind:'loading'} as State,refreshing,refreshError,retry,reload,canRefresh,canRetryRead};

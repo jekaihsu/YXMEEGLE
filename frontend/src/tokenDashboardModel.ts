@@ -63,8 +63,13 @@ export function rangeError(range:{from:string;to:string}):string|null {
  return (Date.parse(range.to)-Date.parse(range.from))/86400000+1>366?'日期範圍最多 366 天。':null;
 }
 export function chartSeries(rows:DayUsage[],range:{from:string;to:string}) {
- // Missing days remain unknown, including gaps between observed weekly buckets.
- const result=rows.filter(row=>row.day>=range.from&&row.day<=range.to).sort((a,b)=>a.day.localeCompare(b.day));
+ // The endpoint groups the full filtered ledger: an omitted day has zero calls.
+ const observed=new Map(rows.map(row=>[row.day,row]));
+ const result:DayUsage[]=[];
+ const upKnown=rows.every(row=>row.up!==undefined),downKnown=rows.every(row=>row.down!==undefined);
+ for(let day=range.from;day<=range.to;day=shift(day,1)){
+  result.push(observed.get(day)||{day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0,...(upKnown?{up:0}:{}),...(downKnown?{down:0}:{})});
+ }
  if((Date.parse(range.to)-Date.parse(range.from))/86400000+1<=62)return result;
  const weeks=new Map<number,DayUsage>();
  for(const row of result){
