@@ -352,7 +352,12 @@ class NodeAssignmentService:
                 finally:
                     if calls is not None and threading.get_ident() == caller:
                         calls.append(client.calls)
-        return self.case_cache.get((ctx.wid, code), load, revalidate=True)
+        from ..read_snapshots import capture
+        # A page-open batch has no timed follow-up. Await its one allowed read
+        # rather than returning a stale write gate while refreshing invisibly.
+        shared = capture.get()
+        first_screen = shared and shared.get('wid') == ctx.wid and shared.get('project_id') == ctx.project['id']
+        return self.case_cache.get((ctx.wid, code), load, revalidate=not first_screen)
 
     def _envelope(self, ctx, cached, roster, body):
         block = self.write_block(ctx)
@@ -391,10 +396,11 @@ class NodeAssignmentService:
             if key is not None:
                 body = node_detail(cached.value, skipped, actor, people, key, enabled, now, evidence, **policy)
             else:
-                _, body = case_view(cached.value, skipped, actor, enabled, now, evidence, **policy)
+                projection = case_view(cached.value, skipped, actor, enabled, now, evidence, **policy)
+                _, body = projection
                 body['node_details'] = {}
                 for node_key in NodeKey:
-                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now, evidence, **policy)
+                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now, evidence, projection=projection, **policy)
                     body['node_details'][node_key.value] = {k: detail[k] for k in ('tasks', 'assignable_people')}
             return self._envelope(ctx, cached, roster, body)
         finally:

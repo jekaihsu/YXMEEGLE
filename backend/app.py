@@ -1982,22 +1982,28 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data, user = identity(request)
         require(len(project_id) <= 200 and not request.query_params, '查詢參數錯誤', 422)
         with sessions() as db:
-            version = db.get(WorkspaceRow, data['wid']).version
+            root = db.get(WorkspaceRow, data['wid'])
+            version = root.version
             from .sop_import.models import CaseState, CasePolicy
             revision = db.get(CaseState, (data['wid'], project_id))
             policy = db.get(CasePolicy, (data['wid'], project_id))
             signature = (revision.checklist_revision, revision.identity_revision) if revision else None
             policy_revision = policy.revision if policy else None
-            visibility_revision = snapshot_visibility(db, db.get(WorkspaceRow, data['wid']), project_id)
+            visibility_revision = snapshot_visibility(db, root, project_id)
         key = ('case', data['wid'], signature, policy_revision, visibility_revision, project_id, json.dumps(data, sort_keys=True), snapshot_viewer(user))
         expected_generation = (version, signature, policy_revision, visibility_revision)
         def verify_generation():
             with sessions() as db:
-                root = db.get(WorkspaceRow, data['wid'])
+                current_version = db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id == data['wid']))
+                require(current_version is not None, '工作區不存在', 404)
                 current = db.get(CaseState, (data['wid'], project_id))
                 policy = db.get(CasePolicy, (data['wid'], project_id))
-                actual = (root.version, (current.checklist_revision, current.identity_revision) if current else None,
-                          policy.revision if policy else None, visibility_revision if root.version == version else snapshot_visibility(db, root, project_id))
+                # The unchanged generation needs only a scalar fence. The root
+                # JSON can contain every case's plan; read it only on change.
+                visibility = visibility_revision if current_version == version else snapshot_visibility(
+                    db, db.get(WorkspaceRow, data['wid']), project_id)
+                actual = (current_version, (current.checklist_revision, current.identity_revision) if current else None,
+                          policy.revision if policy else None, visibility)
                 # Authority changes must never serve the previous viewer's body.
                 require(actual[1:] == expected_generation[1:], '資料已更新，請重新讀取', 409)
                 if actual[0] != version:
