@@ -50,3 +50,8 @@
 .project-detail-shell{--bg:var(--i3-header-bg);--surface:var(--i3-header-surface);--surface-2:var(--i3-header-surface-2);--label:var(--i3-header-label);--label-2:var(--i3-header-label-2);--sep:var(--i3-header-sep);--accent:var(--i3-header-accent);--accent-hover:var(--i3-header-accent-hover);--accent-fill:var(--i3-header-accent-fill);--on-accent:var(--i3-header-on-accent);background:var(--bg);color:var(--label)}
 @media(min-width:901px){.project-detail .i3-stepper .pf-chain:has(>li:nth-child(10)){grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}}
 .pds-more>summary{gap:6px;padding:8px 12px}.i3-case-state :is(.button,.ds-button){background:var(--surface);color:var(--label-2);border-color:var(--sep)}
+
+/* Header actions share reserved space; the launcher cannot float over the menu. */
+.project-detail .pds-tools{display:flex;align-items:center;gap:8px}
+.project-detail .pds-tools .project-chat-launcher{position:static;float:none;margin:0;width:44px;height:44px;min-width:44px;min-height:44px;box-shadow:none}
+.project-detail .pds-header:has(.project-chat-launcher) .pds-back{margin-right:160px}
