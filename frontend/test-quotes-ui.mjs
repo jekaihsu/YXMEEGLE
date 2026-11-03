@@ -164,7 +164,7 @@ test('unknown outcome retains preview, blocks dismissal and offers only same-req
  assert.ok(document.querySelector('[data-kind=UnknownOutcome]'));
  assert.match(document.querySelector('[role=dialog]').textContent,/確認報價/);
  assert.equal(button('確認建立'),undefined);assert.equal(button('上一步').disabled,true);
- await click(document.querySelector('[aria-label=關閉]'));assert.equal(closes,0);
+ const close=document.querySelector('[aria-label=關閉]');assert.equal(close.disabled,true);assert.equal(close.getAttribute('aria-disabled'),'true');assert.match(document.querySelector('[data-kind=UnknownOutcome]').textContent,/關閉與編輯暫停，待結果確認。/);await act(async()=>close.click());assert.equal(closes,0);
  await click(button('重新確認建立結果'));
  assert.equal(calls.filter(c=>c.url==='/api/quotes').length,1);
  const recovery=calls.filter(c=>c.url.includes('/requests/'));assert.equal(recovery.length,2);assert.equal(recovery[0].url,recovery[1].url);

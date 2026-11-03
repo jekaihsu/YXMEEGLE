@@ -56,9 +56,9 @@ export function Segmented<T extends string>({label,options,value,onChange}:{labe
 }
 
 /** Modal sheet with focus trap, Escape and focus return. */
-export function Sheet({title,onClose,children}:{title:string;onClose:()=>void;children:ReactNode}){
+export function Sheet({title,onClose,children,closeDisabled=false}:{title:string;onClose:()=>void;children:ReactNode;closeDisabled?:boolean}){
  const ref=useDialogFocus(onClose);
- return <div className="ds-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section ref={ref} tabIndex={-1} className="ds-sheet glass" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><Button variant="plain" onClick={onClose} aria-label="關閉">✕</Button></header>{children}</section></div>;
+ return <div className="ds-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section ref={ref} tabIndex={-1} className="ds-sheet glass" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><Button variant="plain" onClick={onClose} disabled={closeDisabled} aria-disabled={closeDisabled||undefined} aria-label="關閉">✕</Button></header>{children}</section></div>;
 }
 
 /** Placeholder shaped like the content it stands in for; reuses the .skeleton classes viewData consumers already render. */
