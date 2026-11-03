@@ -97,3 +97,29 @@ Fixed/rejected differences: repeated health badges/relative ages; arbitrary gian
 - Finance aggregates need an authorized live raw-cell/outlier check after integration before removing `金額加總待核對`. LC's numeric parsing fix remains intact; synthetic tests do not certify a corrected company total.
 - Progress per-source partial coverage and the single-case plan outlier claim need complete source evidence; no arbitrary warning or fabricated contributing-case count was added from one paginated screen.
 - Coordinator must obtain the independent cross-family implementation review and reconcile the tiny SettingsOverview / P2 adapter hunks with their owners. No independent approval is claimed here.
+
+
+## Integration follow-up — 2026/11/03
+
+Status: integration merge resolved and verified; original screenshots are retained unchanged. No new view design, backend change, deployment or company-data access.
+
+Merged integration commit `a4398e0089e631b3e2db5a44b36458a862d4117d` into I5 commit `393e23d0f18ae54519df17e885ebbe28b257a9e1`. Merge commit: `97239bad179e0e2bf74b390b41cc5dec15e2f841`. Final evidence-commit head is reported in the worker handoff.
+
+Manual conflict resolutions only:
+
+- `frontend/src/P2Pages.tsx`: retain I4 confirmation refresh callback and ConfirmationList binding; retain contract/work-item forbidden/unlocated rendering, confirmation breadcrumb ownership and removal of the confirmation IntersectionObserver prefetch. Retain I5 manager-overview refresh callback, shared Loading DataState and source-health link. The auto-merged IntegratedPages source reread callback is intact. No confirmation/contract/work-item code was replaced with the older I5 version.
+- `frontend/test-fetch-intent-audit.mjs`: preserve all nonconflicting unit changes and recompute only the existing P2Pages whole-file fingerprint for the resolved file. Both parents and the resolved audit contain 38 entries; no entries or blanket exemptions were added. Neither parent deleted a key relative to their merge base. I4's actual automatic-prefetch code deletion remains applied.
+
+Verification (all executed against the merged worktree):
+
+- PASS `node test-i5-redesign.mjs`.
+- PASS `npm run test:reports` and `npm run test:reports-progress`.
+- PASS `node test-reports-stale-notice.mjs`.
+- PASS `node test-manager-overview-view.mjs` (33 tests, 163 checks).
+- PASS `node test-source-health-view.mjs`, `node test-source-health-ui.mjs`, `node test-lark-pilot.mjs`, `node test-source-lifecycle.mjs`, `node test-source-build-visibility.mjs`, `node test-home-reports.mjs`.
+- PASS I4-focused compatibility checks `node test-i4-work-confirmations.mjs` and `node test-confirmations-loading.mjs`.
+- PASS all four `test-fetch-intent*.mjs`: `npm run test:fetch-intent` covers core, React and audit; `YX_FETCH_INTENT_API_URL=http://127.0.0.1:8796 node test-fetch-intent-browser.mjs` covers synthetic browser and the built app against an isolated demo backend with Dispatch enabled. Home, Case and Dispatch render with no runtime errors and zero idle requests.
+- PASS `npx tsc -b`, `npm run build`, `git diff --check`. Existing Assistant chunk-size warning remains.
+- Additional diagnostic `node test-p2-routes.mjs`: FAIL on the pre-existing assertion that navigation must not contain `{view:'work',label:`. Both this test and AppShell.tsx are byte-identical to integration (verified against the merge parent); integration now deliberately includes the work destination. No unrelated file or assertion was changed. This diagnostic failure does not affect the passing I4-focused checks above.
+
+The `I5-followup-*.txt` transcripts are included alongside this report. A temporary demo backend on port 8796 was used only for the required browser fetch-intent test and stopped afterward. No additional application files were edited beyond the two conflict resolutions. This entire evidence directory, including screenshots and REPORT.md, is copied to `/Users/vc/.local/state/t3-pstack/orchestrate/yx-redesign/impl-evidence/I5/` for coordinator review.
