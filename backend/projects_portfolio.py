@@ -92,3 +92,36 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
                 source_synced_at=state.get('source_status', {}).get('last_sync'), as_of=today,
                 basis='persisted_workspace+lark_derived' if statuses else 'persisted_workspace',
                 node_status_degraded=degraded)
+
+
+class PortfolioCaptures:
+    """Short-lived immutable page sequences, separate from the current-read cache.
+
+    A workspace write expires current reads, not a sequence already being read.
+    The caller keys captures by freshly checked viewer and visibility authority.
+    Cold overlays may be retained here without becoming current cached reads.
+    """
+    def __init__(self, *, clock=None, max_bytes=8_000_000, ttl=120):
+        from collections import OrderedDict
+        from threading import Lock
+        from time import monotonic
+        self.entries, self.lock = OrderedDict(), Lock()
+        self.clock, self.max_bytes, self.ttl = clock or monotonic, max_bytes, ttl
+
+    def clear(self):
+        with self.lock:
+            self.entries.clear()
+
+    def put(self, key, body, revision):
+        with self.lock:
+            self.entries.setdefault((key, body.etag), (self.clock(), body, revision))
+            while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
+                self.entries.popitem(last=False)
+
+    def get(self, key, token):
+        with self.lock:
+            entry = self.entries.get((key, token))
+            if entry and self.clock() - entry[0] < self.ttl:
+                return entry[1:]
+            self.entries.pop((key, token), None)
+            return None
