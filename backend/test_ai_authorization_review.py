@@ -189,3 +189,33 @@ def test_global_dependency_revoke_during_stream_is_checked_at_two_seconds(app, c
     result = events(client.post('/api/ai/chat',json={**BODY,'conversation_id':'revoke-tool-stream'}))
     assert result[-1] == {'type':'error','code':'ai_forbidden','denial_scope':'conversation'}
     assert not any(e['type'] == 'text' or e['type'] == 'done' for e in result)
+
+
+@pytest.mark.parametrize('unresolved',[False,'unknown_code','missing_code'])
+def test_report_case_codes_are_resolved_from_server_rows_and_authorized(app, client, monkeypatch, unresolved):
+    import httpx
+    pid = project(client)
+    with app.state.sessions() as db:
+        code = db.get(BusinessRow,(wid(app,client),'projects',pid)).data['code']
+    if unresolved: code = '' if unresolved == 'missing_code' else 'C-NOT-IN-WORKSPACE'
+    original = httpx.AsyncClient.get
+    async def report(self,path,**kwargs):
+        if path == '/api/reports/sales':
+            return httpx.Response(200,json={'items':[dict(code=code,name='Server report case')],'total':1},request=httpx.Request('GET','http://ai.internal'+path))
+        return await original(self,path,**kwargs)
+    monkeypatch.setattr(httpx.AsyncClient,'get',report)
+    _, response = ask(app,client,'global-report',calls=[dataset_call('report-read','report_sales',{})])
+    result = events(response)
+    if unresolved:
+        assert result[-1] == {'type':'error','code':'ai_forbidden','denial_scope':'conversation'}
+        assert client.get('/api/ai/conversations/global-report').status_code == 404
+        return
+    assert result[-1]['type'] == 'done'
+    with app.state.sessions() as db:
+        assert pid in db.scalars(select(ledger.AiCaseRead.project_id).where(ledger.AiCaseRead.usage_id == result[0]['usage_id'])).all()
+    hide(app,client,pid)
+    assert client.get('/api/ai/conversations/global-report').status_code == 403
+    fake, response = ask(app,client,'hidden-new-report',calls=[dataset_call('hidden-report','report_sales',{})])
+    result = events(response)
+    assert result[-1]['code'] == 'ai_forbidden'
+    assert len(fake.inputs) == 1, 'hidden report content must never reach a model continuation'

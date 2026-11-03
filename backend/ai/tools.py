@@ -43,7 +43,7 @@ class Reader:
         response.raise_for_status()
         data = response.json()
         from .read_provenance import observed
-        observed(path, data)
+        observed(path, data, params)
         return data
 
 

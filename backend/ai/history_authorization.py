@@ -77,3 +77,22 @@ def permission_keys(sessions, workspace_id):
             org = workspace_id.removeprefix('test-')
             users.update({p.person_id:p.data for p in db.scalars(select(PersonRow).where(PersonRow.organization_id == org))})
         return {ident:permission_key(u) for ident, u in users.items() if u.get('active', True)}
+
+
+def resolve_case_codes(sessions, workspace_id, codes):
+    """Resolve trusted report-row codes against server records; ambiguity is conservative."""
+    from ..sources import normalized_case
+    from sqlalchemy import select
+    wanted = {normalized_case(code) for code in codes}
+    found = set()
+    projects = set()
+    with sessions() as db:
+        headers = db.scalars(select(BusinessRow.data).where(BusinessRow.workspace_id == workspace_id,
+            BusinessRow.kind == 'projects'))
+        for project in headers:
+            matches = wanted & {normalized_case(code) for code in
+                [project.get('code'), *project.get('code_history', [])] if code}
+            if matches:
+                found.update(matches)
+                projects.add(project['id'])
+    return projects, found == wanted
