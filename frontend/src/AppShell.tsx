@@ -16,9 +16,9 @@ const NAV_GROUPS=[{label:'工作',views:['assistant','howto','dashboard']},{labe
 export {Avatar} from './Avatar';
 
 type CallbackError={title:string;description:string;next:string};
-export type AppShellProps={s:Session;w?:Workspace;route:Route;error:string;setError:(m:string)=>void;callbackError?:CallbackError;mobile:boolean;setMobile:(open:boolean)=>void;sessionOpen:boolean;setSessionOpen:(open:boolean)=>void;overdue:number;activeNav:string;asOfLabel:string;busy:boolean;mutationBusy:boolean;dirtyDraft:boolean;ready:boolean;go:(r:Route)=>void;refresh:()=>Promise<void>;guardedRefresh:()=>Promise<boolean>;reread:()=>void;onFreshness:(next:Freshness,snapshot?:Freshness)=>void;children:ReactNode;overlays?:ReactNode};
+export type AppShellProps={s:Session;w?:Workspace;route:Route;error:string;setError:(m:string)=>void;callbackError?:CallbackError;mobile:boolean;setMobile:(open:boolean)=>void;sessionOpen:boolean;setSessionOpen:(open:boolean)=>void;overdue:number;activeNav:string;asOfLabel:string;busy:boolean;mutationBusy:boolean;dirtyDraft:boolean;ready:boolean;go:(r:Route)=>void;refresh:()=>Promise<void>;guardedRefresh:()=>Promise<boolean>;reread:()=>void;onFreshness:(next:Freshness,snapshot?:Freshness)=>void;children:ReactNode;notice?:ReactNode;overlays?:ReactNode};
 
-export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobile,sessionOpen,setSessionOpen,overdue,activeNav,ready,go,refresh,children,overlays}:AppShellProps){
+export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobile,sessionOpen,setSessionOpen,overdue,activeNav,ready,go,refresh,children,notice,overlays}:AppShellProps){
  const [compact,setCompact]=useState(false);
  const [keyboardFocus,setKeyboardFocus]=useState(false);
  useEffect(()=>{
@@ -82,6 +82,7 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
   <div ref={mainShell} className="main-shell"><header className="topbar glass--bar"><div className="breadcrumbs"><button className="icon-button mobile-menu" onClick={()=>setMobile(!mobile)} aria-label="開啟導覽" aria-expanded={mobile} aria-controls="workspace-navigation"><Menu size={20}/></button><span>工作空間</span><ChevronRight size={13}/><strong>{ROUTE_LABELS[route.view]}</strong></div><div className="topbar-right">{s.environment&&s.environment!=='production'&&<span className="demo-tag">{s.environment==='test'?'測試':'示範'}</span>}<button className="user-button" aria-label="目前登入身份" aria-expanded={sessionOpen} onClick={()=>setSessionOpen(!sessionOpen)}><Avatar user={s.user||undefined}/><span>{s.user?.name}</span></button></div></header>
   {callbackError&&<div className="error-banner auth-callback-banner" role="alert"><TriangleAlert size={18}/><span><strong>{callbackError.title}</strong><br/>{callbackError.description} {callbackError.next}</span><a className="text-button" href="/api/auth/lark/login">重新登入</a></div>}
   {error&&<div className="error-banner workspace-error" role="alert"><TriangleAlert size={18}/><span>{error}</span><button className="text-button" onClick={()=>{setError('');void refresh()}}>重新載入</button><button className="icon-button" onClick={()=>setError('')} aria-label="關閉錯誤訊息"><X size={16}/></button></div>}
+  {notice}
   <main id="main-content" tabIndex={-1} key={route.view} className={`workspace ${route.view==='project'?'project-workspace':''}`}>
    {!ready?error?<div className="loading-page"><h2>暫時無法連接工作區</h2><p>請確認服務已啟動，或使用下方登入。</p><button className="button" onClick={()=>void refresh()}>重新連接</button>{s?.auth_configured&&<a className="button primary" href="/api/auth/lark/login">使用 Lark 登入</a>}</div>:<RouteSkeleton route={route} title={ROUTE_LABELS[route.view]}/>:children}
   </main>

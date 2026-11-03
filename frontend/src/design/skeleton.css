@@ -7,6 +7,8 @@
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
+.skeleton-table-row{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:16px;padding:16px;border-bottom:1px solid var(--sep)}
+.skeleton-table-row>.skeleton{height:1rem}
 .skeleton-row { height: 2.5rem; margin-block: .5rem; }
 .skeleton-header { height: 2rem; width: 60%; }
 .skeleton-chip { display: inline-block; height: 1.5rem; width: 5rem; margin: .25rem; }

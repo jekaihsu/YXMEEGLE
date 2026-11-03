@@ -1,3 +1,5 @@
+import {useSyncExternalStore} from 'react';
+import {subscribeConnectivity,isOffline} from './api';
 import {Select as FormSelect} from './design/Select';
 import {STATUS,NODE_NAMES} from './workflowLabels';
 export {STATUS,NODE_NAMES} from './workflowLabels';
@@ -53,7 +55,7 @@ export function OwnerSelect({w,value,onChange,name,disabled=false}:{w:Workspace;
  const[localValue,setLocalValue]=useState(value||'');const selected=onChange?(value||''):localValue;
  return <>{name&&<input type="hidden" name={name} value={selected} disabled={disabled}/>}<FormSelect aria-label="選擇負責人" value={selected} onChange={e=>{setLocalValue(e.target.value);onChange?.(e.target.value)}} disabled={disabled}><option value="">尚未指派</option>{w.users.filter(u=>u.active!==false||u.id===selected).map(u=><option key={u.id} value={u.id} disabled={u.active===false}>{u.name} · {u.department}{u.active===false?'（已停用，保留歷史指派）':''}</option>)}</FormSelect></>
 }
-export function Primary({children,busy,disabled,disabledReason,...rest}:{children:ReactNode;busy?:boolean;disabled?:boolean;disabledReason?:string;onClick?:(e:MouseEvent<HTMLButtonElement>)=>void;type?:'button'|'submit'}){return <DisabledAction disabled={disabled||busy} reason={busy?undefined:disabledReason}>{id=><button className="button primary" disabled={disabled||busy} {...rest} aria-describedby={id}>{busy?<Loader2 className="spin" size={15}/>:null}{children}</button>}</DisabledAction>}
+export function Primary({children,busy,disabled,disabledReason,...rest}:{children:ReactNode;busy?:boolean;disabled?:boolean;disabledReason?:string;onClick?:(e:MouseEvent<HTMLButtonElement>)=>void;type?:'button'|'submit'}){const offline=useSyncExternalStore(subscribeConnectivity,isOffline,()=>false);return <DisabledAction disabled={disabled||busy||offline} reason={offline?'目前離線，無法儲存或送出。':busy?undefined:disabledReason}>{id=><button className="button primary" disabled={disabled||busy||offline} {...rest} aria-describedby={id}>{busy?<Loader2 className="spin" size={15}/>:null}{children}</button>}</DisabledAction>}
 export function PageHead({eyebrow,title,subtitle,children}:{eyebrow?:string;title:string;subtitle?:string;children?:ReactNode}){return <div className="page-heading"><div>{eyebrow&&<div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><div className="heading-actions">{children}</div></div>}
 export function openTask(c:Ctx,row:TaskRow){c.go({view:'project',project:row.p.id,node:row.n.id,task:row.t.id,tab:'flow'})}
 export function taskReadiness(r:TaskRow,c:Ctx){
@@ -91,4 +93,4 @@ export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNod
  return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在載入完整資料…</p><Skeleton lines={4}/></div>;
 }
 
-export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines'|'dispatch_board';onHome:()=>void}){return <section className="empty" aria-label="功能尚未開放"><h1>{feature==='dispatch_board'?'派工看板':feature==='change_extension'?'變更與展延':'追蹤與檢討'}尚未開放</h1><p>{feature==='dispatch_board'?'派工看板尚未啟用。':'目前保留歷史紀錄，暫停此功能操作。'}</p><button className="button" onClick={onHome}>回首頁</button></section>}
+export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines'|'dispatch_board';onHome:()=>void}){return <section className="system-state-card" aria-label="功能尚未開放"><h1>{feature==='dispatch_board'?'派工看板':feature==='change_extension'?'變更與展延':'追蹤與檢討'}尚未開放</h1><p>{feature==='dispatch_board'?'派工看板尚未啟用。':'目前保留歷史紀錄，暫停此功能操作。'}</p><button className="button primary" onClick={onHome}>回首頁</button></section>}
