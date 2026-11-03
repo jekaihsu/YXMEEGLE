@@ -1,10 +1,8 @@
-import Sources from './Sources';
 import {workspaceWriteCommitted} from './pageData';
 import './polish.css';
 import {FocusAlert,OfflineNotice,RouteState} from './SystemStates';
 import {useSyncExternalStore} from 'react';
 import {subscribeConnectivity,isOffline} from './api';
-import './Sources.css';
 import './Approvals.css';
 import {useReloadGuard} from './reloadGuard';
 import {ageFreshness, datasetNotice, failedFreshness} from './freshness';
@@ -36,6 +34,7 @@ import {routeLoaders,prefetchRoute} from './routeLoader';
 import {RouteSkeleton} from './RouteSkeleton';
 
 const TokenDashboard=lazy(()=>import('./TokenDashboard'));
+const Sources=lazy(routeLoaders.Sources);
 const HowToUse=lazy(routeLoaders.HowToUse);
 const Projects=lazy(routeLoaders.Projects);
 const AdministrationEntry=lazy(routeLoaders.AdministrationEntry);
