@@ -52,3 +52,6 @@
   .workspace .admin-selector .ds-picker, .workspace .admin-selector .ds-picker>button {width:100%;}
  }
 }
+@layer polish {
+ .administration-page label:has(input[type=checkbox]), .administration-page label:has(input[type=radio]) {min-height:44px;min-width:44px;}
+}
