@@ -18,7 +18,7 @@ const legacy={
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
  // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': 'e908f3ac5abd3b567a92f77cd2053cd4656f8f4e86e3a263574c87b42c8192d4',
+ 'AppShell.tsx': 'fb4a146d240f5853612b6e49ddbf85f267158b64e898cf1561231e972eb12072',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
