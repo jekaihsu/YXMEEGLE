@@ -1,4 +1,0 @@
-npm notice run yongxiang-workspace-prototype@0.1.0 test:reports-progress
-npm notice run node test-reports-progress.mjs && node test-reports-progress-fixes.mjs
-Progress status registry, hash, filters, null achievement, detail loading/not-found, focus return and cancellation passed (20 assertions).
-Progress regression behavior checks passed. Focus, page 2 identity, zero chip, hash, detail, 202, 429, bounded refresh and fingerprint.

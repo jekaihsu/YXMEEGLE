@@ -177,7 +177,7 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  const row:CaseRow={
   id,label,unfinished:unfinishedCell,
   actionable:fact(c.actionable,renderBool),
-  responsible:fact(c.responsible,renderLabel),
+  responsible:fact(c.responsible,value=>typeof value==='string'?value.trim()||'未填':null),
   // Stage mapping has no receipt and due date has no verified formal field (VCC-117 D3, VCC-123): never rendered.
   currentStage:fact(c.current_stage,renderLabel,'unknown'),
   effectiveDueDate:fact(c.effective_due_date,renderLabel,'unknown'),

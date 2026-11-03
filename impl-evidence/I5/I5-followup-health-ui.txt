@@ -1,1 +1,0 @@
-Source health shows Taipei time, age, unknown state and retry without identifiers.

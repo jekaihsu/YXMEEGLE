@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import {Simulate} from 'react-dom/test-utils';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const result=await build({stdin:{contents:"export {default as App} from './src/App';export {default as Dashboard} from './src/TokenDashboard';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const result=await build({stdin:{contents:"export {default as App} from './src/App';export {default as Dashboard} from './src/TokenDashboard';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.token-dashboard-test.mjs',import.meta.url);await fs.writeFile(path,result.outputFiles[0].text);
 let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/token_dashboard/',pretendToBeVisual:true});
@@ -27,7 +27,7 @@ requests=[];globalThis.fetch=(url,init)=>new Promise(resolve=>requests.push({url
 history.replaceState(null,'','/token_dashboard?from=2026-10-01&to=2026-10-31');root=createRoot(document.getElementById('root'));
 await flush(()=>root.render(React.createElement(ui.Dashboard)));
 assert.equal(requests.length,1);await flush(()=>requests[0].resolve(json(fixture)));
-assert.match(document.body.textContent,/尚無評分/);assert.equal(document.querySelector('.td-reasons'),null);assert.doesNotMatch(document.querySelector('.td-satisfaction').textContent,/%/);
+assert.match(document.body.textContent,/待確認/);assert.equal(document.querySelector('.td-reasons'),null);assert.doesNotMatch(document.querySelector('.td-satisfaction').textContent,/%/);
 assert.match(document.body.textContent,/未計價 1 次/);assert.match(document.querySelector('.td-person').closest('tbody').textContent,/未計價 2 次/);assert.match(document.querySelector('.td-providers').textContent,/未計價 3 次/);assert.match(document.body.textContent,/1,234/);
 assert.equal(document.querySelector('input[type=search]').maxLength,200,'the search box cannot exceed the length the API accepts');
 await flush(()=>document.querySelector('.td-person').click());assert.equal(new URLSearchParams(location.search).get('actor'),'a');
@@ -54,7 +54,7 @@ assert.equal(new URL(requests[5].url,'http://localhost').searchParams.get('ratin
 await flush(()=>requests[5].resolve(json(feedbackFixture)));
 assert.match(document.querySelector('.td-satisfaction').textContent,/70.0%.*👍 7 \/ 👎 3.*已評分 10 次/);
 assert.match(document.querySelector('.td-providers').textContent,/Claude.*70.0%.*👍 7 \/ 👎 3.*GPT.*尚無評分/s);
-assert.deepEqual([...document.querySelectorAll('.td-reasons li')].map(row=>row.textContent),['答錯2 次','不完整1 次','太慢0 次','其他0 次','未填寫0 次']);
+assert.deepEqual([...document.querySelectorAll('.td-reasons li')].map(row=>row.textContent),['答錯2 次','不完整1 次','太慢0 次','其他0 次','未填寫待確認 次']);
 assert.equal(document.querySelectorAll('.td-dislike-marker').length,1);
 const dailyBar=document.querySelector('rect[aria-label*="3 次倒讚"]');
 assert.match(dailyBar.getAttribute('aria-label'),/7 次按讚/);
@@ -65,6 +65,7 @@ assert.deepEqual([...dailyTable.querySelectorAll('th')].map(cell=>cell.textConte
 assert.deepEqual([...dailyTable.querySelector('tbody tr:last-child').cells].map(cell=>cell.textContent),['2026-10-31','12','7','3','1,234','50','US$0.0200']);
 assert.match(document.querySelector('rect[aria-label*="3 次倒讚"]').getAttribute('aria-label'),/12 次提問/);
 assert.equal(document.querySelector('span[aria-label="倒讚"]').nextElementSibling.textContent,'答錯');
+assert.equal(document.querySelectorAll('.td-recent-mobile>li').length,3);assert.equal(document.querySelector('.td-recent-mobile .td-record-heading strong').textContent,'陳雅文');assert.match(document.querySelector('.td-recent-mobile details').textContent,/輸入 tokens200輸出 tokens30/);
 assert.ok([...document.querySelectorAll('.td-preview')].every(el=>el.textContent==='—'),'old response leaves content columns empty');
 assert.ok(document.querySelector('span[aria-label="按讚"]'));assert.ok(document.querySelector('span[aria-label="未評分"]'));
 const personTable=document.querySelector('.td-person').closest('table');
@@ -87,7 +88,7 @@ for(const reasons of [{unspecified:3},undefined]){
  await flush(()=>{history.pushState(null,'',`?from=2026-10-01&to=2026-10-31&rating=${reasons?'up':'down'}`);window.dispatchEvent(new Event('popstate'))});
  await flush(()=>requests.at(-1).resolve(json({...feedbackFixture,reasons})));
  assert.match(document.querySelector('.td-reasons').textContent,/倒讚原因/);
- assert.equal(document.querySelector('.td-reasons li:last-child').textContent,`未填寫3 次`);
+ assert.equal(document.querySelector('.td-reasons li:last-child').textContent,reasons?'未填寫3 次':'未填寫待確認 次');
 }
 assert.deepEqual([...document.querySelectorAll('[aria-label="最近提問表，可左右捲動"] tbody tr')].map(row=>row.cells[3].textContent),['案件','全域','—']);
 for(const scope of ['project','global','']){await flush(()=>{const select=[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('範圍')).querySelector('select');select.value=scope;select.dispatchEvent(new Event('change',{bubbles:true}))});assert.equal(new URLSearchParams(location.search).get('scope'),scope||null);assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('scope'),scope||null);await flush(()=>requests.at(-1).resolve(json(feedbackFixture)))}
@@ -114,11 +115,31 @@ await flush(()=>[...drawer.querySelectorAll('button')].find(b=>b.textContent==='
 await flush(()=>[...drawer.querySelectorAll('button')].find(b=>b.textContent==='上一筆').click());const pending=requests.at(-1);await flush(()=>drawer.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(document.activeElement,opener);assert.equal(pending.init.signal.aborted,true);
 await flush(()=>opener.click());await flush(()=>requests.at(-1).resolve(json({detail:'missing'},404)));assert.match(document.querySelector('[role=dialog]').textContent,/找不到這筆提問/);await flush(()=>document.querySelector('[role=dialog]').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
 let downloaded,revoked;URL.createObjectURL=blob=>{assert.ok(blob.size>0);return 'blob:export'};URL.revokeObjectURL=url=>{revoked=url};const originalClick=window.HTMLAnchorElement.prototype.click;window.HTMLAnchorElement.prototype.click=function(){downloaded={href:this.href,name:this.download}};
-await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='匯出').click());assert.equal(new URL(requests.at(-1).url,'http://localhost').pathname,'/api/ai/usage/export');assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('q'),'進度');await flush(()=>requests.at(-1).resolve(new Response('{"question":"進度"}\n')));assert.match(downloaded.name,/\.jsonl$/);assert.equal(revoked,'blob:export');window.HTMLAnchorElement.prototype.click=originalClick;
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='匯出 JSONL').click());assert.equal(new URL(requests.at(-1).url,'http://localhost').pathname,'/api/ai/usage/export');assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('q'),'進度');await flush(()=>requests.at(-1).resolve(new Response('{"question":"進度"}\n')));assert.match(downloaded.name,/\.jsonl$/);assert.equal(revoked,'blob:export');window.HTMLAnchorElement.prototype.click=originalClick;
+
+// Explicit refresh retains the same-query snapshot and never exports unknown data.
+const refreshButton=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重新讀取');
+const exportButton=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='匯出 JSONL');
+await flush(()=>refreshButton().click());assert.match(document.querySelector('.td-kpis').textContent,/1,234/);assert.equal(exportButton().disabled,true);
+await flush(()=>requests.at(-1).resolve(json({detail:'fixture unavailable'},503)));
+assert.match(document.body.textContent,/保留上次用量 · 資料待更新/);assert.match(document.querySelector('.td-kpis').textContent,/1,234/);assert.match(document.body.textContent,/讀取時間/);assert.equal(exportButton().disabled,true);
+const quietCount=requests.length;
+await flush(()=>{window.dispatchEvent(new Event('online'));window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'))});assert.equal(requests.length,quietCount);
+await flush(()=>refreshButton().click());await flush(()=>requests.at(-1).resolve(json({...fixture,totals:{questions:null,input_tokens:null,output_tokens:null,cost_usd:null,unpriced_calls:null}})));
+assert.equal(document.querySelectorAll('.td-kpis article').length,5);assert.ok([...document.querySelectorAll('.td-kpis article strong')].every(n=>n.textContent==='待確認'));assert.doesNotMatch(document.body.textContent,/這段期間尚無提問/);assert.match(document.body.textContent,/已知費用不代表完整費用/);assert.equal(exportButton().disabled,true);
+await flush(()=>refreshButton().click());await flush(()=>requests.at(-1).resolve(json({detail:'permission revoked'},403)));assert.equal(document.querySelector('.td-kpis'),null);assert.equal(document.querySelector('option[value=a]'),null);
 
 const countBeforeRange=requests.length;
 await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});
-assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
+assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(document.activeElement.getAttribute('aria-label'),'用量資料');assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
+// A late export may not download protected content after an identity epoch changes.
+await flush(()=>{history.pushState(null,'','?from=2026-10-01&to=2026-10-31&actor=export-epoch');window.dispatchEvent(new Event('popstate'))});await flush(()=>requests.at(-1).resolve(json(feedbackFixture)));
+downloaded=undefined;window.HTMLAnchorElement.prototype.click=function(){downloaded=this.download};
+await flush(()=>exportButton().click());const oldExport=requests.at(-1);
+await flush(()=>ui.invalidateSessionEpoch());await flush(()=>oldExport.resolve(new Response('private export')));assert.equal(downloaded,undefined,'late export after epoch change is discarded');
+await flush(()=>requests.at(-1).resolve(json(feedbackFixture)));
+await flush(()=>exportButton().click());await flush(()=>requests.at(-1).resolve(json({detail:'revoked'},403)));assert.equal(document.querySelector('.td-kpis'),null,'export denial clears protected summary');
+window.HTMLAnchorElement.prototype.click=originalClick;
 await flush(()=>root.unmount());dom.window.close();
 assert.doesNotMatch(await fs.readFile(new URL('./src/AppShell.tsx',import.meta.url),'utf8'),/token_dashboard|TokenDashboard/);
 const manifest=JSON.parse(await fs.readFile(new URL('./dist/.vite/manifest.json',import.meta.url),'utf8'));

@@ -6,6 +6,8 @@ import ts from 'typescript';
 
 // These whole-file digests freeze the audited legacy sites, including indirect
 // callbacks. Migrations remove entries; changed survivors require a fresh audit.
+// I8 merge: preserve both branches' legacy-site removals. Re-audit only merged
+// App/AppShell presentation hooks and the unchanged I8 API/usage/submit guards.
 const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
@@ -15,8 +17,8 @@ const legacy={
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
- // I1: MRU, cancelable/bounded view-focus observer and input-modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': 'b8c9b74f741d46d4dda8a13af21079c68d002ff877056249eb0d7c7d18af5e89',
+ // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
+ 'AppShell.tsx': 'fb4a146d240f5853612b6e49ddbf85f267158b64e898cf1561231e972eb12072',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
@@ -28,22 +30,22 @@ const legacy={
  'assistant/useInputModality.ts': '822efb5b2e63069ef075c0a0bef50d0d5f3045dc34fb1a8422dc72fb85e11bf9',
  'design/PickerPopover.tsx': 'c9573b531f847dddeff291b4823f403f16688d4f75531339853f7d516c260ca8',
  // I1: DataState export; existing picker presentation listeners unchanged.
- 'design/index.tsx': 'fe0146b94de390791220bb6765b7e5f616892bc19c6a87972dc72bf79088e9be',
+ 'design/index.tsx': '6782b99d515e684dfc8577ced7fa704d522712d9b065dd5dfcc4b40d155b85f1',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1bfb68b728abee62479f560fa761651fe1fd3ecb94453a52c65d6f0b3190e74d',
  'reports/ProgressTab.tsx': '52c0dd698d7e5308bd0ec41759435aa2545a9194d7f1587d7fb0ec4f790866b6',
  "AssigneePicker.tsx": "2f3f8a6e8081097da460588d7957851de7e4b7bc84091a76da4af69569b16489",
- "App.tsx": "37ec063a1ce7289e6c372c71407cbc4ba35523089e76c1b41bcf0a8cf28d18fe",
+ "App.tsx": "2b1aace1537a3a5614af78bc02792dee2ddb1a8e717ec96cbd67b40e04c40e95",
  "CompletionCelebration.tsx": "f73bd9143729b0934efc35be418bb0b8d01ae4b7291389d022a5342af0adde7d",
  "inputRecovery.ts": "ea9bc500bbebb5a28a1755e834a9c3e352dbe7694eecc8f2e6766dbcb9810287",
  "LarkPilotPanel.tsx": "3173adde587f4ff70711675906c92f21db2701d87fd76be7ce6de8a7467f0326",
  "StageFixture.tsx": "9dfb8e14c631b01a1acd9a1adc88c5d094164b94945dadc2553c998504f52df8",
- "P2Pages.tsx": "32fd9844c05de8dbc0e95490d47167006888e51b66c6b6d75e950236e8653cd1",
- "api.ts": "a63a733f181926716e31fde9dbc649da20d0ce978a2b70196d1d48b1a07b93f5",
+ "P2Pages.tsx": "fdb8dea1c8a5150331d91d5b435e4836df88dbe7e7eff261c308a880bdb075dc",
+ "api.ts": "1398b98d1e2d25fd1f66153b4f646452f31df9374ebe16e697a168a4e3fa846d",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
  "refreshSources.ts": "41162fecd19aacd07713c0bb5decc4eb91e456cbdee31ed8a2ab144da77b42ca",
- "TokenDashboard.tsx": "a01af58e64d817f35890b11339b712e2283fc9558c0b3c78e8571ca5af3942bb",
+ "TokenDashboard.tsx": "e41e9f7bc61c5751a8c9b018ce894db156af739c6f7213af017a19eb37824ba1",
  "HomeDispatchCard.tsx": "3cd4ce3f0572cd34767e44489432b04e43d3cc974f83aa00e3fe9ccc3bd29aee",
  "useDialogFocus.ts": "b636c3476c8855862349e384da2886332caf2b28740e59a8eb69299b3be767ff",
  "DispatchPublishDialog.tsx": "28bc218ce2feb8aed4316350a97726aa6136a30210acda644ed03d7824479655",

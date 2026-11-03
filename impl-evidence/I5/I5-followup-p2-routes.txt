@@ -1,7 +1,0 @@
-FAIL wiring: five hash views stay reachable through compact navigation and drilldowns
-  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /\{view:'work',label:/. Input:
-  
-  "import {getSessionEpoch,onSessionEpochChange} from './api';\n" +
-    "import {recentCasesKey,readRecentCases,openRecentCase,saveRecentCases,clearRecentCases} from './design/recentCases';\n" +
-    "import {createRoutePrefetch} from './routeLoader';\n" +
-    "import {RouteSkeleton} from './RouteSkeleton';\n" +

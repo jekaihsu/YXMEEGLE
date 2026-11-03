@@ -31,6 +31,7 @@ export interface CaseDetailProps {
   onSort?: (sort: SortSpec | string) => void;
   onNavigate?: (target: CaseDetailNavTarget | string) => void;
   onBack?: () => void;
+  onRetry?: () => void;
   onPage?: (page: number) => void;
   currentSort?: SortSpec;
 }
@@ -65,7 +66,7 @@ export function PlanQuantityPanel({summary}: {summary: PlanSummary | null | 'una
       {summary.needsReview &&
         <p className="p2-plan-note">需人工確認：重複的合約項未計入總量</p>}
       {summary.truncated && <p className="p2-plan-note">清單僅顯示部分資料</p>}
-    </> : <p className="p2-plan-note">計畫數量待核對，實際數量與完成率尚未取得</p>}
+    </> : summary ? <p className="p2-plan-note">已讀取摘要中沒有計畫項目（0 項）；實際數量與完成率尚未取得</p> : <p className="p2-plan-note">計畫數量待核對，實際數量與完成率尚未取得</p>}
   </section>;
 }
 
@@ -120,12 +121,21 @@ function getIdentifierLabel(idKey: string): string {
   }
 }
 
+function confirmationNotice(states: readonly string[]) {
+ if(states.includes('forbidden'))return {kind:'Denied',title:'你目前無法查看此確認單',body:'目前沒有檢視權限。請返回確認單清單，或聯絡管理者確認權限。'} as const;
+ if(states.includes('read_failed'))return {kind:'Error',title:'無法載入確認單',body:'讀取未完成，請重新讀取；這不代表沒有確認單資料。'} as const;
+ if(states.includes('loading'))return {kind:'Loading',title:'正在載入確認單',body:'正在讀取確認單資料，筆數與關聯狀態待核對。'} as const;
+ if(states.includes('stale'))return {kind:'Stale',title:'資料待更新，目前顯示保留資料',body:'目前內容為先前成功讀取的資料，請依各章節來源同步時間核對。'} as const;
+ return {kind:'Partial',title:'部分資料未驗證',body:'確認單與合約的對應需要授權來源。標示「待核對」的內容不是 0，也不是沒有資料。'} as const;
+}
+
 export function CaseDetail({
   view,
   onSelect,
   onSort,
   onNavigate,
   onBack,
+  onRetry,
   currentSort,
 }: CaseDetailProps) {
   const instanceId = useId();
@@ -208,22 +218,8 @@ export function CaseDetail({
   if (view.header.length === 0) {
     return (
       <div className="p2-detail-root p2-case-root" ref={rootRef}>
-        <section
-          className={`p2-banner ${view.page.states.map(s => `state-${s}`).join(' ')}`}
-          role="status"
-          aria-live="polite"
-          aria-label="案件與確認單明細資料狀態"
-        >
-          <div className="p2-banner-header">
-            <span className="p2-banner-title">案件與確認單明細資料狀態</span>
-            <span className="p2-badge" data-state={view.page.states[0]}>
-              {view.page.label}
-            </span>
-          </div>
-          {view.page.reason && (
-            <p className="p2-banner-reason">{plainReason(view.page.reason)}</p>
-          )}
-        </section>
+        <h1>工程確認單</h1>
+        <DataState {...confirmationNotice(view.page.states)} actions={onRetry&&view.page.states.includes('read_failed')?<button className="button" onClick={onRetry}>重新讀取</button>:undefined}/>
         {onBack && (
           <div>
             <button
@@ -644,7 +640,7 @@ export function CaseDetail({
         </details>
       </header>
 
-      {(view.page.states.length > 0 || view.sections.some(s=>s.states.length>0)) && <DataState kind={view.page.states.includes('forbidden')?'Denied':view.page.states.includes('read_failed')?'Error':view.page.states.includes('stale')?'Stale':'Partial'} title="部分資料未驗證" body="確認單與合約的對應需要授權來源。標示「待核對」的內容不是 0，也不是沒有資料。"/>}
+      {(view.page.states.length > 0 || view.sections.some(s=>s.states.length>0)) && <DataState {...confirmationNotice(view.page.states)} actions={onRetry&&view.page.states.includes('read_failed')?<button className="button" onClick={onRetry}>重新讀取</button>:undefined}/>}
 
       {/* 頁內導覽 (In-page Navigation) */}
       <nav className="p2-inpage-nav" aria-label="章節快速導覽">

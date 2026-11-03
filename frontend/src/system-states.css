@@ -1,0 +1,15 @@
+@layer polish{
+.login-page{background:var(--bg);padding:32px 16px;min-height:100svh;align-content:start;box-sizing:border-box}
+.login-card{margin:32px auto;width:min(100%,440px);box-sizing:border-box;padding:32px;background:var(--surface);border:1px solid var(--sep);border-radius:16px;box-shadow:none;overflow-wrap:anywhere}
+.login-card h1{font-size:1.75rem;line-height:1.4}.login-card p{line-height:1.7}.login-card>.button{width:100%;min-height:44px;margin-top:8px;white-space:normal}.login-card .eyebrow{letter-spacing:normal;font-size:1rem}.auth-error-card{padding:16px;background:var(--status-warn-bg);color:var(--status-warn-fg);border-radius:12px;margin:20px 0;overflow-wrap:anywhere;border:1px solid var(--sep)}.auth-error-card:focus{outline:2px solid var(--accent);outline-offset:3px}.auth-error-card h2{font-size:1.1rem;margin:0 0 16px}.auth-error-card dt{font-weight:600}.auth-error-card dd{margin:4px 0 16px;line-height:1.7}
+.system-offline{padding:16px 24px;background:var(--status-warn-bg);color:var(--status-warn-fg);border-bottom:1px solid var(--sep)}.system-offline p{margin:4px 0 0;line-height:1.6}.system-route{max-width:800px;padding:32px 20px;margin:auto}.system-route h1{overflow-wrap:anywhere}.system-state-card{width:calc(100% - 32px);padding:32px;max-width:720px;margin:32px auto;background:var(--surface);border-radius:16px;line-height:1.7}.system-state-card button{min-height:44px}
+@media(max-width:480px){.login-card{padding:24px;margin:20px auto}.system-state-card{padding:24px 16px}.system-offline{padding:12px 16px}}
+}
+
+@layer polish{
+body:has(.system-recovery,.system-state-card,.system-route,.token-dashboard,.error-page,.login-page){background:var(--bg)}
+.system-recovery .ds-group{background:var(--surface);box-shadow:none;border:1px solid var(--sep);border-radius:16px;padding:24px}
+.system-recovery .inline-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.system-recovery .ds-section{margin-bottom:24px}.system-recovery h1{line-height:1.4;overflow-wrap:anywhere}
+@media(max-width:480px){.system-recovery.owned-state{padding:16px;margin:16px auto}.system-recovery .inline-actions>*{width:100%}}
+}
