@@ -54,4 +54,6 @@
 /* Header actions share reserved space; the launcher cannot float over the menu. */
 .project-detail .pds-tools{display:flex;align-items:center;gap:8px}
 .project-detail .pds-tools .project-chat-launcher{position:static;float:none;margin:0;width:44px;height:44px;min-width:44px;min-height:44px;box-shadow:none}
-.project-detail .pds-header:has(.project-chat-launcher) .pds-back{margin-right:160px}
+.project-detail .project-case-header{position:relative}
+.project-detail .project-case-header>.pds-tools{z-index:13}
+.project-detail .project-case-header .pds-back{margin-right:160px}
