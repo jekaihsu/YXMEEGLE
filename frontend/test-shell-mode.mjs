@@ -64,7 +64,7 @@ try{
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.equal(window.shellContext.w.counts.my_overdue_tasks,1,'the shell still carries the server overdue count');assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期'),'the nav badge was removed in 155b65a');
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.equal(rows()[0].querySelector('.pl-current>span').textContent,'待核對'); // 目前作業 no longer repeats the workflow badge shown in the status column
+ assert.equal(rows()[0].querySelector('.pl-current>span:not(.sr-only)').textContent,'待核對'); // 目前作業 no longer repeats the workflow badge shown in the status column
  assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,0,'list rows show only the current node');assert.equal(rows()[0].querySelector('.pl-status').textContent,'逾期');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});

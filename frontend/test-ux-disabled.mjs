@@ -27,8 +27,11 @@ try{
  for(const hash of ['#view=approvals','#view=routines','#view=project&project=pA&tab=operations&section=routines','#view=project&project=pA&tab=approvals&approval=private']){
   await flush(()=>{location.hash=hash;window.dispatchEvent(new Event('hashchange'))});
   assert.match(document.querySelector('main.workspace').textContent,/尚未開放/);
-  const label=hash.includes('approvals')?'回今日工作台':'回首頁';
+  // F8-system-states.md retains the home CTA; appCommon uses this literal label.
+  const label='回今日工作台';
   assert.equal(document.querySelector('main.workspace .system-state-card button,main.workspace .approvals-disabled button').textContent,label);
+  await flush(()=>document.querySelector('main.workspace .system-state-card button,main.workspace .approvals-disabled button').click());
+  assert.equal(location.hash,'#view=dashboard');
  }
  assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('變更與展延'));
  assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('追蹤與檢討'));
