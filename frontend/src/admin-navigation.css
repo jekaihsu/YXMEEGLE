@@ -1,0 +1,54 @@
+@layer polish {
+ .administration-page {min-width:0;}
+ .admin-layout {display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start;}
+ .admin-subnav {display:grid;gap:4px;position:sticky;top:20px;}
+ .admin-subnav button {justify-content:flex-start;width:100%;}
+ .admin-subnav .active {background:var(--accent-soft);color:var(--accent);}
+ .admin-content {min-width:0;}
+ .admin-selector {display:none;}
+ .administration-page .settings-overview-container {margin:0;max-width:none;gap:12px;}
+ .admin-summary-cards {display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));}
+ .admin-summary-card {display:block;border:1px solid var(--separator);border-radius:12px;padding:20px;background:var(--surface);color:var(--label);text-decoration:none;}
+ .admin-summary-card h3 {margin:0 0 8px;color:var(--accent);font-size:1rem;}
+ .admin-summary-card p {margin:0 0 8px;}
+ .admin-summary-card small {color:var(--label-2);}
+ .administration-page :is(button,select,input:not([type=checkbox]):not([type=radio]),summary,a), .dispatch-board :is(button,select,input,summary,a), .dispatch-workflow :is(button,select,input,summary,a) {min-height:44px;min-width:44px;}
+ .administration-page a {display:inline-flex;align-items:center;}
+ .administration-page a.admin-summary-card {display:block;}
+ .administration-page summary {cursor:pointer;padding:10px 0;}
+ .administration-page :is(a,button,input,select,summary):focus-visible {outline:2px solid var(--accent);outline-offset:3px;}
+ .administration-page .owned-table {overflow:auto;}
+ @media(max-width:700px) {
+  .admin-layout {display:block;}
+  .admin-subnav {display:none;}
+  .admin-selector {display:grid;gap:6px;margin:12px 0 20px;}
+  .admin-selector select {width:100%;}
+  .admin-summary-cards {grid-template-columns:1fr;}
+ }
+}
+@layer polish {
+ body:has(.administration-page) {background-image:none;background-color:var(--bg);}
+ .workspace .administration-page .settings-overview-container {padding:0;margin:0;}
+ .workspace .administration-page .so-topbar {padding:0 0 12px;background:none;border-radius:0;min-height:44px;}
+ .workspace .administration-page .so-topbar h2 {margin:0;}
+ .workspace .admin-subnav .ds-button {background:transparent;box-shadow:none;border-color:transparent;border-radius:8px;}
+ .workspace .admin-subnav .ds-button.active {background:var(--surface-2);color:var(--accent);}
+}
+@layer polish {
+ .workspace .administration-page>h1 {font-size:26px;line-height:1.3;margin:0 0 16px;}
+ .workspace .administration-page .so-topbar {flex-direction:row;align-items:center;justify-content:space-between;}
+ .workspace .administration-page .so-topbar h2 {font-size:22px;line-height:1.3;}
+ .workspace .administration-page .settings-overview-container>p {margin:0;}
+ @media(max-width:700px) {
+  .workspace .admin-selector {display:flex;align-items:center;gap:12px;margin:0 0 20px;white-space:nowrap;}
+  .workspace .admin-selector select {min-width:0;flex:1;}
+ }
+}
+@layer polish {
+ .administration-page .sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+ @media(max-width:700px) {
+  .workspace .admin-selector {flex-direction:row;}
+  .workspace .admin-selector .ds-select {min-width:0;flex:1;}
+  .workspace .admin-selector .ds-picker, .workspace .admin-selector .ds-picker>button {width:100%;}
+ }
+}
