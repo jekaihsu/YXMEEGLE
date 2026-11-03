@@ -1133,3 +1133,6 @@
   }
 }
 }
+
+/* Shared source-reference link: the link itself owns its keyboard and pointer hit area. */
+.p2-cell-link{display:inline-flex;align-items:center;min-height:44px;min-width:44px}

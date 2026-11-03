@@ -22,7 +22,7 @@ try{
    }
    const failures=await page.evaluate(()=>{
     const failures=[];
-    const controlHeight=matchMedia('(max-width:700px),(pointer:coarse)').matches?44:40;
+    const controlHeight=44;
     for(const field of document.querySelectorAll('.reports-filters label')){
      const control=field.querySelector('.ds-picker>button,input');if(!control)continue;
      const range=document.createRange();range.selectNodeContents(field.firstChild);

@@ -54,6 +54,7 @@ assert.equal(document.activeElement.tagName,'BODY','desktop load does not steal 
 await flush(()=>document.querySelector('.assistant-history-open').click());
 assert.equal(document.querySelectorAll('.assistant-message').length,2);
 assert.match(document.querySelector('.assistant-message[data-role=assistant]').textContent,/控制測量進行中/);assert.match(document.querySelector('[role=note]').textContent,/未記錄案件來源/);
+assert.match(document.querySelector('.assistant-saved-date').textContent,/歷史回答.*2026\/11\/01 08:00:00.*來源時間未提供/);
 const before=calls.filter(call=>call.url.startsWith('/api/ai/conversations?')).length;
 await flush(()=>document.querySelector('textarea').focus());
 await flush(()=>{const input=document.querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'下一步');input.dispatchEvent(new window.Event('input',{bubbles:true}));input.dispatchEvent(new window.KeyboardEvent('keyup',{key:'步',bubbles:true}))});
