@@ -28,7 +28,7 @@ export function SourceHealth({view,onRetry,onReload,busy=false}:SourceHealthProp
     <p>最近成功 · {successfulRead(row.last_success.value)}</p>
     {row.lastErrorSummary&&<p className="source-read-error">{row.lastErrorSummary}</p>}
     {row.retry&&onRetry?<button type="button" className="source-health-btn-retry" disabled={busy} onClick={()=>onRetry(row.retry!.handle)}>{busy?'更新中…':'重試'}</button>:row.needsAttention&&<span>待處理</span>}
-   </article>)}</div>:<DataState kind={view?.page.states.includes('loading')?'Loading':view?.page.states.includes('forbidden')?'Denied':view?.page.states.includes('read_failed')?'Error':'Empty'} title={view?.page.states.includes('loading')?'正在讀取來源健康':view?.page.states.includes('forbidden')?'無權讀取來源健康':'尚無可見來源'} body="尚無成功紀錄時，來源狀態與筆數皆未知。"/>}
+   </article>)}</div>:<DataState kind={view?.page.states.includes('loading')?'Loading':view?.page.states.includes('forbidden')?'Denied':view?.page.states.includes('read_failed')?'Error':view?.page.states.includes('complete_empty')?'Empty':'Partial'} title={view?.page.states.includes('loading')?'正在讀取來源健康':view?.page.states.includes('forbidden')?'無權讀取來源健康':view?.page.states.includes('complete_empty')?'尚無可見來源':'來源狀態尚未確認'} body="尚無成功紀錄時，來源狀態與筆數皆未知。"/>}
   </section>
  </div>;
 }
