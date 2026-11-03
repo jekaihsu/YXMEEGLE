@@ -11,7 +11,7 @@ import ts from 'typescript';
 const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
- 'ProjectsList.tsx': '232f052dfb9702867388d0e42b2dec9e4aec483ce02bbd3f27f9dfd96b643e78',
+ 'ProjectsList.tsx': 'ffad4ce5ab09ce55a986a4baa401e5adaab2fd249c7c1e3a2c1bc94802ae8b6b',
  'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
