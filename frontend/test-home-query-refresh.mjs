@@ -33,5 +33,8 @@ try{
  assert.equal(requests.length,beforeIdle,'resuming interaction never refreshes');
  await render('ab');await act(async()=>clock.advance(250));assert.equal(requests.length,3,'return to an in-flight query joins its original request');
  assert.equal(document.querySelector('p').textContent,'29');
+ await render('denied');await act(async()=>clock.advance(250));
+ await act(async()=>requests.at(-1).resolve(new Response(JSON.stringify({detail:'no permission'}),{status:403})));
+ assert.equal(read.denied,true);assert.equal(read.body,null);
  console.log('PASS home query debounce, cancellation, retained body and workspace version');
 }finally{await act(async()=>root.unmount());clock.restore()}

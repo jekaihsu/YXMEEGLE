@@ -282,7 +282,11 @@ test('wiring: five hash views stay reachable through compact navigation and dril
  assert.doesNotMatch(shell, /\{view:'confirmations',label:/);
  assert.doesNotMatch(shell, /\{view:'(confirmation|contract|workitem)',label/);
  assert.match(shell, /projects:'案件總覽'/); assert.match(shell, /\{view:'projects',label:ROUTE_LABELS\['projects'\]/); assert.match(read('src/IntegratedPages.tsx'), /<h1>我的工作<\/h1>/);
- assert.doesNotMatch(shell, /\{view:'work',label:/);
+ assert.match(shell, /\{view:'work',label:ROUTE_LABELS\.work,icon:ListTodo\}/);
+ assert.ok(shell.indexOf("{view:'dashboard',label:")<shell.indexOf("{view:'work',label:"),'work follows Home in sidebar');
+ assert.ok(shell.includes("aria-current={activeNav==='confirmations'?'page':undefined}"),'More drawer exposes current confirmations destination');
+ assert.ok(shell.includes("go({view:'confirmations'})"),'More drawer retains confirmations entry');
+ assert.ok(read('src/ProjectsList.tsx').includes('<a className="button" href="#view=confirmations">工程確認單</a>'),'Projects header retains confirmations entry');
  const ci = fs.readFileSync(path.join(root, '..', 'scripts', 'local_ci.sh'), 'utf8');
  for (const t of ['drilldown-context', 'confirmation-list-view', 'case-detail-view', 'contract-detail-view', 'work-item-detail-view', 'manager-overview-view', 'p2-routes']) assert.ok(ci.includes(`test-${t}.mjs`), `local_ci runs test-${t}`);
 });

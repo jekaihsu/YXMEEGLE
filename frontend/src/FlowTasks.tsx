@@ -30,6 +30,8 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  const hasFilters=(ctx.nodes.find(n=>n.key===ctx.selectedId)?.taskRows.length||0)>4||applied.length>0;
  const [assigning,setAssigning]=useState<{nodeKey:string;taskId:string}|null>(null);
  const [restore,setRestore]=useState('');
+ const [showAll,setShowAll]=useState(false);
+ useEffect(()=>setShowAll(false),[ctx.selectedId]);
  const groups=groupTasks({ctx,filters,userId,today:c.w.as_of,loaded:key=>!!details[key]||!ctx.nodes.find(n=>n.key===key)?.assignment});
  const selected=groups.selected,selectedId=ctx.selectedId;
  const sopTask=c.route.task_source==='sop_local';
@@ -49,15 +51,15 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  },[c.route.task,loading,selected?.matching.length]);
  const filterRoute=(key:typeof STAGE_FILTERS[number])=>c.go(withTaskFilter(c.route,key,!filters[key]),true);
  const clear=()=>c.go({...c.route,task_filters:undefined},true);
- const assignButton=(row:TaskView)=>!row.ownerId&&row.task?.can.assign&&<FlowAction allowed={!busy&&row.task.can.assign} reason={busy?reason:'你可查看此任務，但目前無指派權限。'} onClick={()=>open(row.nodeKey,row.id)}>指派</FlowAction>;
+ const assignButton=(row:TaskView)=>!row.ownerId&&row.task&&<FlowAction allowed={!busy&&row.task.can.assign} reason={busy?reason:'你可查看此任務，但目前無指派權限。'} onClick={()=>open(row.nodeKey,row.id)}>指派</FlowAction>;
  const caseReason=sourceStatusPending(p)?lifecycleGate(p)||'來源案件狀態待核對':!executionAllowed(p,c.w)?executionReason(p):caseProgressStatus(p)==='paused'?'案件暫停中':'';
  const sharedReasons=sharedBlockerReasons(selected?.rows||[]);
  const rowView=(row:TaskView,group:TaskGroup)=>{
   const rowReasons=row.flags.blocker.state==='blocked'?row.flags.blocker.reasons.filter(r=>!sharedReasons.includes(r)&&(!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r)))):[];
   const plan=row.task?productionPlanFacts(row.task,row.nodeKey,group.node.production):null;
-  return <li key={row.id} data-assignment-task={row.id} className="st-row">
+  return <li key={`${row.source}:${row.id}`} data-assignment-task={row.id} className="st-row">
    <div className="pf-task-line"><button className="pf-task-open" onClick={()=>c.go({...c.route,...(row.source==='SOP 任務'?flowTaskTarget(row):{node:row.task?row.nodeKey:group.node.legacy?.id,task:row.id,task_source:undefined}),tab:c.route.tab==='overview'?'overview':'flow'})}><strong>{row.title}</strong>
-    <span className="st-meta"><Badge>{row.statusText}</Badge><Executor row={row}/><span>{row.deadline?.slice(0,10)||'未排期限'}</span>{row.flags.overdue&&<Badge>逾期</Badge>}</span>
+    <span className="st-meta"><span className="i3-origin">{row.source==='Lark 任務'?'Lark':row.source==='SOP 任務'?'SOP':'本地流程'}</span><Badge>{row.flags.overdue?'逾期':row.statusText}</Badge><Executor row={row}/><span>{row.deadline?.slice(0,10)||'未排期限'}</span></span>
     {rowReasons.length>0&&<small className="st-task-blocker">{rowReasons[0]}</small>}</button>
     {assignButton(row)}{!row.ownerId&&row.source==='SOP 任務'&&row.sopTask.allowedActions.includes('edit')&&<Button onClick={()=>c.go({...c.route,...flowTaskTarget(row),tab:c.route.tab==='overview'?'overview':'flow'})}>指派</Button>}</div>
    {row.id===seed?.id?evidence:plan&&<ProductionPlanFacts plan={plan}/>}
@@ -80,7 +82,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
   {filters.blocked&&selected&&!blockedKnown(selected.rows)&&<p className="st-note" role="status">此來源未提供任務阻礙資訊，無法判定哪些任務受阻。</p>}
   {incomplete&&<p role="alert">任務來源暫不可用，請重試明細後再確認完整清單。<Button onClick={retryDetails}>重試任務明細</Button></p>}
   {loading&&<div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
-  <ul className="pf-task-list">{shown.map(row=>rowView(row,selected!))}</ul>
+  <ul className="pf-task-list">{shown.filter((row,i)=>showAll||i<8||row.id===c.route.task).map(row=>rowView(row,selected!))}</ul>{!showAll&&shown.length>8&&<Button onClick={()=>setShowAll(true)}>查看全部（{shown.length} 項）</Button>}
   {!loading&&!incomplete&&selected&&selected.loaded&&!shown.length&&<div className="pf-empty">{selected.rows.length?'沒有符合條件的任務':`此階段尚無任務${!isProjectLead(c.s,p)&&p.pm_id?' · PM：'+nameOf(c.w,p.pm_id):''}`}{selected.rows.length>0&&<Button variant="plain" onClick={clear}>清除篩選</Button>}{!selected.rows.length&&emptyActions}</div>}
   {targetRow&&!ctx.currentIds.includes(targetRow.nodeKey)&&ctx.currentIds.length>0&&<p className="st-note" role="status">此任務屬於「{ctx.nodes.find(n=>n.key===targetRow.nodeKey)?.label}」階段，不是目前階段「{ctx.nodes.find(n=>n.key===ctx.currentIds[0])?.label}」；開啟連結不會變更活動階段。</p>}
   {pinned&&<p className="st-note" role="status">這項任務不符合目前的篩選條件，因連結指向它而保留顯示。</p>}

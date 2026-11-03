@@ -5,5 +5,5 @@ const b=await build({stdin:{contents:"import React from 'react';import {renderTo
 const m={exports:{}};new Function('require','module','exports',b.outputFiles[0].text)(createRequire(import.meta.url),m,m.exports);
 const html=m.exports.render({gaps:[],stale:true,fetched_at:'2026-11-02T12:00:00Z'});
 assert.doesNotMatch(html,/背景更新中/,'stale alone is not proof of an active refresh');assert.match(html,/資料待更新/);assert.match(html,/2026/);
-assert.match(m.exports.render({gaps:[],stale:true,refresh_error:'failed'}),/更新失敗，顯示舊資料/);
+assert.match(m.exports.render({gaps:[],stale:true,refresh_error:'failed'}),/舊資料 · 資料待更新/);
 console.log('reports stale notice: truthful state and retained timestamp');

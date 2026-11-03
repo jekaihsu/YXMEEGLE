@@ -51,6 +51,6 @@ assert.equal(paused,'受阻');
 await act(async()=>root.unmount());
 const shellRoot=createRoot(document.getElementById('root'));
 await flush(()=>shellRoot.render(React.createElement(ui.ProjectDetailShell,{c:{...c,route:{view:'project',project:'P-PAUSED'}},p:rows[0],tab:'overview',onPeople(){},onPrefetch(){},onCancelPrefetch(){}})));
-assert.equal(document.querySelector('.pds-case-status').textContent.slice(0,'案件狀態暫停中'.length),'案件狀態'+ui.caseStatusLabel('paused'),'R15: library and detail read the same dictionary');
+assert.equal(document.querySelector('.pds-status-chip').textContent,ui.caseStatusLabel('paused'),'R15: library and detail read the same dictionary');
 await act(async()=>shellRoot.unmount());
 console.log('PASS library restores search/scroll on return and uses one work badge while detail retains the case status dictionary');
