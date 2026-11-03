@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import {projectFixture,assignmentFixture} from './fixtures/node-assignments.mjs';
+
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate} from './src/ProjectDetail';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const file=new URL('./.case-live3-tabs-test.mjs',import.meta.url);
+await fs.writeFile(file,bundle.outputFiles[0].text);
+let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
+const {project,user,workspace}=projectFixture();
+const c={w:{...workspace,scope:'shell'},s:{user,workspace_id:'offline',features:{node_assignment:true}},route:{view:'project',project:project.id},go(){},registerDrafts(){},notify(){}};
+const requests=[];
+globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));
+let root,reloadVersion;
+const render=tab=>act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,reloadVersion,route:{...c.route,tab}}})));
+const settle=()=>{for(const request of requests)request.resolve(new Response('{"detail":"offline test complete"}',{status:503}));};
+try{
+ root=createRoot(document.getElementById('root'));
+ await render('overview');
+ assert.deepEqual(requests.map(r=>r.url),['/api/projects/p1/first-screen'],'overview starts one aggregate read');
+ await render('flow');
+ assert.equal(requests.length,1,'changing tabs shares the pending first-screen read');
+ await render('overview');
+ const examples=JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
+ const tasks=structuredClone(examples.sop_tasks);tasks.project_id=project.id;
+ const progress=JSON.parse(await fs.readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id=project.id;
+ const assignments=assignmentFixture().list;
+ assignments.node_details=Object.fromEntries(assignments.nodes.map(n=>[n.key,{tasks:[],assignable_people:[]} ]));
+ const start={project_id:project.id,code:project.code,eligible:false,can_start:false,already_started:true,seeds_pending:0,seeds_optional:false,blockers:[],warnings:[],nodes:[],chain_note:'',preview_hash:'h1',plan_rule_version:'v1'};
+ await act(async()=>requests[0].resolve(new Response(JSON.stringify({project:{...workspace,scope:'project',project:{...project,source_kind:'lark'}},assignments:{status:200,body:assignments},tasks:{status:200,body:tasks},start:{status:200,body:start},progress:{status:200,body:progress},snapshot:{as_of:'2026-11-03T02:41:47Z',completeness:'partial',stale:true}}),{headers:{'X-Read-Snapshot':'stale'}})));
+
+ const header=()=>document.querySelector('.pds-status-chip')?.textContent;
+ const initial=header();assert.equal(initial,'控制 · 進行中');
+ await render('files');
+ const full=requests.find(r=>r.url==='/api/projects/p1');assert(full);
+ await act(async()=>full.resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,nodes:[]}}))));
+ assert.equal(header(),'控制 · 進行中');
+ assert.match(document.querySelector('.pds-data-time').textContent,/2026\/11\/03 10:41:47/);
+ assert.match(document.querySelector('.pds-data-time').textContent,/部分資料/);
+ await render('data');assert.equal(header(),'控制 · 進行中');
+ await render('flow');assert.equal(header(),'控制 · 進行中');
+ assert.equal(requests.filter(r=>r.url==='/api/projects/p1/first-screen').length,1);
+ await act(async()=>{root.unmount();settle()});ui.invalidateSessionEpoch();requests.length=0;
+ root=createRoot(document.getElementById('root'));await render('overview');
+ await act(async()=>requests[0].resolve(new Response(JSON.stringify({detail:'case_not_found'}),{status:404})));
+ assert.match(document.body.textContent,/找不到案件/);
+ assert.equal(document.querySelector('.ds-data-state').dataset.kind,'Error');
+ assert.equal(document.querySelector('details code').textContent,'case_not_found');
+ assert.equal(requests.length,1,'terminal missing case must stop all fallback/dependent reads');
+ await render('files');assert.equal(requests.length,1,'tab changes retain terminal nonexistence');
+ await act(async()=>root.unmount());ui.invalidateSessionEpoch();requests.length=0;root=createRoot(document.getElementById('root'));await render('items');
+ assert.equal(requests.length,1,'items defers dependent reads until the case exists');
+ await act(async()=>requests[0].resolve(new Response(JSON.stringify({detail:'case_not_found'}),{status:404})));assert.equal(requests.length,1);
+ await act(async()=>root.unmount());ui.invalidateSessionEpoch();requests.length=0;root=createRoot(document.getElementById('root'));await render('files');
+ await act(async()=>requests[0].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,source_kind:'lark',nodes:project.nodes.map(n=>({...n,status:'pending'}))}}))));
+ assert.equal(header(),'目前階段待確認 · 進行中','a detail-only Lark response must not manufacture a sales stage');
+ console.log('PASS LIVE3 literal cross-tab stage/time and terminal 404');
+}finally{await act(async()=>{root?.unmount();settle()});dom.window.close()}

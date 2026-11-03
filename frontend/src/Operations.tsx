@@ -1,3 +1,4 @@
+import {CaseFinanceSources} from './CaseFinanceSources';
 import {Select as FormSelect} from './design/Select';
 import {ReportLinkReview} from './ReportLinkReview';
 import {useViewData} from './viewData';
@@ -103,7 +104,7 @@ export function ProjectOperations({c,p,n,initialSection}:{c:Context;p:Project;n:
  {(c.w.sop_requests||[]).filter((r:RecordData)=>r.project_id===p.id).map((r:RecordData)=><p key={r.id}>SOP 更新 · {r.reason} · <Status value={r.status}/>{supervisor&&r.status==='pending'&&<Button className="button compact" onClick={()=>void run('sop_apply',{id:r.id})}>核准套用新增任務與文件規則</Button>}</p>)}
  </>}
  {section==='batches'&&<DeliveryBatches c={c} p={p} n={n}/>}
- {section==='finance'&&<div className="finance-readonly"><Section><h3>來源財務資料</h3><p>財務資料僅供核對，不在工作台直接記帳、登錄收付款或核准帳務。重大財務確認依核定 Lark 流程辦理。</p><dl><dt>合約來源金額</dt><dd>{p.source_projection?.finance?.contract_amount??p.source_finance?.合約總額??'來源待核對'}</dd><dt>預估成本</dt><dd>{p.source_projection?.finance?.estimated_cost??'來源待核對'}</dd><dt>實際成本</dt><dd>{p.source_projection?.finance?.actual_cost??'來源待核對'}</dd></dl><p>來源數字不代表已核准或已結清。</p><a className="button" href={'#'+new URLSearchParams({view:'project',project:p.id,node:n.id,tab:'flow',section:'approvals'})}>查看重大審批</a></Section></div>}
+ {section==='finance'&&<div className="finance-readonly"><Section><h3>來源財務資料</h3><CaseFinanceSources p={p}/><p>財務資料僅供核對，不在工作台直接記帳、登錄收付款或核准帳務。重大財務確認依核定 Lark 流程辦理。</p><dl><dt>預估成本</dt><dd>{p.source_projection?.finance?.estimated_cost??'來源待核對'}</dd><dt>實際成本</dt><dd>{p.source_projection?.finance?.actual_cost??'來源待核對'}</dd></dl><p>來源數字不代表已核准或已結清。</p><a className="button" href={'#'+new URLSearchParams({view:'project',project:p.id,node:n.id,tab:'flow',section:'approvals'})}>查看重大審批</a></Section></div>}
  {section==='inputs'&&<>
  {c.s.mode==='lark'&&(c.w.environment==='production'||(c.w.environment==='test'&&c.w.settings.test_connection_mode==='isolated_live'))&&<InputRegistration key={p.id+':'+n.id} c={c} p={p} n={n} canSubmit={operator}/>}
  <a className="button" href={`/api/projects/${p.id}/file-index.csv`}>匯出案件文件清單</a>
