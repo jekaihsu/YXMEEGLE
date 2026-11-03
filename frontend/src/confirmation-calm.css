@@ -1,0 +1,192 @@
+.p2-page {
+  color:var(--label)
+}
+.p2-page .ds-data-state {
+  margin-bottom:16px
+}
+.p2-page button,.p2-page summary,.approvals-disabled summary {
+  min-height:44px
+}
+.p2-page summary,.approvals-disabled summary {
+  padding:12px;
+  cursor:pointer
+}
+.p2-page [hidden] {
+  display:none!important
+}
+.p2-page .p2-card,.approvals-disabled .p2-card {
+  background:var(--surface);
+  border:1px solid var(--sep);
+  box-shadow:none;
+  color:var(--label)
+}
+.p2-page .p2-table th,.p2-page .p2-plan-table th {
+  background:var(--surface-2);
+  color:var(--muted)
+}
+.p2-page .p2-table td,.p2-page .p2-plan-table td {
+  background:var(--surface);
+  color:var(--label)
+}
+.p2-page .p2-title,.p2-page .p2-header-title {
+  font-size:var(--fs-title1,1.75rem);
+  color:var(--label)
+}
+.p2-page .p2-cell-unknown {
+  color:var(--muted)
+}
+.p2-page .p2-section-source-time,.p2-page .p2-meta-item {
+  color:var(--muted)
+}
+.p2-page .p2-plan-chips {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px
+}
+.p2-page .p2-plan-chips .p2-badge {
+  background:transparent;
+  border:0;
+  padding:0 4px;
+  font-weight:400
+}
+.p2-page .p2-inpage-nav {
+  position:static;
+  box-shadow:none
+}
+.p2-page .p2-warnings-list {
+  padding:0;
+  list-style:none
+}
+.p2-page .p2-warning-item {
+  border:0;
+  background:transparent;
+  padding:8px 0
+}
+.p2-page .p2-warning-icon {
+  display:none
+}
+.p2-page .p2-row-title-btn {
+  min-height:44px;
+  text-align:left;
+  overflow-wrap:anywhere
+}
+.p2-page button:focus-visible,.p2-page summary:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+.approvals-disabled {
+  max-width:960px;
+  margin:0 auto;
+  display:grid;
+  gap:24px
+}
+.approvals-disabled table {
+  width:100%;
+  text-align:left
+}
+.approvals-disabled td,.approvals-disabled th {
+  padding:12px;
+  border-bottom:1px solid var(--sep)
+}
+.approvals-disabled caption {
+  text-align:left;
+  color:var(--muted);
+  padding:12px
+}
+
+@media(max-width:700px) {
+  .confirmation-list-root .p2-table {
+  min-width:0!important;
+  width:100%;
+  table-layout:fixed
+}
+.confirmation-list-root .p2-table thead {
+  display:none
+}
+.confirmation-list-root .p2-table tbody {
+  display:block
+}
+.confirmation-list-root .p2-table tr {
+  display:flex;
+  flex-direction:column;
+  border-bottom:1px solid var(--sep);
+  padding:12px
+}
+.confirmation-list-root .p2-table td {
+  position:static!important;
+  display:block!important;
+  white-space:normal!important;
+  width:auto!important;
+  min-width:0!important;
+  border:0!important;
+  padding:4px!important;
+  overflow-wrap:anywhere
+}
+.confirmation-list-root .p2-table-scroll {
+  overflow:visible
+}
+.confirmation-list-root .p2-toolbar-row-primary,.confirmation-list-root .p2-toolbar-primary-left {
+  flex-wrap:wrap;
+  min-width:0
+}
+.confirmation-list-root .p2-search-box {
+  width:100%
+}
+.p2-page .p2-case-root .p2-main-layout {
+  display:flex;
+  flex-direction:column
+}
+.p2-page .p2-side-column {
+  width:100%
+}
+
+}
+
+.confirmation-case-code {
+  display:block;
+  font-size:.8125rem;
+  color:var(--muted);
+  font-weight:400
+}
+.confirmation-list-root .p2-table th:first-child,.confirmation-list-root .p2-table td:first-child {
+  width:auto
+}
+.confirmation-list-root .p2-col-sticky-2 {
+  left:0!important
+}
+
+.workspace:has(.p2-page),.workspace:has(.approvals-disabled) {
+  background:var(--bg)
+}
+.confirmation-list-root .p2-header-title-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto
+}
+.confirmation-list-root .p2-header-meta {
+  grid-column:1/-1
+}
+
+
+@media(max-width:700px) {
+  .p2-page .p2-case-root .p2-table-wrapper {
+  overflow-x:auto;
+  max-width:100%
+}
+.p2-page .p2-case-root .p2-table-wrapper>.p2-table {
+  min-width:760px
+}
+.p2-page .p2-case-root .p2-plan-panel {
+  overflow-x:auto
+}
+.p2-page .p2-case-root .p2-plan-table {
+  min-width:620px
+}
+
+}
+
+
+.p2-page .p2-case-root .p2-table-wrapper>.p2-table { min-width:860px; }
+.p2-page .p2-case-root .p2-header>details { padding:0; }
+@media(max-width:767px) {
+  .p2-page { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+}

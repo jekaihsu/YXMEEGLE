@@ -60,11 +60,11 @@ const renderAssigned=async version=>{await act(async()=>root.render(React.create
 const assignment={panel:'assigned',scope:'mine',readState:'partial',snapshot_version:'one',as_of:null,freshness:{status:'unknown',last_success_at:null,refreshing:false},counts:{node_assignments:null,tasks:null,local_workflow:null,sop_tasks:0,complete:false},items:[],next_cursor:null,has_more:false,complete:false,total_count:null,manager_view_available:false};
 await renderAssigned(1);await respond(assignment);
 assert.equal(document.querySelectorAll('.work-page [role=status]').length,1);
-assert.match(text(),/工作來源尚未完整，請重新讀取。/);
+assert.match(text(),/工作來源尚未完整/);
 assert.doesNotMatch(text(),/未知|0 項|目前沒有符合條件|尚無成功讀取時間/);
 assert.equal(document.querySelector('table'),null,'hide empty groups');
 await renderAssigned(2);await respond({...assignment,complete:true,readState:'ready',counts:{...assignment.counts,complete:true},total_count:0});
-assert.match(text(),/目前沒有符合條件的工作。/);
+assert.match(text(),/目前沒有符合條件的工作/);
 assert.doesNotMatch(text(),/工作來源尚未完整/);
 await act(async () => root.unmount());
 console.log('my-work integrated render: ok');

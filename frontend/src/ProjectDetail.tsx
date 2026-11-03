@@ -1,11 +1,11 @@
-import {sourceStatusPending} from './stageModel';
+import {resolveStages,sourceStatusPending} from './stageModel';
 import {FlowPeopleLink,FlowAction} from './FlowActions';
 import {DetailsMenu} from './design/DetailsMenu';
 import {Select as FormSelect} from './design/Select';
 import {DetailRefreshProvider, useCaseData, caseValue, trackCaseResource, type CaseSnapshot, useDetailRefresh} from './detailRefresh';
 import {EnsureSopStatus} from './EnsureSopStatus';
 import {InlineTaskEditor} from './InlineTaskEditor';
-import {editorFields,localCase,checklistProject,type TaskDraft} from './nodeWorkbenchModel';
+import {withLocalChecklist,editorFields,localCase,checklistProject,type TaskDraft} from './nodeWorkbenchModel';
 import {ProjectOverview} from './ProjectOverview';
 import {ProjectDetailShell,ProjectExecutionDetails} from './ProjectDetailShell';
 import {useSopTasks,canReadSop,prefetchSopTasks} from './useSopTasks';
@@ -17,7 +17,7 @@ import {caseDataSections,sourceKindLabel} from './caseDataSections';
 import {SheetActions,SheetPrimary,type SheetMenuItem} from './TaskSheetParts';
 import {useRestoreEditFocus} from './taskSheetFocus';
 import {FlowWorkspaceSkeleton} from './FlowDiagram';
-import {projectFlowRoute,selectedFlowNode,workflowKeys} from './flowModel';
+import {buildFlowModel,projectFlowRoute,selectedFlowNode,workflowKeys} from './flowModel';
 import {executionAllowed, executionReason} from './ProjectExecution';
 import {projectQuotes} from './sourceQuotes';
 import {SourceContractIndex} from './ProjectReadiness';
@@ -25,7 +25,7 @@ import {lazy, useEffect, useState, useRef, useCallback, type FormEvent} from 're
 import {ArrowRight, ArrowUpRight, Check, ChevronLeft, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, TriangleAlert, Upload, Users} from 'lucide-react';
 import {usePageResource} from './viewData';
 import type {PageData, FetchIntent} from './pageData';
-import {time as dataTime} from './DataFreshness';
+import {ProjectChatLauncher} from './assistant/ProjectChatLauncher';
 import {api, ApiError, getSessionEpoch, perfMark} from './api';
 import {MentionComposer, MentionText, MentionDelivery} from './MentionComposer';
 import {Avatar} from './AppShell';
@@ -36,9 +36,10 @@ import {draftKey, useDraft} from './drafts';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Approval, type Node, type Project, type Task, type Workspace} from './types';
 import {Ctx,active,progress,date,nameOf,money,amountWithheld,amountLabel,points,isLate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
-import {DisabledActionReasons,Button,Skeleton} from './design';
+import {DataState,DisabledActionReasons,Button,Skeleton} from './design';
 import './ProjectDetail.css';
 import './ProjectCalm.css';
+import './CaseDetailI3.css';
 import {prefetchNodeAssignments, useNodeAssignments} from './useNodeAssignments';
 import {seedStartSop} from './useStartSop';
 import {seedNodeAssignments} from './useNodeAssignments';
@@ -104,17 +105,20 @@ function ProjectDetailContent({c}:{c:Ctx}){
  const retained='value' in detail?detail.value:'previous' in detail?detail.previous:undefined;
  const snapshot=retained?.data;
  useEffect(()=>{if(shell&&snapshot)perfMark('project-detail-render')},[shell,snapshot]);
+ if(detail.kind==='Denied')return <DataState kind="Denied" title="無法查看此案件" body="目前身分無權查看，已停止顯示案件資料。" actions={<Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button>}/>;
  if(!shell)return <ProjectDetail key={id} c={c}/>;
  if(detail.kind==='Closed')return <Empty title="案件資料已關閉" detail="登入身分已變更，請重新開啟案件。"/>;
  const error='error' in detail?detail.error instanceof Error?detail.error.message:String(detail.error):'';
- const summary=c.w.projects.find(p=>p.id===id);
- if(!snapshot)return error?<div className="project-detail project-detail-calm"><div role="alert"><Empty title={error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':error}/></div><div className="co-actions"><Button onClick={()=>void refreshDetail?.(false)}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail project-detail-calm">{summary?<><Button variant="plain" onClick={()=>c.go({view:'projects'})}><ChevronLeft size={15}/>案件總覽</Button><p>{summary.code}</p><h1>{summary.name}</h1><p role="status">正在載入案件詳細內容…</p></>:<Skeleton height="2.5rem" width="60%"/>}{!summary&&<p role="status">正在載入案件詳細內容…</p>}<Skeleton height="3rem"/><FlowWorkspaceSkeleton/></div>;
+ if(detail.kind==='UnknownOutcome'&&!snapshot)return <DataState kind="UnknownOutcome" title="儲存結果尚未確認" body="請先查詢最新結果，避免重複送出。" actions={<Button onClick={()=>void refreshDetail?.(false)}>查詢最新結果</Button>}/>;
+ if(!snapshot)return <div className="project-detail project-detail-calm">{error?<DataState kind={detail.kind==='Conflict'?'Conflict':'Error'} title="案件讀取失敗" body={error} actions={<><Button onClick={()=>void refreshDetail?.(false)}>重新讀取</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></>}/>:<><DataState kind="Loading" title="正在載入案件" body="正在核對節點與任務…"/><div className="i3-loading-card" aria-hidden="true"><Skeleton height="2rem"/><Skeleton lines={3} width="100%"/><Skeleton height="12rem" width="100%"/></div><FlowWorkspaceSkeleton/></>}</div>;
+
  const {scope:_scope,version:_version,as_of:_asOf,snapshot:_snapshot,project,...records}=snapshot;
  const stale=!!error||retained?.stale===true||snapshot.snapshot?.stale===true;
  const sourceAt=snapshot.snapshot?.as_of??retained?.fetchedAt??null;
- return <>{error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{error}<Button onClick={()=>void refreshDetail?.(false)}>重試</Button></div>}<div className={`data-freshness freshness-view data-freshness-${stale?'stale':'fresh'}`} data-snapshot-id={retained?.snapshotId||undefined}><span role="status">資料時間 {sourceAt?dataTime(sourceAt):'來源未提供'}{stale?' · 資料待更新':''}{retained?.completeness==='partial'?' · 部分資料':retained?.completeness==='unknown'?' · 完整性未確認':''}</span><Button variant="plain" onClick={()=>void refreshDetail?.(false)}>重新整理</Button></div><ProjectDetail key={project.id} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
+ return <>{detail.kind==='UnknownOutcome'&&<DataState kind="UnknownOutcome" title="儲存結果尚未確認" body="以下保留上次資料，請先查詢最新結果。" actions={<Button onClick={()=>void refreshDetail?.(false)}>查詢最新結果</Button>}/>}{error&&<DataState kind={detail.kind==='Conflict'?'Conflict':'Stale'} title="案件更新未完成" body={`以下保留上次資料：${error}`} actions={<Button onClick={()=>void refreshDetail?.(false)}>重新讀取</Button>}/>}<ProjectDetail key={project.id} snapshotTime={sourceAt} snapshotNote={`${stale?' · 資料待更新':''}${retained?.completeness==='partial'?' · 部分資料':retained?.completeness==='unknown'?' · 完整性未確認':''}`} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
+
 }
-export function ProjectDetail({c}:{c:Ctx}){
+export function ProjectDetail({c,snapshotTime,snapshotNote}:{c:Ctx;snapshotTime?:string|null;snapshotNote?:string}){
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus&&!assignmentTarget(c.route,p?.nodes)?'complete-node':'');useEffect(()=>{if(c.route.focus&&!assignmentTarget(c.route,p?.nodes))setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');
 
  const sopTasks=useSopTasks(p?.id||'',c.s.workspace_id||'',!!p&&canReadSop(c.s.user)&&['overview','flow'].includes(projectFlowRoute(c.route).tab));
@@ -123,6 +127,11 @@ export function ProjectDetail({c}:{c:Ctx}){
  if(!p)return <Empty title="找不到這個案件" detail="案件連結可能已失效，請回到案件總覽重新開啟。"/>;
  const selectedKey=selectedFlowNode(p,c.route.node,'data' in assignments.state ? assignments.state.data : undefined);
  const selected=p.nodes.find(n=>n.key===selectedKey);
+ const headerList='data' in assignments.state?assignments.state.data:undefined;
+ const headerFlow=buildFlowModel({project:assignments.state.kind==='disabled'?p:{...p,nodes:[]},assignments:headerList,today:c.w.as_of,users:c.w.users});
+ const headerNodes=withLocalChecklist(headerFlow.nodes,'data' in sopTasks.state?sopTasks.state.data:undefined,sopTasks.assignees);
+ const headerStage=resolveStages({nodes:headerNodes,list:headerList});
+ const current=headerNodes.find(n=>n.key===headerStage.currentIds[0]);
  const target=assignmentTarget(c.route,p.nodes,workflowKeys('data' in assignments.state ? assignments.state.data : undefined));const changeEnabled=c.s.features?.change_extension===true;
  const route=projectFlowRoute(c.route),tab=route.tab;const dataSection=tab==='data'?(route.section||'basic'):'';const selectedTask=target&&c.s.features?.node_assignment?undefined:p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);
  const closeTask=()=>c.go({...c.route,node:c.route.node||selectedTask?.n.id,task:undefined,task_source:undefined,comment:undefined});
@@ -135,9 +144,9 @@ export function ProjectDetail({c}:{c:Ctx}){
  {!['pricing','settlement'].includes(selected.key)&&<FlowAction allowed={!c.busy&&selected.status!=='completed'&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':selected.status==='completed'?'節點已完成。':executionReason(p)} onClick={()=>{close();setModal('complete-node')}}>完成節點</FlowAction>}
  </div>}</DetailsMenu>}</div>;
 
- return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectDetailShell c={c} p={p} tab={tab} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/>
+ return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectDetailShell c={c} p={p} tab={tab} current={current} snapshotTime={snapshotTime} snapshotNote={snapshotNote} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/>
  {(tab==='overview'||tab==='flow')&&<EnsureSopStatus c={c} p={p} sop={sopTasks} assignments={assignments}/>}
- {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} workbench={()=><ProjectFlow c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} inline emptyActions={selected&&isProjectLead(c.s,p)&&!localCase(p)?<div className="nw-actions"><Button variant="primary" disabled={c.busy||!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</Button></div>:null} secondary={null} legacyActions={localActions}/>}/>}
+ {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} workbench={()=><ProjectFlow c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} inline emptyActions={selected&&isProjectLead(c.s,p)&&!localCase(p)?<div className="nw-actions"><FlowAction allowed={!c.busy&&executionAllowed(p,c.w)} reason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</FlowAction></div>:null} secondary={null} legacyActions={localActions}/>}/>}
  {tab==='items'&&<WorkItemsTab key={p.id} c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/>}
  {tab==='people'&&<ProjectPeople c={c} p={p} assignments={assignments} selectedKey={selectedKey} onParticipants={()=>setModal('participants')}/>}
  {tab==='files'&&<FilePanel key={c.route.node||''} c={c} p={p} node={p.nodes.find(n=>n.id===c.route.node||n.key===c.route.node)}/>}
@@ -159,6 +168,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  {c.route.task&&c.route.task_source!=='sop_local'&&!selectedTask&&!target&&<div className="error-banner"><TriangleAlert size={17}/>找不到此任務，請從列表重新選擇。</div>}
  {modal==='participants'&&<ParticipantsModal c={c} p={p} onClose={()=>setModal('')}/>}{modal==='addtask'&&selected&&<AddTaskModal c={c} p={p} node={selected} onClose={()=>setModal('')}/>}{modal==='approval'&&changeEnabled&&<ApprovalForm c={c} p={p} node={selected} type={approvalType} onClose={()=>setModal('')}/>}{selected&&<NodeCompletion key={`${p.id}-${selected.id}-${c.s.user?.id}`} c={c} p={p} node={selected} open={modal==='complete-node'} onClose={()=>setModal('')} onNavigate={(nextTab,section,task)=>{setModal('');c.go({view:'project',project:p.id,node:selected.id,tab:nextTab,section,task,completion:selected.id})}}/>}
 
+ {(tab==='overview'||tab==='flow')&&<footer className="i3-assistant-lane"><ProjectChatLauncher projectId={p.id} projectCode={p.code} projectName={p.name}/></footer>}
  </div></DisabledActionReasons.Provider>
 }
 export function NodeCompletion({c,p,node,open,onClose,onNavigate}:{c:Ctx;p:Project;node:Node;open:boolean;onClose:()=>void;onNavigate:(tab:string,section?:string,task?:string)=>void}){

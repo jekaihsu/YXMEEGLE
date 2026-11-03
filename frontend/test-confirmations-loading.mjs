@@ -45,7 +45,7 @@ try {
  assert.equal(document.querySelectorAll('tbody tr').length, 6);
  const loaded = document.querySelector('main').textContent;
  assert.match(loaded, /資料待更新/);
- assert.match(loaded, /2026-10-14T01:00:00Z/);
+ assert.match(loaded, /2026\/10\/14 09:00:00/);
  assert.match(loaded, /已載入筆數：6/);
  assert.ok(!loaded.includes('confirmation list body is malformed or unavailable'));
  console.log('PASS completed backend snapshot renders six rows, counts and last-success time');

@@ -1,3 +1,6 @@
+import {DataState} from './design/DataState';
+import {taipeiTime} from './taipeiTime';
+import './work-calm.css';
 import {Select as FormSelect} from './design/Select';
 import {useSourceRefresh} from './useSourceRefresh';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
@@ -93,14 +96,14 @@ export function SourceHealthPage({c}: {c: Ctx}) {
   <LegacyTabs c={c} view="sources"/>
   {error&&<p role="alert">{error}</p>}
   {reason && <span role="status">權限不足</span>}
-  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
+  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy} onReload={()=>setAttempt(n=>n+1)}/></Suspense>
   {c.s.user?.role==='manager'&&<small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>}
  </main>;
 }
 
 
 export function WorkPage({c}:{c:Ctx}) {return c.s?.features && ('change_extension' in c.s.features || 'node_assignment' in c.s.features) ? <HomeDataProvider c={c}><AssignmentWorkPage c={c}/></HomeDataProvider> : <LegacyWorkPage c={c}/>}
-function AssignmentWorkPage({c}:{c:Ctx}) {
+export function AssignmentWorkPage({c}:{c:Ctx}) {
  const panel=HOME_PANELS.find(p=>p===c.route.tab) ?? 'assigned';
  const params=new URLSearchParams(c.route.ctx);
  const scope=params.get('scope')==='team' ? 'team' : 'mine';
@@ -112,27 +115,33 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   for(const [key,value] of Object.entries(changes))value ? next.set(key,value) : next.delete(key);
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
- return <main className="page work-page project-detail-calm" aria-label="我的工作完整表格">
+ return <main className="page work-page" aria-label="我的工作完整表格">
   <header className="section-heading"><h1>我的工作</h1><Button disabled={read.pending} onClick={()=>void c.refresh()}>重新讀取</Button></header>
+  <p className="work-meta">{WORK_PANELS.find(([key])=>key===panel)?.[1]} · {read.body && (read.body.complete || read.body.items.length>0) ? '已讀取 '+read.body.items.length+' 項' : '筆數待核對'} · 資料時間 {taipeiTime(read.body?.as_of,'待核對')}{read.body?.freshness.status==='stale' ? ' · 來源：資料較舊' : ''}</p>
+  <div className="work-tabs" role="tablist" aria-label="工作清單">{WORK_PANELS.map(([key,label],index)=><button key={key} role="tab" type="button" aria-selected={panel===key} aria-controls="work-panel" tabIndex={panel===key?0:-1} onClick={()=>update({},key)} onKeyDown={event=>{const next=event.key==='ArrowRight'?(index+1)%6:event.key==='ArrowLeft'?(index+5)%6:event.key==='Home'?0:event.key==='End'?5:null;if(next!==null){event.preventDefault();(event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();update({},WORK_PANELS[next][0]);}}}>{label}</button>)}</div>
   <div className="my-work-toolbar">
-   <label>工作清單<FormSelect value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
+   <label className="work-mobile-panel">工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
-   </FormSelect></label>
+   </select></label>
    <label>工作類型<FormSelect value={params.get('kinds')||''} onChange={e=>update({kinds:e.target.value})}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></FormSelect></label>
    <label>期限<FormSelect value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></FormSelect></label>
    <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
    {(read.body?.manager_view_available || scope==='team') && <label>範圍<FormSelect value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></FormSelect></label>}
   </div>
-  {read.pending&&<p className="my-work-loading" role="status">正在讀取工作…</p>}
-  {read.body && <>{read.body.items.length ? <>
-   <p className="my-work-banner-as-of">已讀取 {read.body.items.length} 項工作{read.body.as_of?` · 更新於 ${new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(read.body.as_of))}`:''}{!read.body.complete?' · 部分來源待讀取':''}{read.body.freshness.status==='stale'?' · 上次資料':''}</p>
-   <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
-  </> : !read.pending&&<p role="status">{read.body.complete ? '目前沒有符合條件的工作。' : '工作來源尚未完整，請重新讀取。'}</p>}</>}
-  {!read.body&&!read.pending&&!read.error&&<p role="status">工作暫時無法讀取，請重新讀取。</p>}
-  <div className="my-work-actions">
+  <section id="work-panel" role="tabpanel" aria-label={WORK_PANELS.find(([key])=>key===panel)?.[1]} aria-busy={read.pending}>
+  {read.pending && <DataState kind="Loading" title="正在讀取工作…" body="正在讀取目前清單，筆數待核對。"/>}
+  {!read.pending && read.error && <DataState kind="Error" title="工作讀取失敗" body={read.error}/>}
+  {read.body?.freshness.status==='stale' && <DataState kind="Stale" title="資料待更新，目前顯示保留資料" body={'資料時間 '+taipeiTime(read.body.as_of,'待核對')+'。請按重新讀取更新。'}/>}
+  {read.body && !read.body.complete && <DataState kind="Partial" title="工作來源尚未完整" body="目前僅顯示已讀取的工作；沒有讀取到工作不代表沒有工作。"/>}
+  {read.body && read.body.items.length>0 && <Suspense fallback={<DataState kind="Loading" title="正在載入工作…" body="保留目前篩選條件。"/>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>}
+  {read.body?.complete && !read.body.items.length && !read.pending && <DataState kind="Empty" title="目前沒有符合條件的工作" body="這份清單已完整讀取。可切換工作清單或調整篩選。"/>}
+  {!read.body&&!read.pending&&!read.error&&<DataState kind="Partial" title="工作資料尚未取得" body="筆數待核對，請重新讀取。"/>}
+  </section>
+  <footer className="my-work-actions">
+   {read.body && !read.pending && <p>{!read.body.complete&&!read.body.items.length?'筆數待核對':'已讀取 '+read.body.items.length+' 項'}{read.body.next_cursor ? '，尚有下一頁' : read.body.has_more ? '，後續頁面待核對' : read.body.complete ? '，沒有更多頁' : '，來源尚未完整'}</p>}
    {params.has('cursor') && <Button onClick={()=>update({})}>回第一頁</Button>}
-   {read.body?.next_cursor && <Button onClick={()=>update({cursor:read.body?.next_cursor||''})}>下一頁</Button>}
-   {read.error && <p role="status">{read.error}</p>}
-  </div>
+   {read.body?.next_cursor && <Button disabled={read.pending} onClick={()=>update({cursor:read.body?.next_cursor||''})}>下一頁</Button>}
+  </footer>
  </main>;
 }
+const WORK_PANELS:readonly (readonly [HomePanel,string])[]=[['assigned','指派給我'],['confirmation','待我確認'],['delegated','我交辦的'],['proxy','代理給我'],['local','本地 SOP'],['completed','已完成']];

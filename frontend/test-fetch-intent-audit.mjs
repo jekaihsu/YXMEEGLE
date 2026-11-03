@@ -6,21 +6,19 @@ import ts from 'typescript';
 
 // These whole-file digests freeze the audited legacy sites, including indirect
 // callbacks. Migrations remove entries; changed survivors require a fresh audit.
-// I8: AppShell adds a ReactNode notice slot; existing presentation listeners unchanged.
-// I8 re-audit: App subscribes to presentation-only connectivity; API rejects offline writes.
-// Usage timers are search debounce / object URL disposal, popstate is a user query.
-// Shared Button adds offline submit disabling only; existing picker listeners unchanged.
+// I8 merge: preserve both branches' legacy-site removals. Re-audit only merged
+// App/AppShell presentation hooks and the unchanged I8 API/usage/submit guards.
 const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
- 'ProjectsList.tsx': 'd2c97b8ef41d35fcfbb462967052a432dad4a69d8b28bc83a7ae8d7b3df145fb',
+ 'ProjectsList.tsx': '232f052dfb9702867388d0e42b2dec9e4aec483ce02bbd3f27f9dfd96b643e78',
  'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
  // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': '84d349b7b5b07793573820642d13dbb4e7916c5df99a1f9c8fa45c6358c9a1e4',
+ 'AppShell.tsx': 'eb3da194b7f142a75f5bfb243198f32539fed5a7bfebe60048329b9cf8b1566e',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
@@ -35,14 +33,14 @@ const legacy={
  'design/index.tsx': '6782b99d515e684dfc8577ced7fa704d522712d9b065dd5dfcc4b40d155b85f1',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1bfb68b728abee62479f560fa761651fe1fd3ecb94453a52c65d6f0b3190e74d',
- 'reports/ProgressTab.tsx': '07324dd7af61e77ed2a499fb579b11884c3a3329f2416b01d9f893b7859bc11b',
+ 'reports/ProgressTab.tsx': '52c0dd698d7e5308bd0ec41759435aa2545a9194d7f1587d7fb0ec4f790866b6',
  "AssigneePicker.tsx": "2f3f8a6e8081097da460588d7957851de7e4b7bc84091a76da4af69569b16489",
- "App.tsx": "53e686fd973ed9992227b593b986dc43d9f31b53363d9cc8082785f5b79b5e10",
+ "App.tsx": "2b1aace1537a3a5614af78bc02792dee2ddb1a8e717ec96cbd67b40e04c40e95",
  "CompletionCelebration.tsx": "f73bd9143729b0934efc35be418bb0b8d01ae4b7291389d022a5342af0adde7d",
  "inputRecovery.ts": "ea9bc500bbebb5a28a1755e834a9c3e352dbe7694eecc8f2e6766dbcb9810287",
- "LarkPilotPanel.tsx": "56440e752c8deefd1cf4aab42e5a95aa24c02246cb59ead49452e37a2814fbf9",
+ "LarkPilotPanel.tsx": "3173adde587f4ff70711675906c92f21db2701d87fd76be7ce6de8a7467f0326",
  "StageFixture.tsx": "9dfb8e14c631b01a1acd9a1adc88c5d094164b94945dadc2553c998504f52df8",
- "P2Pages.tsx": "e43860fe8bd3e7b811b594e63a6949854ecf344903541c34351562261ae593e7",
+ "P2Pages.tsx": "32fd9844c05de8dbc0e95490d47167006888e51b66c6b6d75e950236e8653cd1",
  "api.ts": "1398b98d1e2d25fd1f66153b4f646452f31df9374ebe16e697a168a4e3fa846d",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
@@ -55,8 +53,8 @@ const legacy={
  "TaskTimeline.tsx": "216aa59335a7c7c17cdf7a8b9681a40d00798b493b5f53ef1125a27743a26c71",
  "reloadGuard.ts": "1983950556280811e13d243bfcba34e97ce91814745e222e234e34f458750f0e",
  "assistant/ProjectChatLauncher.tsx": "df78000709295f98a73c8dc2f1f2a3dd078910e9cb830671fb0243e1151dcfde",
- "reports/ContactsTab.tsx": "9a7d005c955c51c0492c185a51c77e23237661c5dc582ead8717debdd3d800ff",
- "reports/useReport.ts": "b5254276d664fd7407c0f628f2516591e0f72429243fc6818c60676200b237a0"
+ "reports/ContactsTab.tsx": "f9669894e96f21adbecaa3dbd3b2ee64c53c6186722e601e9d4ccda4ebd839bc",
+ "reports/useReport.ts": "43575fa63998c2ab6260120f103a4c9ad1030779609b0b9f693cfa4062d8028c"
 };
 export function triggers(source){
  const tree=ts.createSourceFile('source.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

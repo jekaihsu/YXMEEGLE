@@ -47,8 +47,8 @@ const v=(b=body(),extra={})=>build({body:b,...extra});
 const cardOf=(view,id)=>view.snapshot.cards.find(c=>c.id===id);
 
 test('1. header: snapshot timestamp and readable scope; missing timestamp is a dash',()=>{
- const a=v();eq(a.header.asOfLabel,`${L.asOf} ${ASOF}`);ok(a.header.scopeLabel.includes('PM：pm-1'),'scope from snapshot filters');
- eq(v(body({as_of:undefined})).header.asOfLabel,`${L.asOf} —`,'no invented timestamp');
+ const a=v();eq(a.header.asOfLabel,`${L.asOf} 2026/10/14 01:02:03 (台北時間)`);ok(a.header.scopeLabel.includes('PM：pm-1'),'scope from snapshot filters');
+ eq(v(body({as_of:undefined})).header.asOfLabel,`${L.asOf} 尚未載入`,'no invented timestamp');
  eq(v(withSnap({filters:{}})).header.scopeLabel,L.filterNone);
 });
 test('2. cases first, owner/stage/due/blocker/pending shown honestly: unknown is a dash plus reason',()=>{
@@ -250,7 +250,7 @@ test('21. 128b-4030811 X1: population unavailable keeps cases listed with row ke
 
 // ---- mutation checks: break each guard in a temp copy and require the behavior it protects to break ----
 const src=readFileSync(new URL('./src/managerOverviewView.ts',import.meta.url),'utf8');
-const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
+const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/taipeiTime.ts',import.meta.url),join(dir,'taipeiTime.ts'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
 let n=0;
 async function mutated(find,replace){
  ok(src.includes(find),'mutation anchor exists: '+find.slice(0,40));
