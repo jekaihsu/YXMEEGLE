@@ -16,19 +16,12 @@ from .data_state import data_state
 
 def load_source_metadata(db, model, wid):
     """Capture health evidence without decoding source record values."""
-    from sqlalchemy import func, select
-    from .case_source_reads import json_fields
-    if db.get_bind().dialect.name!='sqlite':
+    dialect=db.get_bind().dialect.name
+    if dialect not in ('sqlite','postgresql'):
         row=db.get(model,wid)
         return row.data if row else None
-    metadata=db.scalar(select(json_fields(model.data,('status','authorized','last_sync','last_attempt_at','tables'))).where(model.id==wid))
-    if metadata is None:return None
-    snapshot=json.loads(metadata)
-    records=func.json_each(model.data,'$.records').table_valued('value',joins_implicitly=True)
-    keys=('base_token','table_id','record_id')
-    rows=db.scalars(select(json_fields(records.c.value,keys)).select_from(model,records).where(model.id==wid))
-    snapshot['records']=[json.loads(row) for row in rows]
-    return snapshot
+    from .source_metadata_reads import read_metadata
+    return read_metadata(db,model,wid)
 
 
 def _time(value):

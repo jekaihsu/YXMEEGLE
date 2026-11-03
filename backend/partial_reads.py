@@ -25,7 +25,8 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     strict_events=row.id.startswith('lark-') and row.data.get('environment') not in ('demo','test')
     kinds=set(collections)
     if project_ids is not None: kinds.add('projects')
-    result={key:deepcopy(value) for key,value in row.data.items() if key not in COLLECTIONS}
+    from .case_metadata_reads import root_metadata
+    result=root_metadata(row.data,project_ids,scoped=filter_project_rows and project_ids is not None)
     for collection in COLLECTIONS: result[collection]=[]
     if row.data.get('storage_schema')!=2:
         for collection in kinds:

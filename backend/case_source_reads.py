@@ -61,7 +61,9 @@ def cached_rows(db, model, workspace, selected, project_ids, *, filter_project_r
     key=(workspace.id,workspace.version,tuple(sorted(selected)),None,'case_source_rows')
     @measure('sourcebuild')
     def fetch():
-        query=select(model.kind,cast(model.data,Text)).where(model.workspace_id==workspace.id,
+        from .json_read_projection import json_fields as project_fields
+        compact=project_fields(model.data,CASE_SOURCE_FIELDS,db.get_bind().dialect.name)
+        query=select(model.kind,cast(compact,Text)).where(model.workspace_id==workspace.id,
             model.kind.in_(selected),model.parent_id=='').order_by(model.ordinal)
         result=[]
         for kind,payload in db.execute(query):

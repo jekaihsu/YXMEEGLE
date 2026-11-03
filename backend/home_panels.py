@@ -349,8 +349,10 @@ class HomePanels:
 
     def read_workspace(self, request, data, user):
         with self.sessions() as db:
-            row = db.get(self.workspace_model, data['wid'])
-            state = self.load(db, row, collections=('users', 'projects'))
+            from .read_roots import read_root
+            row = read_root(db,self.workspace_model, data['wid'])
+            from .home_read_inputs import probe_root
+            state = self.load(db, probe_root(row), collections=('users', 'projects'))
             params = request.query_params
             panel = 'completed' if params.get('status') == 'done' else params.get('panel', 'assigned')
             sop_only = params.get('kinds') == 'sop_task'
@@ -363,7 +365,10 @@ class HomePanels:
                                 'project_finance_versions', 'project_payment_batches', 'project_delivery_batches')
                 if self.assignment_unavailable(state, data):
                     omitted += ('project_daily_reports',)
-                state = self.load(db, row, omit_kinds=omitted)
+                if panel == 'assigned':
+                    from .home_read_inputs import assigned_omissions
+                    omitted = tuple(dict.fromkeys((*omitted, *assigned_omissions())))
+                state = self.load(db, row, omit_kinds=omitted, case_sources='sop' if panel == 'assigned' else False)
         return self.read(request, data, user, state)
 
     def read(self, request, data, user, state):

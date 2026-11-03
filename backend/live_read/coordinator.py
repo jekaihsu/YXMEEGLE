@@ -11,7 +11,7 @@ import hashlib
 
 from fastapi import HTTPException
 
-from sqlalchemy import update, event
+from sqlalchemy import update, event, select
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import IntegrityError
 
@@ -88,8 +88,7 @@ class RefreshCoordinator:
         if not self._enabled(wid):
             from ..models import WorkspaceRow
             with self.Session() as db:
-                workspace = db.get(WorkspaceRow, wid)
-                workspace_as_of = (workspace.data or {}).get('as_of') if workspace else None
+                workspace_as_of = db.scalar(select(WorkspaceRow.data['as_of'].as_string()).where(WorkspaceRow.id == wid))
         result = freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
         for dataset in DATASETS:
             # Snapshot fingerprints and internal exception classes are not public.
