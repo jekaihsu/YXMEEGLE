@@ -789,9 +789,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle,complete_read=True)
 
     @app.get('/api/projects')
-    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc',page:int=0,snapshot:str=''):
+    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc',page:int=0,snapshot:str='',sections:bool=False,section:str='',filters:str=''):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
         require(0<=page<=10000 and (not page or view=='portfolio'), '分頁參數錯誤', 422)
+        require(section in ('', 'sop', 'notStarted', 'other', 'done') and (not sections or page > 0), '分組參數錯誤', 422)
         require(len(snapshot)<=100 and (not snapshot or page>0), '分頁參數錯誤', 422)
         from . import index_reads
         if view:
@@ -835,11 +836,27 @@ def create_app(overrides=None,*,dispatch_transport=None):
                         # Missing history (another process, expiry, eviction) cannot
                         # reconstruct an old DB revision. Return one complete new
                         # capture for atomic replacement, never mixed-revision rows.
-                        start = 0 if replaced else (page-1)*30
-                        result['items'] = result['items'] if replaced else result['items'][start:start+30]
-                        result.update(page=1 if replaced else page,
-                            next_page=None if replaced else page+1 if start+30<result['total'] else None,
-                            snapshot=version_body.etag, snapshot_replaced=replaced,
+                        if sections:
+                            from .portfolio_sections import window, filtered, section_counts
+                            if filters:
+                                require(len(filters) <= 2500, '篩選參數過長', 422)
+                                try: portfolio_filters = json.loads(filters)
+                                except ValueError: portfolio_filters = None
+                                require(isinstance(portfolio_filters, dict), '篩選參數錯誤', 422)
+                                require(set(portfolio_filters) <= {'q','client','owner','node','state','kind','attention','sort','direction'}
+                                    and all(isinstance(v, str) and len(v) <= 240 for k,v in portfolio_filters.items() if k not in ('attention','direction'))
+                                    and type(portfolio_filters.get('attention', False)) is bool
+                                    and type(portfolio_filters.get('direction', 1)) is int
+                                    and portfolio_filters.get('direction', 1) in (-1, 1), '篩選參數錯誤', 422)
+                                filtered(result, portfolio_filters, today)
+                                result['section_counts'] = section_counts(db, result['items'])
+                            window(result, page=page, section=section, replaced=replaced)
+                        else:
+                            start = 0 if replaced else (page-1)*30
+                            result['items'] = result['items'] if replaced else result['items'][start:start+30]
+                            result.update(page=1 if replaced else page,
+                                next_page=None if replaced else page+1 if start+30<result['total'] else None)
+                        result.update(snapshot=version_body.etag, snapshot_replaced=replaced,
                             stale=snapshot_status == 'stale' or version_body.volatile)
                         body = EncodedSnapshot.encode(JSONResponse(result).body, volatile=version_body.volatile)
                     return body.response(request, snapshot_status)

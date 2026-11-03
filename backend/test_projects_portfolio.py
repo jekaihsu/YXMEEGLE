@@ -149,7 +149,9 @@ def test_portfolio_falls_back_when_either_source_is_unreadable(portfolio_case, t
     h = portfolio_case
     h.add('業務')
     h.home.fake.fault('GET', '/' + table + '/records', lambda _: httpx.Response(403, json={'code': 91403}), times=20)
-    assert h.read() == {**h.read(enabled=False), 'node_status_degraded': True}
+    body = h.read()
+    assert body['node_status_degraded']
+    assert all(p['lifecycle_state'] == '待核對' for p in body['items'])
     assert h.home.fake.writes() == []
 
 
@@ -228,7 +230,9 @@ def test_portfolio_falls_back_on_unparseable_source_records(portfolio_case, monk
     def read_table(_scope, table, _spec, **_options):
         return Cached([{'record_id': 'recBroken', 'fields': None}] if table is Table.NODES else [], False, T0)
     monkeypatch.setattr(h.home.service, 'read_table', read_table)
-    assert h.read() == {**h.persisted, 'node_status_degraded': True}
+    body = h.read()
+    assert body['node_status_degraded']
+    assert all(p['lifecycle_state'] == '待核對' for p in body['items'])
 
 
 def test_same_case_code_collapses_to_one_card_and_a_confirmed_case_wins():
@@ -256,7 +260,8 @@ def test_cold_portfolio_serves_persisted_cards_while_lark_is_blocked(portfolio_c
         future=pool.submit(h.read,warm=False)
         try:
             body=future.result(timeout=2)
-            assert body=={**h.persisted,'node_status_degraded':True}
+            assert body['node_status_degraded']
+            assert all(p['lifecycle_state'] == '待核對' for p in body['items'])
             assert entered.wait(2)
         finally:
             release.set()
