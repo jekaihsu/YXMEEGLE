@@ -7,7 +7,7 @@ import {EnsureSopStatus} from './EnsureSopStatus';
 import {InlineTaskEditor} from './InlineTaskEditor';
 import {withLocalChecklist,editorFields,localCase,checklistProject,type TaskDraft} from './nodeWorkbenchModel';
 import {ProjectOverview} from './ProjectOverview';
-import {ProjectDetailShell,ProjectWorkflowHeader,ProjectExecutionDetails} from './ProjectDetailShell';
+import {ProjectCaseHeader,ProjectDetailShell,ProjectWorkflowHeader,ProjectExecutionDetails} from './ProjectDetailShell';
 import {useSopTasks,canReadSop,prefetchSopTasks} from './useSopTasks';
 import {peekProjectProgress,prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
 import type {ProjectProgress} from './projectProgressApi';
@@ -25,7 +25,6 @@ import {lazy, useEffect, useState, useRef, useCallback, type FormEvent, type Rea
 import {ArrowRight, ArrowUpRight, Check, ChevronLeft, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, TriangleAlert, Upload, Users} from 'lucide-react';
 import {usePageResource} from './viewData';
 import type {PageData, FetchIntent} from './pageData';
-import {ProjectChatLauncher} from './assistant/ProjectChatLauncher';
 import {api, ApiError, getSessionEpoch, perfMark} from './api';
 import {MentionComposer, MentionText, MentionDelivery} from './MentionComposer';
 import {Avatar} from './AppShell';
@@ -149,7 +148,7 @@ export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;sn
  {!['pricing','settlement'].includes(selected.key)&&<FlowAction allowed={!c.busy&&selected.status!=='completed'&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':selected.status==='completed'?'節點已完成。':executionReason(p)} onClick={()=>{close();setModal('complete-node')}}>完成節點</FlowAction>}
  </div>}</DetailsMenu>}</div>;
 
- return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm">{['overview','flow'].includes(tab)?<ProjectWorkflowHeader c={c} p={p} tab={tab} assignments={assignments} sopTasks={sopTasks} selectedKey={selectedKey} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote}/>:<ProjectDetailShell c={c} p={p} tab={tab} current={current} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/>}
+ return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectCaseHeader c={c} p={p}>{['overview','flow'].includes(tab)?<ProjectWorkflowHeader c={c} p={p} tab={tab} assignments={assignments} sopTasks={sopTasks} selectedKey={selectedKey} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote}/>:<ProjectDetailShell c={c} p={p} tab={tab} current={current} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/>}</ProjectCaseHeader>
  {(tab==='overview'||tab==='flow')&&<EnsureSopStatus c={c} p={p} sop={sopTasks} assignments={assignments}/>}
  {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} workbench={()=><ProjectFlow c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} inline emptyActions={selected&&isProjectLead(c.s,p)&&!localCase(p)?<div className="nw-actions"><FlowAction allowed={!c.busy&&executionAllowed(p,c.w)} reason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</FlowAction></div>:null} secondary={null} legacyActions={localActions}/>}/>}
  {tab==='items'&&<WorkItemsTab key={p.id} c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/>}
@@ -173,7 +172,6 @@ export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;sn
  {c.route.task&&c.route.task_source!=='sop_local'&&!selectedTask&&!target&&<div className="error-banner"><TriangleAlert size={17}/>找不到此任務，請從列表重新選擇。</div>}
  {modal==='participants'&&<ParticipantsModal c={c} p={p} onClose={()=>setModal('')}/>}{modal==='addtask'&&selected&&<AddTaskModal c={c} p={p} node={selected} onClose={()=>setModal('')}/>}{modal==='approval'&&changeEnabled&&<ApprovalForm c={c} p={p} node={selected} type={approvalType} onClose={()=>setModal('')}/>}{selected&&<NodeCompletion key={`${p.id}-${selected.id}-${c.s.user?.id}`} c={c} p={p} node={selected} open={modal==='complete-node'} onClose={()=>setModal('')} onNavigate={(nextTab,section,task)=>{setModal('');c.go({view:'project',project:p.id,node:selected.id,tab:nextTab,section,task,completion:selected.id})}}/>}
 
- {(tab==='overview'||tab==='flow')&&<footer className="i3-assistant-lane"><ProjectChatLauncher projectId={p.id} projectCode={p.code} projectName={p.name}/></footer>}
  </div></DisabledActionReasons.Provider>
 }
 export function NodeCompletion({c,p,node,open,onClose,onNavigate}:{c:Ctx;p:Project;node:Node;open:boolean;onClose:()=>void;onNavigate:(tab:string,section?:string,task?:string)=>void}){

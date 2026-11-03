@@ -21,7 +21,7 @@ try{
    assert.doesNotMatch(await page.locator('body').innerText(),/資料為上次成功讀取|上次成功資料，待更新|讀取時間/);
    const measurement=await page.evaluate(()=>({height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,viewport:innerWidth,selected:(()=>{const e=document.querySelector('.pf-node[aria-current]'),chain=document.querySelector('.pf-chain');if(!e||!chain)return null;const b=e.getBoundingClientRect(),v=chain.getBoundingClientRect();return {left:b.left,right:b.right,viewportLeft:v.left,viewportRight:Math.min(v.right,innerWidth)}})()}));
    assert.ok(measurement.width<=width,`horizontal overflow: ${JSON.stringify(measurement)}`);
-   if(tab==='overview'){assert.equal(await page.locator('.pf-diagram').count(),0);if(width===1280)assert.ok(measurement.height<=1100,`overview height ${measurement.height}`)}
+   if(tab==='overview'){assert.equal(await page.locator('.i3-stepper.pf-diagram').count(),1);assert.equal(await page.locator('.po-next-action').count(),1);assert.equal(await page.locator('#flow-tasks').count(),1);if(width===1280)assert.ok(measurement.height<=1800,`overview height ${measurement.height}`)}
    if(tab==='flow'&&measurement.selected){const s=measurement.selected;assert.ok(s.left>=s.viewportLeft-1&&s.right<=s.viewportRight+1,'selected stage visible initially')}
    const path=`${output}/${project}-${tab}-${width}.png`;await page.screenshot({path,fullPage:true});results.push({project,tab,...measurement,path});
   }

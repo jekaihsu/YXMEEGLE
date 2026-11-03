@@ -5,11 +5,11 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {projectFixture} from './fixtures/node-assignments.mjs';
-const bundle=await build({stdin:{contents:"export {ProjectDetailShell} from './src/ProjectDetailShell';export {DisabledActionReasons} from './src/design';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate} from './src/ProjectDetail';export {DisabledActionReasons} from './src/design';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.project-chat-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
 let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','FormData','Event','HTMLElement','navigator','MutationObserver','Element','Node'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','FormData','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','HTMLDetailsElement','navigator','MutationObserver','Element','Node'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 let mobile=false,mediaChange;
 window.matchMedia=query=>({get matches(){return mobile},addEventListener(_name,fn){if(query.includes("640px"))mediaChange=fn},removeEventListener(){}});
 globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
@@ -17,21 +17,23 @@ window.HTMLElement.prototype.attachEvent=()=>{};window.HTMLElement.prototype.det
 window.HTMLElement.prototype.scrollIntoView=()=>{};window.HTMLElement.prototype.scrollTo=()=>{};
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const {project,user,workspace}=projectFixture();
-const c={w:workspace,s:{user},go(){},notify(){}};
+const c={w:workspace,s:{user,mode:'demo',workspace_id:'chat-test',features:{}},go(){},notify(){},registerDrafts(){},refresh:async()=>{}};
 const root=createRoot(document.getElementById('root'));
 const flush=async(fn=()=>{},delay=30)=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,delay))});
-const render=(p=project,tab='overview')=>flush(()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.ProjectDetailShell,{c,p,tab,onPeople(){},onPrefetch(){},onCancelPrefetch(){}}))));
+const render=(p=project,tab='overview')=>flush(()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.ProjectDetailGate,{c:{...c,w:{...workspace,projects:[p]},route:{view:'project',project:p.id,tab}}}))));
 const bubble=()=>document.querySelector('.project-chat-launcher');
 const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true}]};
 const json=data=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
 const calls=[],chats=[];
-let unavailable=false,offline=false,forbidden=false;
+let unavailable=false,offline=false,forbidden=false;let pendingStream,pendingSignal,streamAborts=0;const encode=new TextEncoder();
 globalThis.fetch=async(url,init)=>{
+ if(!String(url).startsWith('/api/ai/'))return new Response(JSON.stringify({detail:'fixture unavailable'}),{status:403});
  calls.push(url);
  if(offline)throw new TypeError('offline');
  if(url==='/api/ai/models')return json(unavailable?{models:[]}:catalog);
  chats.push(JSON.parse(init.body));
  if(forbidden)return new Response(JSON.stringify({code:"ai_forbidden"}),{status:403});
+ if(chats.length===1){pendingSignal=init.signal;pendingSignal.addEventListener('abort',()=>streamAborts++);return new Response(new ReadableStream({start(controller){pendingStream=controller;controller.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'本案正在'})+'\n\n'))}}))}
  return new Response('data: '+JSON.stringify({type:'text',delta:'本案正在規劃。'})+'\n\ndata: {"type":"done"}\n\n');
 };
 await render();assert.equal(calls.length,0,'mount does not request model catalog');
@@ -50,8 +52,21 @@ const nested=document.createElement('section');nested.setAttribute('role','dialo
 await flush(()=>document.body.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(bubble().getAttribute('aria-expanded'),'true','outside Escape leaves panel open');
 await flush(()=>document.querySelector('[role=combobox]').click());await flush(()=>document.querySelector('[role=option]').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(bubble().getAttribute('aria-expanded'),'true','model Escape only dismisses selector');
 await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);
-assert.equal(chats[0].project_id,project.id);assert.equal(chats[0].messages[0].content,'進度如何？');assert.match(dialog().textContent,/本案正在規劃/);
-await render(project,'people');assert.match(dialog().textContent,/本案正在規劃/,'tab changes preserve conversation');
+assert.equal(chats[0].project_id,project.id);assert.equal(chats[0].messages[0].content,'進度如何？');assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在');
+const originalLauncher=bubble(),originalDialog=dialog();
+for(const tab of ['people','overview','items','flow','files','data','people']){
+ await render(project,tab);
+ assert.equal(document.querySelector('[aria-current=page]').textContent,({overview:'總覽',flow:'流程與任務',items:'工項與進度',people:'排程與人員',files:'文件與交付',data:'案件資料'})[tab]);
+ assert.equal(document.querySelectorAll('.project-chat-launcher').length,1);
+ assert.equal(pendingSignal.aborted,false,'tab changes do not abort an in-flight answer');assert.equal(streamAborts,0);assert.equal(chats.length,1);
+ assert.equal(bubble(),originalLauncher,'one launcher instance survives real case tab changes');
+ assert.equal(dialog(),originalDialog,'open conversation survives tab changes');
+ assert.equal(bubble().getAttribute('aria-expanded'),'true');
+ assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在');
+}
+await flush(()=>{pendingStream.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'規劃。'})+'\n\ndata: {"type":"done"}\n\n'));pendingStream.close()},80);
+assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在規劃。');assert.equal(streamAborts,0);
+await render(project,'overview');assert.equal(dialog(),originalDialog);assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在規劃。','tab changes preserve completed conversation');
 await flush(()=>dialog().dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
 assert.equal(bubble().getAttribute('aria-expanded'),'false');assert.equal(document.activeElement,bubble());assert.equal(dialog().closest('[hidden]')!==null,true);
 await flush(()=>bubble().click());assert.match(dialog().textContent,/本案正在規劃/,'close and reopen preserve conversation');

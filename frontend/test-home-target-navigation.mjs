@@ -34,12 +34,16 @@ try{
  assert.equal(ui.parseRoute(location.hash).node,'field','real App go preserves the home node through the hash');
  assert.equal(ui.parseRoute(location.hash).task,'recTask1','real App go preserves the task through the hash');
  await flush(()=>window.dispatchEvent(new Event('hashchange')));await flush();
- assert.match(document.querySelector('.pf-node[aria-current=step]').getAttribute('aria-label'),/^外業節點/);
+ assert.match(document.querySelector('.pf-node[aria-pressed=true]').getAttribute('aria-label'),/^外業節點/);
  assert.equal(document.querySelector('.task-drawer[data-kind=lark] h2').textContent,'控制點成果核對');
  assert.equal(document.activeElement?.closest('[role="dialog"]')?.getAttribute('aria-label'),'控制點成果核對','home navigation focuses the target task inspector');
  await flush(()=>{location.hash='view=work&tab=assigned';window.dispatchEvent(new Event('hashchange'))});await flush();
- await flush(()=>document.querySelector('tbody summary').click());
+ assert.equal(document.querySelector('.assignment-work-table .work-title-link')?.textContent,'首頁外業任務');
+ const fixtureHost=document.createElement('div');document.body.append(fixtureHost);const compact=createRoot(fixtureHost);
+ await flush(()=>compact.render(React.createElement(ui.AssignmentTable,{compact:true,items:[item],onNavigate:route=>{location.hash=new URLSearchParams(route).toString()}})));
+ await flush(()=>fixtureHost.querySelector('[aria-expanded=false]').click());assert.equal(fixtureHost.querySelector('[aria-expanded=true]').textContent,'首頁外業任務');
  await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='開啟任務').click());await flush();
+ await flush(()=>window.dispatchEvent(new Event('hashchange')));await flush();await flush(()=>compact.unmount());fixtureHost.remove();
  assert.equal(ui.parseRoute(location.hash).node,'field','child target retains its node');
  assert.equal(ui.parseRoute(location.hash).task,'recTask2','child target overrides the parent task');
  assert.equal(document.querySelector('.task-drawer[data-kind=lark] h2').textContent,'子任務核對');

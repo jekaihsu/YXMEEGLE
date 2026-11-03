@@ -5,13 +5,18 @@ const base=process.argv[2]||'http://[::1]:5200/';
 if(!new URL(base).hostname.match(/^(\[::1\]|localhost|127\.0\.0\.1)$/))throw Error('This sweep changes local form values. Use an isolated local demo.');
 const browser=await chromium.launch({channel:'chrome',headless:true}),results=[];
 const routes=['projects','quotes','work','work&tab=legacy','people','admin&tab=settings','admin&tab=daily','admin&tab=people','sources','reports&tab=review','reports&tab=progress','reports&tab=quality','reports&tab=attendance',...['overview','flow','items','people','files','data'].map(tab=>`project&project=p1&tab=${tab}`),...['basic','quotes','contracts','family','participants','files','approvals','activity','sources'].map(section=>`project&project=p1&tab=data&section=${section}`)];
-try{for(const width of [1280,390]){
+try{for(const width of [1440,390]){
  const page=await browser.newPage({viewport:{width,height:900}});page.setDefaultTimeout(5000);
  await page.goto(base);await page.request.post(new URL('/api/demo/session',base).href,{data:{user_id:'u-manager'}});
  for(const route of routes){
   const errors=[];const onError=error=>errors.push(error.message);page.on('pageerror',onError);
   await page.goto(`${base.split('#')[0]}#view=${route}`);await page.locator('main').waitFor();
   await page.waitForFunction(()=>!document.querySelector('.route-skeleton,.route-progress[aria-busy=true]')).catch(()=>{});
+  if(route.startsWith('project&')){
+   await page.locator('.project-chat-launcher').waitFor({state:'visible'});
+   const bounds=await page.locator('.project-chat-launcher').boundingBox(),menu=await page.locator('[aria-label="更多案件操作"]').boundingBox();
+   assert.equal(bounds.x<menu.x+menu.width&&bounds.x+bounds.width>menu.x&&bounds.y<menu.y+menu.height&&bounds.y+bounds.height>menu.y,false,`${width} ${route}: launcher blocks header menu`);
+  }
   await page.evaluate(()=>document.querySelectorAll('details').forEach(d=>{if(!/more|menu/.test(d.className))d.open=true}));
   const count=await page.locator('.ds-picker>button:visible').count();
   for(let index=0;index<count;index++){
@@ -42,6 +47,6 @@ try{for(const width of [1280,390]){
   results.push({route,width,status:errors.length?'page-error':'visited',controls:count,errors});page.off('pageerror',onError);
  }
  await page.close();
-}}finally{await browser.close();await fs.mkdir(new URL('../../.runtime/case-detail-perf/',import.meta.url),{recursive:true});await fs.writeFile(new URL('../../.runtime/case-detail-perf/picker-sweep.json',import.meta.url),JSON.stringify(results,null,2))}
+}}finally{await browser.close();await fs.mkdir(new URL((process.env.FX2_EVIDENCE||'/tmp/yx-picker-sweep')+'/','file:///'),{recursive:true});await fs.writeFile(new URL((process.env.FX2_EVIDENCE||'/tmp/yx-picker-sweep')+'/picker-sweep.json','file:///'),JSON.stringify(results,null,2))}
 console.log(JSON.stringify({passed:results.filter(r=>r.status==='pass').length,disabled:results.filter(r=>r.status==='disabled').length,failed:results.filter(r=>r.status==='fail'||r.status==='page-error')}));
 assert(!results.some(r=>r.status==='fail'||r.status==='page-error'));

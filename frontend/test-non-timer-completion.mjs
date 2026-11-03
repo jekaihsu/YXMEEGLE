@@ -36,7 +36,7 @@ try{
  await mount(null);
  const c={w:{...workspace,scope:'shell'},s:{user:a,mode:'lark',workspace_id:'test'},route:{view:'projects'},refresh:async()=>{},go(){},run(){}};
  globalThis.fetch=async(url)=>{calls.push(url);return json({items:[],total:0,node_status_degraded:true,as_of:'2026-10-01',basis:'persisted_workspace'})};
- await mount(React.createElement(m.Projects,{c}));await idle('projects degraded');let count=calls.length;await click('重新載入');assert.equal(calls.length,count+1);
+ await mount(React.createElement(m.Projects,{c}));await idle('projects degraded');let count=calls.length;await click('重新讀取');assert.equal(calls.length,count+1);
  for(const status of [202,503]){
   globalThis.fetch=async(url,init)=>{calls.push(url);return init?.method==='POST'?json(status===202?{status:'refreshing'}:{detail:'offline'},status):json({items:[],total:0,node_status_degraded:true,as_of:'2026-10-01',basis:'persisted_workspace'})};
   const count=calls.length;await click('重新同步 Lark');assert.equal(calls.length,count+1);await idle(`projects sync ${status}`);

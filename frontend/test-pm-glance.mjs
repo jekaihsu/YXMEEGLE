@@ -35,7 +35,7 @@ const attendanceBody = {status: 'ok', week_start: '2026-10-12', week_end: '2026-
 const attendance = raw => attendanceTiles({kind: 'ready', view: parsePeopleAttendance({...attendanceBody, ...raw})});
 assert.deepEqual(attendance({}).map(t => t.value), ['2', '0']);
 assert.ok(attendance({}).every(t => t.href === '#view=people' && t.asOf.includes('2026/10/14 09:00:00')));
-assert.deepEqual(attendance({summary: {on_leave: null, on_trip: null}}).map(t => t.value), ['—', '—']);
+assert.deepEqual(attendance({summary: {on_leave: null, on_trip: null}}).map(t => t.value), ['待核對', '待核對']);
 for (const [status, expected] of [['loading', 'unknown'], ['incomplete', 'unknown'], ['not-connected', 'unknown'], ['read-failed', 'failed'], ['needs-permission', 'needs-permission']]) {
  const tiles = attendance({status, missing_scopes: ['attendance:readonly']});
  assert.ok(tiles.every(t => t.state === expected && t.value === '—'), status);
@@ -69,6 +69,7 @@ assert.ok(unknown.every(tile => /^#view=(work|overview|sources|people|confirmati
 
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/#view=pm-glance', pretendToBeVisual: true});
 for (const key of ['window', 'document', 'location', 'history', 'Event', 'HTMLElement']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 dom.window.scrollTo = () => {};
 const requests = [];

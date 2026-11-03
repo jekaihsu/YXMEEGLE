@@ -6,8 +6,8 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {workspace,a} from './session-epoch-fixture.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
-for(const key of ['window','document','location','localStorage','sessionStorage','HTMLElement','Event','MouseEvent'])globalThis[key]=dom.window[key];
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+for(const key of ['window','document','location','localStorage','sessionStorage','HTMLElement','Element','Node','Event','MouseEvent'])globalThis[key]=dom.window[key];
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;HTMLElement.prototype.scrollIntoView=function(){};
 globalThis.requestAnimationFrame=callback=>setTimeout(callback,0);
 dom.window.HTMLElement.prototype.scrollIntoView=function(){};
 const bundle=await build({stdin:{contents:"export {Dashboard,ShellDashboard} from './src/DailyHome';export {Projects} from './src/ProjectsList';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
@@ -46,23 +46,25 @@ assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處�
 
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`,created_at:new Date(Date.UTC(2026,0,1)+ (300-i)*86400000).toISOString()}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
+const changePicker=async(label,value)=>{await act(async()=>document.querySelector(`select[aria-label="${label}"]`).parentElement.querySelector("button").click());const native=document.querySelector(`select[aria-label="${label}"]`);const text=[...native.options].find(o=>o.value===value).text;await act(async()=>[...document.querySelectorAll('[role=option]')].find(o=>o.textContent===text).click());assert.equal(native.value,value)};
+await act(async()=>document.querySelector('.pl-filter-trigger').click());
 const size=document.querySelector('[aria-label="每組顯示筆數"]');
-await flush(()=>{size.value='50';size.dispatchEvent(new Event('change',{bubbles:true}))});
+await changePicker('每組顯示筆數','50');await flush(()=>document.querySelector('[aria-label="關閉"]').click());
 assert.equal(document.querySelectorAll('.pl-case').length,50);assert.ok(document.querySelector('.pl-footer').textContent.includes('符合條件 300 筆'));
 const row=document.querySelector('.pl-case');await flush(()=>row.querySelector('.pl-more>button').click());await flush(()=>[...document.querySelectorAll('[role="menuitem"]')].find(b=>b.textContent.includes('查看案件詳情')).click());
 assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric'),null,'contract amount is absent from overview rows');
-await flush(()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,300);assert.ok(document.querySelector('.pl-groups').textContent.includes('CASE-300'));
+for(let count=75;count<=300;count+=25){await flush(()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,count)};assert.ok(document.querySelector('.pl-groups').textContent.includes('CASE-300'));
 // App add-time ordering is shared by shell requests and legacy rows.
 w.projects=[['old','2026-10-01'],['new','2026-10-13'],['tied','2026-10-13'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
 await flush(()=>root.render(React.createElement(Projects,{key:'created',c:{...c,route:{view:'projects'}}})));
 const sortPicker=()=>document.querySelector('select[aria-label="案件排序"]');
-assert.equal(sortPicker().value,'due');
+await flush(()=>document.querySelector('.pl-filter-trigger').click());assert.equal(sortPicker().value,'due');
 const selectSort=async value=>{
- await flush(()=>{const select=sortPicker();select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+ if(!sortPicker())await flush(()=>document.querySelector('.pl-filter-trigger').click());await changePicker('案件排序',value);
  assert.equal(sortPicker().value,value);
 };
 await selectSort('created');
-const codes=()=>[...document.querySelectorAll('.pl-code')].map(e=>e.textContent.slice(1));
+const codes=()=>[...document.querySelectorAll('.pl-code')].map(e=>e.textContent);
 assert.deepEqual(codes(),['new','tied','old','empty']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['old','new','tied','empty']);

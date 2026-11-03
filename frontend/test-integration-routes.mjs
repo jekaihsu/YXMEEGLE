@@ -53,10 +53,31 @@ assert.deepEqual(health({status: 'ok', body: 'x'}).states, ['unknown']);
 // App wiring: pages are the defaults, legacy components stay mounted behind tab=legacy, nothing else is fetched
 const app = await fs.readFile(new URL('./src/App.tsx', import.meta.url), 'utf8');
 assert.match(app, /route\.view==='work'&&\(isLegacyTab\(route,'work'\)\?[^]*?<MyWork c=\{fc\}\/>[^]*?:<WorkPage c=\{c\}\/>\)/);
-assert.match(app, /route\.view==='sources'&&\(isLegacyTab\(route,'sources'\)\?[^]*?<Sources c=\{c\}\/>[^]*?:<SourceHealthPage c=\{c\}\/>\)/);
-assert.match(app, /async function sync|const sync=async/, 'legacy sync function is not deleted');
+assert.match(await fs.readFile('./src/Sources.tsx','utf8'), /const sync=async/, 'legacy sync remains on its route');
 const pages = await fs.readFile(new URL('./src/IntegratedPages.tsx', import.meta.url), 'utf8');
 assert.deepEqual([...pages.matchAll(/useFetched\('([^']+)'/g)].map(x => x[1]).sort(), ['/api/health', '/api/my-work', '/api/source-health']);
 assert.match(pages, /diagnosticCapability: true/);
 assert.doesNotMatch(pages, /\/api\/(audit|projects|actions|workspace)\b|method:\s*'(POST|PUT|PATCH|DELETE)'/, 'VCC-125: no reuse of audit/action/project payloads and no writes');
+
+// Render the real App route branches, including wrappers and keyed legacy Sources.
+const {JSDOM}=await import('jsdom');
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=sources',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;
+HTMLElement.prototype.scrollIntoView=function(){};window.scrollTo=()=>{};window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
+const {workspace,a}=await import('./session-epoch-fixture.mjs');
+const requests=[];globalThis.fetch=async url=>{requests.push(url);return new Response(JSON.stringify(url==='/api/session'?{mode:'demo',user:a,users:[a],workspace_id:'integration-test'}:url==='/api/workspace'?workspace:{}),{status:200})};
+const built=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const file=new URL('./.integration-app.mjs',import.meta.url);await fs.writeFile(file,built.outputFiles[0].text);let App;try{({default:App}=await import(file.href))}finally{await fs.unlink(file)}
+const root=createRoot(document.getElementById('root'));const flush=fn=>act(async()=>{fn?.();await new Promise(r=>setTimeout(r,30))});
+try{
+ await flush(()=>root.render(React.createElement(App)));await flush();
+ assert.equal(document.querySelector('.source-health-root h1')?.textContent,'資料來源');assert.equal(document.querySelector('.source-legacy'),null);
+ assert.equal(requests.filter(url=>url==='/api/source-health').length,1);
+ await flush(()=>{location.hash='view=sources&tab=legacy';window.dispatchEvent(new Event('hashchange'))});await flush();
+ assert.equal(document.querySelector('.source-health-root'),null);assert.equal(document.querySelector('.source-legacy h1')?.textContent,'資料來源');
+ assert.equal(requests.filter(url=>url==='/api/source-health').length,1,'legacy route does not request the health page');
+}finally{await flush(()=>root.unmount());dom.window.close()}
+
 console.log('integration routes: all passed');
