@@ -115,7 +115,7 @@ export function AssignmentWorkPage({c}:{c:Ctx}) {
   for(const [key,value] of Object.entries(changes))value ? next.set(key,value) : next.delete(key);
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
- return <main className="page work-page" aria-label="我的工作完整表格">
+ return <section className="page work-page" aria-label="我的工作完整表格">
   <header className="section-heading"><h1>我的工作</h1><Button disabled={read.pending} onClick={()=>void c.refresh()}>重新讀取</Button></header>
   <p className="work-meta">{WORK_PANELS.find(([key])=>key===panel)?.[1]} · {read.body && (read.body.complete || read.body.items.length>0) ? '已讀取 '+read.body.items.length+' 項' : '筆數待核對'} · 資料時間 {taipeiTime(read.body?.as_of,'待核對')}{read.body?.freshness.status==='stale' ? ' · 來源：資料較舊' : ''}</p>
   <div className="work-tabs" role="tablist" aria-label="工作清單">{WORK_PANELS.map(([key,label],index)=><button key={key} role="tab" type="button" aria-selected={panel===key} aria-controls="work-panel" tabIndex={panel===key?0:-1} onClick={()=>update({},key)} onKeyDown={event=>{const next=event.key==='ArrowRight'?(index+1)%6:event.key==='ArrowLeft'?(index+5)%6:event.key==='Home'?0:event.key==='End'?5:null;if(next!==null){event.preventDefault();(event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();update({},WORK_PANELS[next][0]);}}}>{label}</button>)}</div>
@@ -142,6 +142,6 @@ export function AssignmentWorkPage({c}:{c:Ctx}) {
    {params.has('cursor') && <Button onClick={()=>update({})}>回第一頁</Button>}
    {read.body?.next_cursor && <Button disabled={read.pending} onClick={()=>update({cursor:read.body?.next_cursor||''})}>下一頁</Button>}
   </footer>
- </main>;
+ </section>;
 }
 const WORK_PANELS:readonly (readonly [HomePanel,string])[]=[['assigned','指派給我'],['confirmation','待我確認'],['delegated','我交辦的'],['proxy','代理給我'],['local','本地 SOP'],['completed','已完成']];

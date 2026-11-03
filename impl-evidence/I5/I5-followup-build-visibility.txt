@@ -1,1 +1,0 @@
-PASS only managers see the build label; every role retains source diagnostics

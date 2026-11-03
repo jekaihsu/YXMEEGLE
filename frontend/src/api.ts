@@ -10,11 +10,19 @@ const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(n
 export const getSessionEpoch=()=>sessionEpoch;
 const epochListeners=new Set<()=>void>();
 export const onSessionEpochChange=(listener:()=>void)=>{epochListeners.add(listener);return ()=>{epochListeners.delete(listener)}};
-export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear();for(const listener of epochListeners)listener()};
+export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear();for(const listener of [...epochListeners])listener()};
 export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number,public warming?:boolean,public retry_after?:number,public payload?:unknown){super(message)}}
+// Connectivity changes only presentation. Never read data or retry writes here.
+export const isOffline=()=>typeof navigator!=='undefined'&&navigator.onLine===false;
+export function subscribeConnectivity(listener:()=>void){
+ const update=()=>{listener()};
+ window.addEventListener('online',update);window.addEventListener('offline',update);
+ return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update)};
+}
 export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number,response:Response)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
+  if(mutating&&isOffline())throw new ApiError(0,'目前離線，無法儲存或送出；操作不會排入佇列。','offline_write_blocked');
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
   const {etag,cacheScope,timeoutMs=mutating?0:30000,...request}=init||{};
   // Race the whole read (headers and body), even when a transport ignores abort.
