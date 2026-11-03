@@ -72,3 +72,103 @@
 .attendance-ok {color:color-mix(in srgb,var(--positive) 80%,var(--label))}
 .attendance-attention {color:color-mix(in srgb,var(--critical) 80%,var(--label))}
 }
+@layer pages{
+.people-data-time {
+  margin:0;
+  color:var(--label-2);
+  font-size:13px;
+}
+.people-day-controls,.people-day-list {
+  display:none;
+}
+.people-filter-sheet {
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.people-filter-sheet .people-filters {
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.people-filter-sheet label {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.people-filter-sheet select {
+  min-height:44px;
+}
+.people-filter-sheet :is(button,select):focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px;
+}
+@media(max-width:640px) {
+  .people-heading {
+    flex-direction:row;
+    align-items:center;
+    gap:8px;
+  }
+  .people-heading .button {
+    width:auto;
+  }
+  .people-heading h1 {
+    font-size:23px;
+  }
+  .people-heading p {
+    font-size:12px;
+  }
+  .people-day-controls {
+    display:flex;
+    gap:12px;
+    align-items:end;
+    flex-wrap:wrap;
+  }
+  .people-week-view {
+    display:none;
+  }
+  .people-week-view.is-selected {
+    display:block;
+  }
+  .people-day-list {
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    list-style:none;
+    padding:0;
+    margin:0;
+  }
+  .people-day-list li {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    min-height:65px;
+    padding:10px;
+    border:1px solid var(--sep);
+    border-radius:8px;
+    background:var(--surface);
+  }
+  .people-day-list small {
+    display:block;
+    color:var(--label-2);
+    font-size:12px;
+    margin-top:4px;
+  }
+  .people-day-list li>span {
+    font-size:13px;
+    color:var(--label-2);
+  }
+  .people-legend {
+    font-size:11px;
+    gap:4px;
+  }
+  .people-legend .attendance-status {
+    font-size:11px;
+  }
+}
+}
+
+.people-page .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@layer pages{.main-shell:has(.people-page){background:var(--bg)}.people-page{background:var(--bg)}}
