@@ -14,7 +14,7 @@ HTMLElement.prototype.scrollIntoView = function () {};
 const React = await import('react');
 const {act} = React;
 const {createRoot} = await import('react-dom/client');
-const bundle = await build({stdin: {contents: "export {ProjectDetail, ApprovalForm, contractItemOrder, sourceFieldValue} from './src/ProjectDetail'; export {DailyRecords, dailyRecordOrder} from './src/DailyRecords'; export {auditRecordOrder} from './src/AuditTrail'; export {assignmentTarget, sortAssignmentTasks} from './src/nodeAssignmentApi'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const bundle = await build({stdin: {contents: "export {DetailRefreshProvider} from './src/detailRefresh';export {ProjectDetail, ApprovalForm, contractItemOrder, sourceFieldValue} from './src/ProjectDetail'; export {DailyRecords, dailyRecordOrder} from './src/DailyRecords'; export {auditRecordOrder} from './src/AuditTrail'; export {assignmentTarget, sortAssignmentTasks} from './src/nodeAssignmentApi'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const artifact = new URL('./.ux-case-detail-test.mjs', import.meta.url);
 await fs.writeFile(artifact, bundle.outputFiles[0].text);
 let ui;
@@ -28,7 +28,7 @@ function context(route = {tab: 'flow'}) {
 }
 async function mount(element) {
   root = createRoot(document.getElementById('root'));
-  await act(async () => root.render(element));
+  await act(async () => root.render(React.createElement(ui.DetailRefreshProvider,{scope:'fixture-workspace',identityFingerprint:'fixture-actor'},element)));
   await act(async () => new Promise(resolve => setTimeout(resolve, 10)));
 }
 function sourceFixture() {
@@ -92,7 +92,7 @@ test('opening logs does not read assignments before the flow tab is selected', a
   const c = context({tab: 'logs'});
   await mount(React.createElement(ui.ProjectDetail, {c}));
   assert.equal(requests.filter(url => url.endsWith('/node-assignments')).length, 0);
-  await act(async () => root.render(React.createElement(ui.ProjectDetail, {c: {...c, route: {...c.route, tab: 'flow'}}})));
+  await act(async () => root.render(React.createElement(ui.DetailRefreshProvider,{scope:'fixture-workspace',identityFingerprint:'fixture-actor'},React.createElement(ui.ProjectDetail, {c: {...c, route: {...c.route, tab: 'flow'}}}))));
   assert.equal(requests.filter(url => url.endsWith('/node-assignments')).length, 1);
 });
 test('disabled approval form has no creation controls or mutations', async () => {

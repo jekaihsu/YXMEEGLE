@@ -37,7 +37,7 @@ try{
  const ready=window.caseOwner.state({endpoint:'project:p1:true'});assert.equal(ready.value.fetchedAt,snapshot.fetched_at);assert.equal(ready.value.snapshotId,snapshot.snapshot_id);
  fail=true;revision++;await render();
  const failed=window.caseOwner.state({endpoint:'project:p1:true'});assert.equal(failed.kind,'Error');assert.equal(failed.previous.fetchedAt,snapshot.fetched_at);assert.equal(failed.previous.snapshotId,snapshot.snapshot_id);
- assert.match(document.body.textContent,new RegExp(project.name));assert.match(document.body.textContent,/案件更新失敗/);assert.match(label(),/資料時間 2026\/10\/01.*資料待更新/);
+ assert.match(document.body.textContent,new RegExp(project.name));assert.match(document.body.textContent,/案件更新未完成/);assert.match(label(),/資料時間 2026\/10\/01.*資料待更新/);
  // Grants change without a user-ID change must discard the old case owner's rows.
  const old=window.caseOwner;c.s={...c.s,user:{...user,capabilities:['different-grant'],authz_version:2}};hold=true;fail=false;await render();
  assert.notEqual(window.caseOwner,old);assert.equal(document.querySelector('.cs-summary'),null,'new grants cannot paint old detail rows while the new read is blocked');assert.equal(document.querySelector('[data-snapshot-id]'),null);

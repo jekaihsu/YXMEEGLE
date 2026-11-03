@@ -11,8 +11,13 @@ const bundle=await build({stdin:{contents:"export {api} from './src/api';export 
 const path=new URL('./.freshness-wiring-bundle.mjs',import.meta.url);
 await fs.writeFile(path,bundle.outputFiles[0].text);
 let components;try{components=await import(path.href)}finally{await fs.unlink(path)}
-const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','Event','FormData','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement'])globalThis[key]=dom.window[key];
+// One-shot presentation frame; unlike JSDOM RAF, this does not install an interval.
+dom.window.requestAnimationFrame=callback=>dom.window.setTimeout(()=>callback(dom.window.performance.now()),0);
+dom.window.cancelAnimationFrame=id=>dom.window.clearTimeout(id);
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 Object.defineProperty(document,'hidden',{configurable:true,value:false});
 Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});

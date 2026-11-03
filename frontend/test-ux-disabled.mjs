@@ -9,9 +9,14 @@ const bundle=await build({stdin:{contents:"export {default as App} from './src/A
 const path=new URL('./.ux-disabled-bundle.mjs',import.meta.url);
 await fs.writeFile(path,bundle.outputFiles[0].text);
 let mod;try{mod=await import(path.href)}finally{await fs.unlink(path)}
-const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=approvals'});
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=approvals',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','Event','FormData'])globalThis[key]=dom.window[key];
 window.scrollTo=()=>{};
+// One-shot presentation frame; unlike JSDOM RAF, this does not install an interval.
+dom.window.requestAnimationFrame=callback=>dom.window.setTimeout(()=>callback(dom.window.performance.now()),0);
+dom.window.cancelAnimationFrame=id=>dom.window.clearTimeout(id);
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const requests=[];
 globalThis.fetch=async url=>{requests.push(url);return new Response(JSON.stringify(url==='/api/session'?{user:a,users:[a],mode:'lark',environment:'production',features:{change_extension:false,routines:false}}:workspace))};
@@ -22,7 +27,8 @@ try{
  for(const hash of ['#view=approvals','#view=routines','#view=project&project=pA&tab=operations&section=routines','#view=project&project=pA&tab=approvals&approval=private']){
   await flush(()=>{location.hash=hash;window.dispatchEvent(new Event('hashchange'))});
   assert.match(document.querySelector('main.workspace').textContent,/尚未開放/);
-  assert.ok([...document.querySelectorAll('button')].some(button=>button.textContent==='回首頁'));
+  const label=hash.includes('approvals')?'回今日工作台':'回首頁';
+  assert.equal(document.querySelector('main.workspace .system-state-card button,main.workspace .approvals-disabled button').textContent,label);
  }
  assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('變更與展延'));
  assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('追蹤與檢討'));
