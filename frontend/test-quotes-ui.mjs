@@ -19,7 +19,7 @@ const click=async el=>{assert.ok(el);assert.equal(el.disabled,false);await act(a
 const type=async(el,value)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));await tick()});
 async function sheet(fetcher,extra={}){globalThis.fetch=fetcher;root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(m.QuoteCreateSheet,{users:[],canImport:true,onClose(){},onCreated(){},onOpen(){},...extra}));await tick()});}
 test('ambiguous creation recovers and retries the exact request with explicit unassigned PM and default SOP',async()=>{const calls=[];let creates=0;let receipt;await sheet(async(url,init={})=>{const body=init.body?JSON.parse(init.body):null;calls.push({url,body});if(url.endsWith('/preview'))return reply(x.quote_preview);if(url.includes('/requests/'))return reply({code:'run_not_found'},404);if(url==='/api/quotes'){creates++;return creates===1?reply({code:'unavailable'},500):reply(x.quote_create)}throw Error(url)},{onOpen:ref=>receipt=ref});await type(document.querySelector('input[required]'),'新案件');await click(button('預覽'));assert.deepEqual(calls[0].body,{name:'新案件',pm_id:null,client:'',description:'',official_quote_no:'',import_tasks:true});await click(button('確認建立'));assert.match(document.querySelector('[role=alert]').textContent,/尚未建立/);await click(button('重試建立'));const attempts=calls.filter(c=>c.url==='/api/quotes');assert.equal(attempts.length,2);assert.deepEqual(attempts[0].body,attempts[1].body);assert.equal(calls.find(c=>c.url.includes('/requests/')).url,`/api/quotes/requests/${attempts[0].body.request_id}`);await click(button('開啟案件'));assert.equal(receipt,x.quote_create.local_reference)});
-test('number conflict stays inline and creation without SOP sends no import selection',async()=>{let body;await sheet(async(url,init)=>{body=JSON.parse(init.body);return reply({code:'quote_number_taken'},409)},{canImport:false});assert.equal(document.querySelectorAll('input[type=radio]').length,1);await type(document.querySelector('input[required]'),'新案件');await type(document.querySelector('input[aria-label="報價編號"]'),'115600');await click(button('預覽'));assert.equal(body.import_tasks,false);assert.equal('node_keys' in body,false);assert.equal(document.querySelector('input[aria-invalid=true]').getAttribute('aria-describedby'),'quote-number-error');assert.equal(document.getElementById('quote-number-error').textContent,'報價編號已使用')});
+test('number conflict stays inline and creation without SOP sends no import selection',async()=>{let body;await sheet(async(url,init)=>{body=JSON.parse(init.body);return reply({code:'quote_number_taken'},409)},{canImport:false});assert.equal(document.querySelectorAll('input[type=radio]').length,1);await type(document.querySelector('input[required]'),'新案件');await type(document.querySelector('input[aria-label="報價編號"]'),'115600');await click(button('預覽'));assert.equal(body.import_tasks,false);assert.equal('node_keys' in body,false);assert.equal(document.querySelector('input[aria-invalid=true]').getAttribute('aria-describedby'),'quote-number-error');assert.equal(document.getElementById('quote-number-error').textContent,'報價編號已使用');assert.equal(document.querySelector('.quote-create-advanced').open,true)});
 test('create entry is absent without both flag and capability',async()=>{globalThis.fetch=async()=>reply({total:0,items:[]});const c={s:{user:{capabilities:['create_local_case']}},w:{users:[]},route:{view:'quotes'},go(){}};root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});assert.equal(button('建立報價'),undefined);await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,s:{features:{local_case_creation:true},user:{capabilities:[]}}}}));await tick()});assert.equal(button('建立報價'),undefined);await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,s:{features:{local_case_creation:true},user:{capabilities:['create_local_case']}}}}));await tick()});assert.ok(button('建立報價'))});
 test('register reads all API pages before sorting, paginates and resets the page after search',async()=>{const offsets=[];const rows=Array.from({length:101},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,contract_amount:i}));globalThis.fetch=async url=>{const offset=Number(new URL(url,'http://localhost').searchParams.get('offset'));offsets.push(offset);return reply({total:rows.length,items:rows.slice(offset,offset+100)})};root=createRoot(document.getElementById('root'));const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});assert.deepEqual(offsets,[0,100]);assert.equal(document.querySelectorAll('tbody tr').length,25);assert.match(document.querySelector('tbody tr').textContent,/115100/);await click(button('下一頁'));assert.match(document.querySelector('tbody tr').textContent,/115075/);await type(document.querySelector('[aria-label="搜尋報價"]'),'案件100');assert.equal(document.querySelectorAll('tbody tr').length,1);assert.match(document.querySelector('tbody tr').textContent,/115100/);assert.equal(button('上一頁').disabled,true)});
 
@@ -30,9 +30,9 @@ async function registerDetail(quote,allowed=true) {
  const destinations=[];
  const c={s:{workspace_id:`quote-${quote.quote_no}-${allowed}`,features:{sop_task_writes:true},user:{capabilities:['sop_task_import']}},w:{users:[]},route:{view:'quotes'},go:route=>destinations.push(route)};
  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
- assert.deepEqual([...document.querySelectorAll('thead th')].map(th=>th.textContent.replace(/ [↑↓]/,'')),['報價編號','案件名稱','業主','合約金額','階段','負責人']);
+ assert.deepEqual([...document.querySelectorAll('thead th')].map(th=>th.textContent.replace(/ [↑↓]/,'')),['案件名稱','合約金額','階段','負責人']);
  assert.equal(document.querySelectorAll('.quote-stage-filter option').length,12,'all stage choices remain available');
- await click(button(quote.quote_no));
+ assert.equal(document.querySelector('.quote-code').textContent,quote.quote_no);await click(document.querySelector('.quote-name-button'));
  for(const label of ['工程編號','報價日期','報價期限','PM','SOP 進度'])assert.ok(document.querySelector('[role=dialog]').textContent.includes(label),`${label} retained in detail`);
  return {calls,destinations};
 }
@@ -123,7 +123,7 @@ test('reload and unmount abort quote reads instead of continuing obsolete page r
  const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};
  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
  assert.equal(pending.length,1);
- await click(button('重新整理'));
+ await click(button('重新讀取'));
  assert.equal(pending.length,2);assert.ok(pending[0].init.signal.aborted);
  await act(async()=>{pending[1].resolve(reply({total:201,items:Array.from({length:100},(_,i)=>({...x.quotes.items[0],quote_no:String(i)}))}));await tick()});
  assert.equal(pending.length,3);
@@ -155,4 +155,58 @@ test('bulk quote pages load 2000 rows in one request and 2001 in two before glob
   assert.equal(calls.length,count===2000?1:2,'local interactions do not refetch');
   await act(async()=>root.unmount());root=null;
  }
+});
+
+test('unknown outcome retains preview, blocks dismissal and offers only same-request reconciliation',async()=>{
+ const calls=[];let closes=0;
+ await sheet(async(url,init={})=>{calls.push({url,body:init.body});if(url.endsWith('/preview'))return reply(x.quote_preview);if(url==='/api/quotes'||url.includes('/requests/'))return reply({code:'unavailable'},503);throw Error(url)},{onClose:()=>closes++});
+ await type(document.querySelector('input[required]'),'合成長名稱案件');await click(button('預覽'));await click(button('確認建立'));
+ assert.ok(document.querySelector('[data-kind=UnknownOutcome]'));
+ assert.match(document.querySelector('[role=dialog]').textContent,/確認報價/);
+ assert.equal(button('確認建立'),undefined);assert.equal(button('上一步').disabled,true);
+ const close=document.querySelector('[aria-label=關閉]');assert.equal(close.disabled,true);assert.equal(close.getAttribute('aria-disabled'),'true');assert.match(document.querySelector('[data-kind=UnknownOutcome]').textContent,/關閉與編輯暫停，待結果確認。/);await act(async()=>close.click());assert.equal(closes,0);
+ await click(button('重新確認建立結果'));
+ assert.equal(calls.filter(c=>c.url==='/api/quotes').length,1);
+ const recovery=calls.filter(c=>c.url.includes('/requests/'));assert.equal(recovery.length,2);assert.equal(recovery[0].url,recovery[1].url);
+});
+
+test('revoked quote list clears retained rows instead of showing an empty result',async()=>{
+ let denied=false;globalThis.fetch=async()=>denied?reply({code:'forbidden'},403):reply({total:1,items:[x.quotes.items[0]]});
+ root=createRoot(document.getElementById('root'));const c={s:{workspace_id:'denial',user:{id:'viewer'}},w:{users:[]},route:{view:'quotes'},go(){}};
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});assert.equal(document.querySelectorAll('tbody tr').length,1);
+ denied=true;await click(button('重新讀取'));assert.ok(document.querySelector('[data-kind=Denied]'));assert.equal(document.querySelectorAll('tbody tr').length,0);assert.doesNotMatch(document.body.textContent,/目前沒有報價/);
+});
+
+test('no-cache quote failure reports Error without a false empty state',async()=>{globalThis.fetch=async()=>reply({code:'unavailable'},503);root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(m.Quotes,{c:{s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}}}));await tick()});assert.ok(document.querySelector('[data-kind=Error]'));assert.doesNotMatch(document.body.textContent,/目前沒有報價/);});
+
+test('explicit refresh retains quote rows with a Stale notice until the next snapshot arrives',async()=>{
+ let pending=false,release,calls=0;globalThis.fetch=async()=>{calls++;return pending?new Promise(resolve=>release=resolve):reply({total:1,items:[x.quotes.items[0]]})};
+ root=createRoot(document.getElementById('root'));const c={s:{workspace_id:'retained-refresh',user:{id:'viewer'}},w:{users:[]},route:{view:'quotes'},go(){}};
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});pending=true;
+ await click(button('重新讀取'));assert.equal(calls,2);assert.equal(document.querySelectorAll('tbody tr').length,1);assert.ok(document.querySelector('[data-kind=Stale]'));
+ await act(async()=>{release(reply({total:1,items:[x.quotes.items[0]]}));await tick()});assert.equal(document.querySelector('[data-kind=Stale]'),null);assert.equal(document.querySelectorAll('tbody tr').length,1);
+});
+
+test('offline quote create is never sent, needs no recovery, retains form and permits dismissal',async()=>{
+ let closes=0;const calls=[];
+ await sheet(async(url,init={})=>{calls.push({url,method:init.method});if(url.endsWith('/preview'))return reply(x.quote_preview);throw Error('offline create must not fetch')},{onClose:()=>closes++});
+ await type(document.querySelector('input[required]'),'離線仍保留的報價草稿');await click(button('預覽'));const before=calls.length;
+ Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+ try{
+  window.dispatchEvent(new Event('offline'));await click(button('確認建立'));
+  assert.equal(calls.length,before,'neither create POST nor recovery GET reaches fetch');assert.equal(document.querySelector('[data-kind=UnknownOutcome]'),null);
+  assert.match(document.querySelector('[data-kind=Conflict]').textContent,/目前離線，無法儲存或送出/);assert.equal(button('上一步').disabled,false);
+  await click(button('上一步'));assert.equal(document.querySelector('input[required]').value,'離線仍保留的報價草稿');
+  await click(document.querySelector('[aria-label=關閉]'));assert.equal(closes,1);
+ }finally{Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'))}
+});
+
+test('offline retry after run-not-found preserves the original uncertain request key',async()=>{
+ const bodies=[];let creates=0;
+ await sheet(async(url,init={})=>{if(url.endsWith('/preview'))return reply(x.quote_preview);if(url.includes('/requests/'))return reply({code:'run_not_found'},404);if(url==='/api/quotes'){bodies.push(JSON.parse(init.body));return ++creates===1?reply({code:'unavailable'},503):reply(x.quote_create)}throw Error(url)});
+ await type(document.querySelector('input[required]'),'原請求仍須保留');await click(button('預覽'));await click(button('確認建立'));
+ Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+ try{await click(button('重試建立'));assert.equal(bodies.length,1);assert.match(document.body.textContent,/目前離線/);assert.ok(button('重試建立'));}
+ finally{Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'))}
+ await click(button('重試建立'));assert.equal(bodies.length,2);assert.equal(bodies[0].request_id,bodies[1].request_id);
 });

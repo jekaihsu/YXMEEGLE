@@ -32,11 +32,13 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
  const scope=recentCasesKey(s.user?.id||'',s.workspace_id||w?.workspace_id||'',epoch);
  const storage=()=>{try{return window.sessionStorage}catch{return null}};
  const [recent,setRecent]=useState<{scope:string;ids:string[]}>(()=>({scope,ids:readRecentCases(storage(),scope)}));
- const previousScope=useRef(scope);
- useEffect(()=>onSessionEpochChange(()=>{clearRecentCases(storage(),previousScope.current);setEpoch(getSessionEpoch())}),[]);
+ const previousUser=useRef(s.user?.id);
+ const recentScopes=useRef(new Set([scope]));
+ useEffect(()=>onSessionEpochChange(()=>{for(const key of recentScopes.current)clearRecentCases(storage(),key);recentScopes.current.clear();setEpoch(getSessionEpoch())}),[]);
  useEffect(()=>{
-  if(previousScope.current!==scope)clearRecentCases(storage(),previousScope.current);
-  previousScope.current=scope;
+  if(previousUser.current!==s.user?.id){for(const key of recentScopes.current)clearRecentCases(storage(),key);recentScopes.current.clear()}
+  previousUser.current=s.user?.id;
+  recentScopes.current.add(scope);
   setRecent({scope,ids:readRecentCases(storage(),scope)});
  },[scope]);
  useEffect(()=>{
@@ -48,10 +50,44 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
  useLayoutEffect(()=>{const nodes=[mainShell.current,bottomNav.current,compactBrand.current,skipLink.current];for(const node of nodes)if(node)node.inert=mobile||sessionOpen;return()=>{for(const node of nodes)if(node)node.inert=false}},[mobile,sessionOpen]);
  useEffect(()=>{
   document.title=`${ROUTE_LABELS[route.view]}｜詠翔工作台`;
-  const main=mainShell.current?.querySelector('main');if(!main||!ready)return;
-  const focus=()=>{const h=main.querySelector<HTMLElement>('h1');if(!h||main.querySelector('.route-skeleton'))return false;h.tabIndex=-1;requestAnimationFrame(()=>{if(!mainShell.current?.inert)h.focus({preventScroll:true})});return true};
-  if(focus())return;const observer=new window.MutationObserver(()=>{if(focus())observer.disconnect()});observer.observe(main,{childList:true,subtree:true});return()=>observer.disconnect();
- },[route.view,route.project,route.tab,ready]);
+  const main=mainShell.current?.querySelector('main');if(!main)return;
+  const initialFocus=document.activeElement;
+  let frame:number|undefined,timer:ReturnType<typeof setTimeout>|undefined;
+  const stop=()=>{observer.disconnect();if(timer!==undefined)clearTimeout(timer);if(frame!==undefined)window.cancelAnimationFrame(frame);document.removeEventListener('keydown',stop,true);document.removeEventListener('pointerdown',stop,true)};
+  const focus=()=>{
+   const active=document.activeElement;
+   if(active!==initialFocus&&active!==document.body&&active!==main){stop();return true}
+   const heading=main.querySelector<HTMLElement>('h1');if(!heading||main.querySelector('.route-skeleton'))return false;
+   stop();heading.tabIndex=-1;
+   frame=requestAnimationFrame(()=>{const active=document.activeElement;if(heading.isConnected&&!mainShell.current?.inert&&(active===initialFocus||active===document.body||active===main))heading.focus({preventScroll:true})});
+   return true;
+  };
+  const observer=new window.MutationObserver(focus);
+  if(!focus()){
+   observer.observe(main,{childList:true,subtree:true});
+   document.addEventListener('keydown',stop,true);document.addEventListener('pointerdown',stop,true);
+   // Bound presentation-only waiting when a destination has no H1. Never reads data.
+   timer=setTimeout(stop,10000);
+  }
+  return stop;
+ },[route.view]);
+ // A lazy tab may temporarily hide or replace its rail. Restore only its own lost focus,
+ // within the same view, and only while the user has not focused or pointed elsewhere.
+ useEffect(()=>{
+  const main=mainShell.current?.querySelector('main');if(!main)return;
+  const rails='.pds-tabs,.work-tabs,.reports-tabs,[role="tablist"]';
+  let lastTab:HTMLElement|null=null;
+  const track=(event:FocusEvent)=>{const target=event.target;if(target===document.body)return;lastTab=target instanceof window.HTMLElement&&main.contains(target)&&target.matches('button')&&target.closest(rails)?target:null};
+  const pointer=(event:PointerEvent)=>{if(!(event.target instanceof window.Element)||!event.target.closest(rails))lastTab=null};
+  const observer=new window.MutationObserver(()=>{
+   if(!lastTab||(document.activeElement!==document.body&&document.activeElement!==main))return;
+   const target=lastTab.isConnected?lastTab:[...main.querySelectorAll<HTMLElement>(':is(.pds-tabs,.work-tabs,.reports-tabs,[role=tablist]) button')].find(button=>button.textContent===lastTab?.textContent);
+   if(target?.getClientRects().length&&!mainShell.current?.inert)target.focus({preventScroll:true});
+  });
+  document.addEventListener('focusin',track);document.addEventListener('pointerdown',pointer,true);
+  observer.observe(main,{childList:true,subtree:true,attributes:true,attributeFilter:['style','hidden']});
+  return()=>{observer.disconnect();document.removeEventListener('focusin',track);document.removeEventListener('pointerdown',pointer,true)};
+ },[route.view]);
  const [prefetch]=useState(createRoutePrefetch);
  useEffect(()=>prefetch.cancel,[prefetch]);
  const intent=(target:Route)=>({onMouseEnter:()=>prefetch.schedule(target),onMouseLeave:prefetch.cancel,onFocus:()=>prefetch.schedule(target),onBlur:prefetch.cancel});

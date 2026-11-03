@@ -10,17 +10,18 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api'; export {taskWorkFact,progressWorkItems} from './src/ProjectDetail'; export {seedProjectProgress} from './src/useProjectProgress';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {DetailRefreshProvider,useCaseData} from './src/detailRefresh';export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api'; export {taskWorkFact,progressWorkItems} from './src/ProjectDetail'; export {seedProjectProgress} from './src/useProjectProgress';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.task-sheet.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const tick=()=>new Promise(r=>setTimeout(r,15));
 const guest={id:'ou_guest',name:'訪客',role:'member',department:'',avatar:'',capabilities:[]};
-let root,c,calls;
-const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
+let root,c,calls,seedProgress;
+function Fixture(){const owner=ui.useCaseData();React.useState(()=>{if(seedProgress)ui.seedProjectProgress('p1',seedProgress,owner)});return React.createElement(ui.ProjectDetail,{c})}
+const render=()=>root.render(React.createElement(ui.DetailRefreshProvider,{scope:c.s.workspace_id||'fixture-workspace',identityFingerprint:c.s.user.id},React.createElement(Fixture)));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 const task=(id,patch={})=>({id,title:`任務 ${id}`,owner_id:'',status:'in_progress',required:true,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,points:null,work_item_id:'',description:'',input:'',output:'',comments:[],revision:1,can_execute:true,...patch});
 async function mount(id,patch,{actor,features={},items,events,progress,project,approvals}={}){
- if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];if(progress)ui.seedProjectProgress('p1',progress);
+ if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];seedProgress=progress;
  const base=projectFixture();Object.assign(base.project,project);if(approvals)base.workspace.approvals=approvals;
  const node=base.project.nodes.find(n=>n.key==='sales');node.tasks=[task(id,{owner_id:base.user.id,...patch})];
  if(items)base.workspace.contract_items=items;if(events)base.workspace.events=events;

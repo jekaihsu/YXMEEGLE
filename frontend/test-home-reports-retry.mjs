@@ -6,7 +6,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {fakeClock} from './fake-clock-fixture.mjs';
 import {homeReportFixture} from './home-reports-fixture.mjs';
-const b=await build({stdin:{contents:"export {useHomeReports} from './src/useHomeReports';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
+const b=await build({stdin:{contents:"export {useHomeReports} from './src/useHomeReports';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.home-retry-test.mjs',import.meta.url);await fs.writeFile(file,b.outputFiles[0].text);let m;try{m=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
 for(const key of ['window','document','Event'])globalThis[key]=dom.window[key];globalThis.IS_REACT_ACT_ENVIRONMENT=true;

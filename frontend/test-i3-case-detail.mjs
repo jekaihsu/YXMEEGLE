@@ -94,7 +94,26 @@ await mount({tab:'flow',configure(base){base.project.nodes.find(n=>n.key==='cont
 await act(async()=>{await tick(80)});
 assert.match(document.querySelector('.i3-missing').textContent,/缺 4 項 · 正式派工確認、工作日報、完工檢核與報告、成果照片/);
 assert.equal(document.querySelectorAll('.delivery-checks .late-text').length,0);
-for(const row of document.querySelectorAll('.i3-stage-rows button'))assert.match(row.textContent,/阻礙數：(4|待確認)/);
+assert.equal(document.querySelector('.i3-stage-rows [data-section=review] small').textContent,'缺交付資料：4');
+for(const row of document.querySelectorAll('.i3-stage-rows button:not([data-section=review])'))assert.equal(row.querySelector('small').textContent,'阻礙數：待確認');
 assert.ok(document.querySelector('.i3-stage-rows button[data-section="finance"]'));
+const switcher=document.querySelector('.i3-more-stage'),content=document.querySelector('.i3-stage-content');
+assert.ok(switcher.compareDocumentPosition(content)&Node.DOCUMENT_POSITION_FOLLOWING);
+await click(document.querySelector('.i3-stage-rows [data-section=roles]'));
+assert.equal(document.querySelector('.i3-stage-rows [data-section=roles]').getAttribute('aria-expanded'),'true');
+assert.equal(document.querySelector('.i3-stage-rows [data-section=review]').getAttribute('aria-expanded'),'false');
+assert.equal(document.activeElement,document.querySelector('.i3-stage-content>h3'));assert.equal(document.activeElement.textContent,'責任與交接');assert.equal(writes().length,0);
+for(const [requirements,evidence,expected] of [
+ [[],[],'0'],
+ [[{key:'report',label:'完工報告'}],[{node_id:'node_control',key:'report',status:'returned'}],'0'],
+ [undefined,[],'待確認'],
+ [[{key:'report',label:'完工報告'}],undefined,'待確認']
+]){await mount({tab:'flow',configure(base){base.project.nodes.find(n=>n.key==='control').requirements=requirements;base.project.evidence=evidence}});await act(async()=>{await tick(80)});assert.equal(document.querySelector('.i3-stage-rows [data-section=review] small').textContent,'缺交付資料：'+expected);if(requirements?.length&&evidence===undefined)assert.equal(document.querySelector('.delivery-checks .late-text').textContent,'待確認')}
+await mount({configure(base,f){f.list.nodes.find(n=>n.key==='control').owners=[];f.list.can.control.assign=false;f.list.can.control.claim=true}});
+assert.equal(document.querySelector('.po-next-action h3').textContent,'認領節點');await click(button('前往認領節點'));assert.equal(c.route.section,'node-claim');assert.equal(writes().length,0);assert.equal(document.activeElement.dataset.nodeAction,'claim');
+await mount({configure(base,f){f.list.nodes.find(n=>n.key==='control').owners=[]}});await click(button('前往指派負責人'));assert.ok(document.querySelector('.pf-node-actions form'));assert.equal(writes().length,0);
+await mount({tasks:{control:[]}});await click(button('前往新增任務'));assert.ok(document.querySelector('.pf-node-actions form'));assert.equal(writes().length,0);
+await mount({configure(base,f){f.list.nodes=f.list.nodes.slice(0,6);f.list.summary.current_node='control'}});assert.equal(document.querySelectorAll('.i3-stepper .pf-node').length,6);assert.equal(document.querySelector('.pf-chain').style.getPropertyValue('--i3-node-count'),'6');
+assert.equal(document.querySelector('.pds-status-chip').textContent,document.querySelector('.cs-stage strong').textContent);
 await act(async()=>root.unmount());
 console.log('PASS I3: next-action capabilities/fallback, source mismatch, nine nodes, selection without writes, 27-task cap/reveal, origin, denied action reason, missing-evidence consolidation, unknown disclosure counts');

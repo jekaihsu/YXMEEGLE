@@ -1,3 +1,4 @@
+import {parseInstant,taipeiDate} from './taipeiTime';
 import {overdueDays,dataTime} from './homeViews/deadline';
 import type {ReactNode} from 'react';
 import {homeTarget} from './projectRoutes';
@@ -19,8 +20,9 @@ export function Card({id,subtitle,children,href,action='查看全部',compact=fa
 }
 export function Message({children}:{children:ReactNode}){return <p className="home-message" role="status">{children}</p>}
 export function dueText(deadline:string|null|undefined,today:string){
- if(!deadline)return '期限待確認';
- const due=deadline.slice(0,10),days=Math.round((Date.parse(`${due}T00:00:00Z`)-Date.parse(`${today}T00:00:00Z`))/86400000);
+ const due=taipeiDate(deadline,'');
+ if(!due)return '期限待確認';
+ const days=Math.round((parseInstant(due.replaceAll('/','-'))-parseInstant(today))/86400000);
  const overdue=overdueDays(deadline,today);
  if(overdue)return `逾期 ${overdue} 天`;
  if(days===0)return '今天到期';
@@ -33,7 +35,7 @@ export function Deadline({value,today}:{value:string|null|undefined;today:string
 }
 export function WorkPreview({item,today}:{item:HomeItem;today:string}){
  const detail=[item.kind==='sop_task'?'SOP 任務':null,item.case.name||item.case.code||'案件關聯待核對',item.source_status||({todo:'待處理',done:'已完成',blocked:'受阻'}[item.status]||STATUS[item.status]||'狀態待核對'),item.blocked_reasons[0]].filter(Boolean).join(' · ');
- return <Row label={item.title} detail={detail} value={<Deadline value={item.status==='done'||item.status==='completed'?null:item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(homeTarget(item.target)):undefined}/>;
+ return <Row label={item.title} detail={detail} value={item.status==='done'||item.status==='completed'?undefined:<Deadline value={item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(homeTarget(item.target)):undefined}/>;
 }
 export function WorkCard({c,panel,id,today,read,sharedNotice=false}:{c:Ctx;panel:HomePanel;id:HomeCardId;today:string;read:PanelRead;sharedNotice?:boolean}) {
  const body=read.body;

@@ -14,6 +14,16 @@ def test_staged_app_and_catalog_work_without_repository_fallback(tmp_path, monke
     monkeypatch.setattr(deploy_prepare, 'RUNTIME', tmp_path)
     stage = deploy_prepare.staging()
     assert (stage / 'backend' / 'sop_source_contracts.json').is_file()
+    shipped = {p.relative_to(stage).as_posix() for p in stage.rglob('*') if p.is_file()}
+    assert not {'frontend/src/design/README.md', 'frontend/src/reports/preview.html', 'frontend/src/reports/preview.tsx', 'frontend/src/reports/test-loading.mjs'} & shipped
+    assert 'frontend/src/assistant/elements/LICENSE.assistant-ui' in shipped
+    assert 'frontend/public/howto/overview.webp' in shipped
+    assert 'backend/seed.py' in shipped
+    assert 'backend/case_evidence.py' in shipped
+    assert 'frontend/src/homeRolePreview.tsx' in shipped
+    assert 'frontend/src/assistant/fixtures.ts' not in shipped
+    assert not any(Path(name).name.startswith('benchmark') for name in shipped)
+    assert not any(Path(name).name in {'conftest.py', 'ai_projection_test_support.py', 'partial_testing.py', 'perf_fixture.py', 'write_world.py'} for name in shipped)
     identity=json.loads((stage/'backend/build-manifest.json').read_text())
     assert len(identity['git_sha'])==40 and isinstance(identity['dirty'],bool)
     assert identity['branch'] and identity['built_at']
@@ -154,3 +164,18 @@ def test_staged_package_never_ships_the_dispatch_dev_server_or_its_fake_bitable(
     manifest = {f['path'] for f in json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())['files']}
     assert {'backend/dispatch_publish/service.py', 'backend/app.py'} <= manifest
     assert sorted(m for m in manifest if 'dev_dispatch' in m or 'dispatch_publish_fake' in m) == []
+
+
+@pytest.mark.parametrize('part', ['src', 'public'])
+def test_frontend_stage_inventory_excludes_docs_tests_and_evidence(tmp_path, part):
+    source = tmp_path / part
+    runtime = ['design/tokens.css', 'Page.tsx', 'model.ts', 'howto/overview.webp', 'assistant/elements/LICENSE.assistant-ui']
+    local = ['design/README.md', 'reports/preview.html', 'reports/preview.tsx', 'reports/test-loading.mjs', 'assistant/fixtures.ts',
+             'Page.test.tsx', 'model.spec.ts', 'test-fixture.ts', 'docs/diagram.svg',
+             'evidence/Home.png', 'impl-evidence/FX3/Home.webp', 'screenshots/case.png',
+             'design-notes/layout.tsx', '__tests__/Page.tsx', '.runtime/snapshot.png', 'trace.zip', 'result.log']
+    for name in runtime + local:
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('fixture')
+    assert {p.relative_to(source).as_posix() for p in deploy_prepare.frontend_stage_files(source)} == set(runtime)

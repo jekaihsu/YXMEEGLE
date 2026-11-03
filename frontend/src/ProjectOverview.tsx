@@ -1,15 +1,14 @@
+import {useCaseFlowModel} from './useCaseFlowModel';
 import {caseProgressStatus,sourceStatusPending} from './stageModel';
 import {lifecycleGate} from './sourceLifecycle';
 import type {ReactNode} from 'react';
 import type {useSopTasks} from './useSopTasks';
-import {withLocalChecklist,localCase} from './nodeWorkbenchModel';
+import {localCase} from './nodeWorkbenchModel';
 import {CalendarDays, Clock3, Flag} from 'lucide-react';
-import {buildFlowModel,flowTaskTarget} from './flowModel';
+import {flowTaskTarget} from './flowModel';
 import {type OverviewTarget} from './projectOverviewModel';
 import {executionAllowed,executionReason} from './ProjectExecution';
-import {useProjectProgress} from './useProjectProgress';
 import type {useNodeAssignments} from './useNodeAssignments';
-import {useFlowDetails} from './useFlowDetails';
 import {Avatar} from './AppShell';
 import {CaseSummary} from './CaseSummary';
 import {FlowDiagram} from './FlowDiagram';
@@ -23,12 +22,7 @@ import './ProjectOverview.css';
 
 const shortDate=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0,10) : '未設定';
 export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:()=>ReactNode}){
- const read=useProjectProgress(p.id),list='data' in assignments.state ? assignments.state.data : undefined;
- const details=useFlowDetails(p.id,list,selectedKey,true,assignments.revision);
- const merged=list?{...list,node_details:{...list.node_details,...Object.fromEntries(Object.entries(details.details).map(([key,d])=>[key,{tasks:d.tasks,assignable_people:d.assignable_people}]))}}:undefined;
- const data=read.state.kind==='ready' && read.state.data.project_id===p.id ? read.state.data : undefined;
- const flow=buildFlowModel({project:assignments.state.kind==='disabled' ? p : {...p,nodes:[]},assignments:merged,progress:data,today:c.w.as_of,users:c.w.users});
- const model={...flow,nodes:withLocalChecklist(flow.nodes,'data' in sopTasks.state?sopTasks.state.data:undefined,sopTasks.assignees)};
+ const {list,merged,model}=useCaseFlowModel(c,p,assignments,sopTasks,selectedKey,true);
  const unavailable=assignments.state.kind==='loading' || assignments.state.kind==='error';
  const destination=(target:OverviewTarget)=>({...target,...(target.tab==='flow'?{tab:'overview'}:{})});
  const go=(target:OverviewTarget)=>c.go({view:'project',project:p.id,...destination(target)});
@@ -49,11 +43,13 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const localNode=('data' in sopTasks.state?sopTasks.state.data?.localNodes:undefined)?.find(n=>n.key===current?.key);
  const canRecommend=!!current&&stage.currentKnown&&!stage.finished&&caseProgressStatus(p)!=='completed'&&caseProgressStatus(p)!=='paused'&&!sourceStatusPending(p)&&execution.allowed&&fresh;
  const canOwner=canRecommend&&!current.owners.length&&(localNode?.can.assign||list?.can[current.key]?.assign||list?.can[current.key]?.claim||assignments.state.kind==='disabled'&&isProjectLead(c.s,p));
- const canCreate=canRecommend&&!!current.owners.length&&current.tasks.total===0&&!current.taskRows.length&&!!(current.assignment?merged?.node_details?.[current.key]:current.legacy||localNode)&&(localNode?.can.create_task||list?.can[current.key]?.create_task||assignments.state.kind==='disabled'&&isProjectLead(c.s,p));
- const recommendation=canOwner?'指派負責人':canCreate?'新增任務':'';
+ const canCreate=canRecommend&&!!current.owners.length&&current.tasks.total===0&&!current.taskRows.length&&!!(current.assignment?merged?.node_details?.[current.key]:current.legacy||localNode)&&(localNode?.can.create_task&&sopTasks.state.kind==='ready'&&sopTasks.state.data?.allowed.manage||list?.can[current.key]?.create_task||assignments.state.kind==='disabled'&&isProjectLead(c.s,p));
+ const claimOnly=canOwner&&!localNode?.can.assign&&!list?.can[current.key]?.assign&&!!list?.can[current.key]?.claim;
+ const recommendation=canOwner?(claimOnly?'認領節點':'指派負責人'):canCreate?'新增任務':'';
+ const openRecommendation=()=>c.go({view:'project',project:p.id,tab:canOwner&&!current?.assignment&&!localNode?'people':'flow',node:current?.key,section:claimOnly?'node-claim':canOwner?'node-assign':'add-task'});
  return <div className="project-overview">
   <div className="po-main">
-   <section className="po-card po-next-action" aria-label="下一步"><h2>下一步</h2>{recommendation?<><h3>{recommendation}</h3><p>{current?.label} · {canOwner?'尚未指派負責人':'此階段尚無任務'}</p><Button variant="primary" onClick={()=>c.go({view:'project',project:p.id,tab:'flow',node:current?.key})}>前往{recommendation}</Button></>:summaryStep.kind==='action'||summaryStep.kind==='view'?<><h3>{summaryStep.title}</h3><p>{summaryStep.reason}</p><Button variant="primary" onClick={()=>openStep(summaryStep)}>{summaryStep.button}</Button></>:<><h3>目前沒有可執行的下一步</h3>{summaryStep.kind==='none'&&caseProgressStatus(p)==='paused'&&summaryStep.reasons[0]&&<p>{summaryStep.reasons[0]}</p>}<p>先查看目前階段、負責人與待辦任務。</p><Button variant="primary" onClick={()=>c.go({view:'project',project:p.id,tab:'flow',node:stage.currentIds[0]})}>查看流程與任務</Button></>}{sourceStatusPending(p)&&<p className="po-source-note">來源與工作台狀態不同。<Button variant="plain" onClick={()=>c.go({view:'project',project:p.id,tab:'data',section:'basic'})}>查看狀態差異</Button></p>}</section>
+   <section className="po-card po-next-action" aria-label="下一步"><h2>下一步</h2>{recommendation?<><h3>{recommendation}</h3><p>{current?.label} · {canOwner?'尚未指派負責人':'此階段尚無任務'}</p><Button variant="primary" onClick={openRecommendation}>前往{recommendation}</Button></>:summaryStep.kind==='action'||summaryStep.kind==='view'?<><h3>{summaryStep.title}</h3><p>{summaryStep.reason}</p><Button variant="primary" onClick={()=>openStep(summaryStep)}>{summaryStep.button}</Button></>:<><h3>目前沒有可執行的下一步</h3>{summaryStep.kind==='none'&&caseProgressStatus(p)==='paused'&&summaryStep.reasons[0]&&<p>{summaryStep.reasons[0]}</p>}<p>先查看目前階段、負責人與待辦任務。</p><Button variant="primary" onClick={()=>c.go({view:'project',project:p.id,tab:'flow',node:stage.currentIds[0]})}>查看流程與任務</Button></>}{sourceStatusPending(p)&&<p className="po-source-note">來源與工作台狀態不同。<Button variant="plain" onClick={()=>c.go({view:'project',project:p.id,tab:'data',section:'basic'})}>查看狀態差異</Button></p>}</section>
    <FlowDiagram compact stageNavigation currentIds={stage.currentIds} nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>c.go({view:'project',project:p.id,tab:'overview',node})}/>
    <div className="po-current-summary"><CaseSummary showNext={false} onRetry={()=>void assignments.reload()} ctx={stage} step={summaryStep} loading={assignments.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:''} onStep={openStep} onCurrent={()=>go({tab:'overview',node:stage.currentIds[0]})}/></div>
    {workbench()}
