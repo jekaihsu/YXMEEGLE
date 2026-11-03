@@ -12,7 +12,7 @@ from .workflow import require
 from .business_policy import refresh_business_authority
 
 TEST_AUTH_FIELDS = ('role', 'capabilities', 'active', 'department', 'default_workspace',
-                    'authz_version', 'manager_revoked', 'capability_config_applied')
+                    'authz_version', 'permission_version', 'manager_revoked', 'capability_config_applied')
 
 
 def admitted(person, app_id):
@@ -213,3 +213,11 @@ def hr_view_allowed(person,cfg):
     # Owner decision: all logged-in users now; one list can narrow this later.
     viewers=set(cfg.get('HR_VIEWERS','*').replace(',',' ').split())
     return bool(person and person.get('active',True) and ('*' in viewers or person.get('id') in viewers))
+
+
+def reports_allowed(user):
+    return bool(user and user.get('active', True) and (
+        user.get('role') in ('pm', 'manager', '工務助理')
+        or any(user.get(key) in ('工務助理', '郭倢瑛', '朱雅琪', '林瑩瑄')
+               for key in ('name', 'display_name', 'group', 'department'))
+        or 'manage_sources' in user.get('capabilities', [])))

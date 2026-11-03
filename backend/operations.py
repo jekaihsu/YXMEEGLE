@@ -451,6 +451,9 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         previous=deepcopy(target)
         target.update(name=str(data.get('name') or target.get('name') or ident),department=str(data.get('department',target.get('department',''))),role=role,capabilities=caps,active=active,default_workspace=data.get('default_workspace',target.get('default_workspace','test' if role=='manager' else 'production')))
         require(target['default_workspace'] in ('test','production'),'預設工作區錯誤',422)
+        permission_changed=any(previous.get(k,default)!=target.get(k,default) for k,default in
+            (('role','member'),('active',True))) or set(previous.get('capabilities',[]))!=set(caps)
+        target['permission_version']=previous.get('permission_version',previous.get('authz_version',0))+int(permission_changed)
         target['avatar']=target['name'][:1]; target['authz_version']=target.get('authz_version',0)+1
         for project in ws['projects']: refresh_project_state(project,ws)
         event(ws,user,action,message=person_event_message(ident,previous,target)); return True

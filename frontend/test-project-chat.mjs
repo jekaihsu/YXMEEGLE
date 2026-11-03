@@ -5,13 +5,14 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {projectFixture} from './fixtures/node-assignments.mjs';
-const bundle=await build({stdin:{contents:"export {ProjectDetailGate} from './src/ProjectDetail';export {DisabledActionReasons} from './src/design';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate} from './src/ProjectDetail';export {DisabledActionReasons} from './src/design';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.project-chat-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
 let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','localStorage','FormData','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','HTMLDetailsElement','navigator','MutationObserver','Element','Node'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 let mobile=false,mediaChange;
 window.matchMedia=query=>({get matches(){return mobile},addEventListener(_name,fn){if(query.includes("640px"))mediaChange=fn},removeEventListener(){}});
+window.HTMLDialogElement.prototype.showModal=function(){this.open=true};window.HTMLDialogElement.prototype.close=function(){this.open=false};
 globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
 window.HTMLElement.prototype.attachEvent=()=>{};window.HTMLElement.prototype.detachEvent=()=>{};
 window.HTMLElement.prototype.scrollIntoView=()=>{};window.HTMLElement.prototype.scrollTo=()=>{};
@@ -25,15 +26,18 @@ const bubble=()=>document.querySelector('.project-chat-launcher');
 const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true}]};
 const json=data=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
 const calls=[],chats=[];
-let unavailable=false,offline=false,forbidden=false;let pendingStream,pendingSignal,streamAborts=0;const encode=new TextEncoder();
+let unavailable=false,offline=false,forbidden=false,holdNext=false,historyProject=null,historyDenied=false;let pendingStream,pendingSignal,streamAborts=0,pendingFinished=false;const encode=new TextEncoder();
 globalThis.fetch=async(url,init)=>{
  if(!String(url).startsWith('/api/ai/'))return new Response(JSON.stringify({detail:'fixture unavailable'}),{status:403});
  calls.push(url);
  if(offline)throw new TypeError('offline');
  if(url==='/api/ai/models')return json(unavailable?{models:[]}:catalog);
+ const saved={id:'saved-case-chat',title:'案件對話紀錄',scope:'project',project_id:historyProject,updated_at:'2026-11-03T00:00:00Z',turns:1};
+ if(url.startsWith('/api/ai/conversations?'))return json({history_available:true,items:historyProject&&new URL(url,'http://localhost').searchParams.get('project_id')===historyProject?[saved]:[],next_cursor:null});
+ if(url==='/api/ai/conversations/saved-case-chat')return historyDenied?new Response(JSON.stringify({code:'ai_forbidden'}),{status:403}):json({...saved,messages:[{role:'assistant',content:'已保存的案件回答',at:saved.updated_at,usage_id:null}]});
  chats.push(JSON.parse(init.body));
  if(forbidden)return new Response(JSON.stringify({code:"ai_forbidden"}),{status:403});
- if(chats.length===1){pendingSignal=init.signal;pendingSignal.addEventListener('abort',()=>streamAborts++);return new Response(new ReadableStream({start(controller){pendingStream=controller;controller.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'本案正在'})+'\n\n'))}}))}
+ if(chats.length===1||holdNext){holdNext=false;pendingFinished=false;pendingSignal=init.signal;pendingSignal.addEventListener('abort',()=>{if(!pendingFinished)streamAborts++});return new Response(new ReadableStream({start(controller){pendingStream=controller;controller.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'本案正在'})+'\n\n'))}}))}
  return new Response('data: '+JSON.stringify({type:'text',delta:'本案正在規劃。'})+'\n\ndata: {"type":"done"}\n\n');
 };
 await render();assert.equal(calls.length,0,'mount does not request model catalog');
@@ -64,7 +68,7 @@ for(const tab of ['people','overview','items','flow','files','data','people']){
  assert.equal(bubble().getAttribute('aria-expanded'),'true');
  assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在');
 }
-await flush(()=>{pendingStream.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'規劃。'})+'\n\ndata: {"type":"done"}\n\n'));pendingStream.close()},80);
+await flush(()=>{pendingFinished=true;pendingStream.enqueue(encode.encode('data: '+JSON.stringify({type:'text',delta:'規劃。'})+'\n\ndata: {"type":"done"}\n\n'));pendingStream.close()},80);
 assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在規劃。');assert.equal(streamAborts,0);
 await render(project,'overview');assert.equal(dialog(),originalDialog);assert.equal(document.querySelector('[data-role=assistant] p').textContent,'本案正在規劃。','tab changes preserve completed conversation');
 await flush(()=>dialog().dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
@@ -77,10 +81,25 @@ await flush(()=>{controls.at(-1).focus();document.activeElement.dispatchEvent(ne
 await flush(()=>dialog().dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.activeElement,bubble());assert.equal(document.getElementById('root').inert,undefined);assert.equal(document.body.style.overflow,'');
 await render({...project,id:'project-b',code:'B-2'});assert.equal(bubble().getAttribute('aria-expanded'),'false');assert.equal(dialog(),null);
 await flush(()=>bubble().click(),80);assert.equal(document.querySelectorAll('.assistant-message').length,0,'project switch clears history');
-await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);assert.equal(chats[1].project_id,'project-b');assert.notEqual(chats[0].conversation_id,chats[1].conversation_id);
-forbidden=true;await render({...project,id:'forbidden'});await flush(()=>bubble().click(),80);await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);assert.equal(document.querySelector('textarea').disabled,true);assert.doesNotMatch(document.body.textContent,/目前無法操作/);forbidden=false;
+holdNext=true;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);assert.equal(chats[1].project_id,'project-b');assert.notEqual(chats[0].conversation_id,chats[1].conversation_id);
+assert.equal(pendingSignal.aborted,false);forbidden=true;await render({...project,id:'forbidden'});assert.equal(pendingSignal.aborted,true,'case scope change aborts the old chat request');await flush(()=>bubble().click(),80);await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);assert.equal(document.querySelector('textarea'),null);assert.match(dialog().textContent,/沒有權限/);assert.doesNotMatch(document.body.textContent,/目前無法操作/);forbidden=false;
 unavailable=true;const before=calls.length;await render({...project,id:'unavailable'});assert.equal(calls.length,before,'project changes do not fetch models before opening');await flush(()=>bubble().click(),80);assert.equal(bubble().hidden,true);assert.match(dialog().textContent,/AI 助理尚未開放/);assert.doesNotMatch(document.body.textContent,/目前無法操作/);
 unavailable=false;offline=true;await render({...project,id:'offline'});await flush(()=>bubble().click(),80);assert.match(dialog().textContent,/無法載入 AI 助理/);offline=false;await flush(()=>[...dialog().querySelectorAll('button')].find(b=>b.textContent==='重試').click(),80);assert.ok(document.querySelector('textarea'));
+historyProject='history-epoch';await render({...project,id:historyProject});await flush(()=>bubble().click(),80);
+await flush(()=>document.querySelector('.assistant-history-toggle').click());await flush(()=>document.querySelector('.assistant-history-open').click());
+assert.match(dialog().textContent,/已保存的案件回答/,'case launcher opens retained history');
+const historyLauncher=bubble(),historyDialog=dialog();await render({...project,id:historyProject},'people');
+assert.equal(bubble(),historyLauncher);assert.equal(dialog(),historyDialog);assert.match(dialog().textContent,/已保存的案件回答/,'tab changes preserve opened history');
+await flush(()=>ui.invalidateSessionEpoch());
+assert.equal(bubble(),historyLauncher);assert.equal(dialog(),historyDialog);assert.equal(document.querySelector('textarea'),null,'epoch clears composer within the stable launcher');
+assert.doesNotMatch(dialog().textContent,/已保存的案件回答|案件對話紀錄|沒有權限/,'epoch clears history and transcript without a permission denial');assert.match(dialog().textContent,/對話已重設/);
+await flush(()=>[...dialog().querySelectorAll('button')].find(b=>b.textContent==='重新開啟助理').click());
+holdNext=true;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);assert.equal(pendingSignal.aborted,false);
+await flush(()=>ui.invalidateSessionEpoch());assert.equal(pendingSignal.aborted,true,'epoch aborts the in-flight case response');assert.doesNotMatch(dialog().textContent,/本案正在/,'epoch clears transient streamed text');
+historyProject='history-denied';await render({...project,id:historyProject});await flush(()=>bubble().click(),80);
+await flush(()=>document.querySelector('.assistant-history-toggle').click());await flush(()=>document.querySelector('.assistant-history-open').click());assert.match(dialog().textContent,/已保存的案件回答/);
+historyDenied=true;await flush(()=>document.querySelector('.assistant-history-toggle').click());await flush(()=>document.querySelector('.assistant-history-open').click());
+assert.equal(document.querySelector('textarea'),null,'case history denial clears the composer');assert.doesNotMatch(dialog().textContent,/已保存的案件回答|案件對話紀錄/,'case history denial clears all retained content');assert.match(dialog().textContent,/沒有權限/);assert.equal(document.querySelectorAll('.project-chat-launcher').length,1);
 await flush(()=>root.render(React.createElement('p',null,'案件總覽')));assert.equal(bubble(),null);assert.equal(dialog(),null,'leaving detail removes portal');
 await flush(()=>root.unmount());dom.window.close();
 const manifest=JSON.parse(await fs.readFile(new URL('./dist/.vite/manifest.json',import.meta.url),'utf8'));
@@ -88,4 +107,4 @@ const imports=new Set();function visit(key){if(imports.has(key))return;imports.a
 visit('index.html');visit(Object.keys(manifest).find(key=>/^_ProjectDetail-.*\.js$/.test(key)));
 assert.equal(imports.has('src/assistant/AssistantChat.tsx'),false,'chat stays outside initial and project static chunks');
 assert.equal(manifest['src/assistant/AssistantChat.tsx'].isDynamicEntry,true);
-console.log('Project chat passed. Lazy catalog and chunk, project scope, tab persistence, project reset, dialog semantics, focus return, mobile trap, unavailable and retry.');
+console.log('Project chat passed. Lazy catalog and chunk, project scope, tab changes preserve conversation and in-flight answers, history/denial/session epoch, project reset, dialog semantics, focus return, mobile trap, unavailable and retry.');

@@ -191,8 +191,8 @@ class ProjectContextCache:
         self.entries = OrderedDict()
         self.maxsize = maxsize
 
-    async def get(self, app, cookie, workspace, user, project):
-        key = (workspace, user, project)
+    async def get(self, app, cookie, workspace, user, project, permission=None):
+        key = (workspace, user, project, permission)
         while True:
             task = self.entries.get(key)
             if task is not None and task.done():

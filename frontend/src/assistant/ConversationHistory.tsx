@@ -1,15 +1,17 @@
 import {useCallback,useEffect,useId,useRef,useState,type ReactNode} from 'react';
+import {ApiError} from '../api';
 import {Button} from '../design';
 import {listConversations,openConversation,deleteConversation,relativeTime,type ConversationDetail,type HistoryPage,type HistoryScope} from './history';
 
 type HistoryState={status:'loading'}|{status:'error'}|{status:'ready';page:HistoryPage};
-type Props={projectId?:string;compact?:boolean;revision:number;activeId:string;onOpen:(detail:ConversationDetail)=>void;onNew:()=>void;beforeDelete?:()=>Promise<void>;children:ReactNode};
-export function ConversationHistory({projectId,compact,revision,activeId,onOpen,onNew,beforeDelete,children}:Props){
+type Props={projectId?:string;compact?:boolean;revision:number;activeId:string;onOpen:(detail:ConversationDetail)=>void;onNew:()=>void;onDenied?:(id:string)=>void;beforeDelete?:()=>Promise<void>;children:ReactNode};
+export function ConversationHistory({projectId,compact,revision,activeId,onOpen,onNew,onDenied,beforeDelete,children}:Props){
  const [state,setState]=useState<HistoryState>({status:'loading'}),[attempt,setAttempt]=useState(0);
  const [mobile,setMobile]=useState(()=>window.matchMedia?.('(max-width: 760px)').matches??false);
  const [expanded,setExpanded]=useState(!compact&&!mobile),[confirm,setConfirm]=useState<string>(),[busy,setBusy]=useState(false),[actionError,setActionError]=useState('');
+ const [deniedNotice,setDeniedNotice]=useState(false);
  const [retry,setRetry]=useState<(()=>void)>();
- const listGeneration=useRef(0);
+ const listGeneration=useRef(0),deniedIds=useRef(new Set<string>());
  const action=useRef<AbortController>(),list=useRef<AbortController>();
  const userOpened=useRef(false),focusAfterDelete=useRef<string>();
  const trigger=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null),panel=useRef<HTMLElement>(null);
@@ -25,7 +27,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
    try{
     const page=await listConversations(scope,undefined,controller.signal);
     if(controller.signal.aborted)return;
-    setState({status:'ready',page});
+    setState({status:'ready',page:{...page,items:page.items.filter(item=>!deniedIds.current.has(item.id))}});
 
    }catch{if(!controller.signal.aborted)setState({status:'error'})}
   };
@@ -48,20 +50,31 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   (Array.from(container?.querySelectorAll<HTMLButtonElement>('[data-history-id]')||[]).find(button=>button.dataset.historyId===target)||container?.querySelector<HTMLButtonElement>('[data-history-new]'))?.focus();
  },[state,busy]);
  const close=()=>{trigger.current?.focus();setExpanded(false);setConfirm(undefined)};
- const fresh=()=>{action.current?.abort();setBusy(false);setActionError('');setRetry(undefined);setConfirm(undefined);onNew();if(overlay)close()};
+ const fresh=()=>{setDeniedNotice(false);action.current?.abort();setBusy(false);setActionError('');setRetry(undefined);setConfirm(undefined);onNew();if(overlay)close()};
  const perform=useCallback(async(work:(signal:AbortSignal)=>Promise<void>,again:()=>void)=>{
   action.current?.abort();const controller=new AbortController();action.current=controller;setBusy(true);setActionError('');setRetry(undefined);
   try{await work(controller.signal)}catch{if(!controller.signal.aborted){setActionError('操作未完成，請重試。');setRetry(()=>again)}}finally{if(!controller.signal.aborted)setBusy(false)}
  },[]);
  const open=(conversationId:string)=>void perform(async signal=>{
-  const detail=await openConversation(conversationId,signal);if(signal.aborted)return;
+  let detail:ConversationDetail;
+  try{detail=await openConversation(conversationId,signal,projectId)}catch(error){
+   if(error instanceof ApiError&&error.status===403&&!signal.aborted){
+    deniedIds.current.add(conversationId);
+    setState(previous=>previous.status==='ready'?{status:'ready',page:{...previous.page,items:previous.page.items.filter(item=>item.id!==conversationId)}}:previous);
+    setDeniedNotice(true);setRetry(undefined);
+    if(onDenied)onDenied(conversationId);else if(activeId===conversationId)onNew();
+    return;
+   }
+   throw error;
+  }
+  if(signal.aborted)return;
   if(detail.scope!==scope.scope||(projectId&&detail.project_id!==projectId))throw new Error('scope');
-  onOpen(detail);setConfirm(undefined);if(overlay)close();
+  setDeniedNotice(false);onOpen(detail);setConfirm(undefined);if(overlay)close();
  },()=>open(conversationId));
  const remove=(conversationId:string)=>void perform(async signal=>{
   if(activeId===conversationId)await beforeDelete?.();
   if(signal.aborted)return;
-  await deleteConversation(conversationId,signal);if(signal.aborted)return;
+  await deleteConversation(conversationId,signal,projectId);if(signal.aborted)return;
   if(state.status==='ready'){const ids=state.page.items.map(item=>item.id),index=ids.indexOf(conversationId);focusAfterDelete.current=ids[index+1]||ids[index-1]||''}
   setState(previous=>previous.status==='ready'?{status:'ready',page:{...previous.page,items:previous.page.items.filter(item=>item.id!==conversationId)}}:previous);
   setConfirm(undefined);if(activeId===conversationId)onNew();setAttempt(n=>n+1);
@@ -70,7 +83,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   if(state.status!=='ready'||!state.page.next_cursor)return;
   const page=state.page,generation=listGeneration.current;
   void perform(async signal=>{const next=await listConversations(scope,page.next_cursor!,signal);if(signal.aborted||generation!==listGeneration.current)return;
-   setState(previous=>previous.status!=='ready'?previous:{status:'ready',page:{...next,items:[...new Map([...previous.page.items,...next.items].map(item=>[item.id,item])).values()]}});
+   setState(previous=>previous.status!=='ready'?previous:{status:'ready',page:{...next,items:[...new Map([...previous.page.items,...next.items].filter(item=>!deniedIds.current.has(item.id)).map(item=>[item.id,item])).values()]}});
   },more);
  };
  const content=<>
@@ -79,13 +92,14 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   {state.status==='loading'?<p role="status">正在載入對話…</p>:state.status==='error'?<p role="alert">無法載入對話紀錄。<Button onClick={()=>setAttempt(n=>n+1)}>重新載入紀錄</Button></p>:<>
    {revision>0&&state.page.history_available&&!state.page.items.some(item=>item.id===activeId)&&<p role="status">目前對話尚未列入紀錄，請按重新載入紀錄查看結果。<Button onClick={()=>setAttempt(n=>n+1)}>重新載入紀錄</Button></p>}
    {state.page.items.length===0?<p>尚無對話紀錄</p>:<ul className="assistant-history-list">{state.page.items.map(item=><li key={item.id}>
-    <div className="assistant-history-row"><Button variant="plain" className="assistant-history-open" data-history-id={item.id} disabled={busy} aria-current={activeId===item.id?'true':undefined} onClick={()=>open(item.id)}><span>{item.title||'未命名對話'}</span><time dateTime={item.updated_at} title={new Date(item.updated_at).toLocaleString('zh-TW')}>{relativeTime(item.updated_at)}</time></Button><Button variant="plain" disabled={busy} aria-label={`刪除對話：${item.title}`} onClick={()=>setConfirm(item.id)}>刪除</Button></div>
+    <div className="assistant-history-row"><Button variant="plain" className="assistant-history-open" data-history-id={item.id} disabled={busy} aria-current={activeId===item.id?'true':undefined} onClick={()=>open(item.id)}><span>{item.title||'未命名對話'}</span>{item.authorization_basis==='legacy_workspace'&&<small>舊對話 · 工作區層級</small>}<time dateTime={item.updated_at} title={new Date(item.updated_at).toLocaleString('zh-TW')}>{relativeTime(item.updated_at)}</time></Button><Button variant="plain" disabled={busy} aria-label={`刪除對話：${item.title}`} onClick={()=>setConfirm(item.id)}>刪除</Button></div>
     {confirm===item.id&&<div className="assistant-history-confirm"><span>確定刪除此對話？</span><Button disabled={busy} variant="destructive" onClick={()=>remove(item.id)}>確定刪除</Button><Button disabled={busy} onClick={()=>setConfirm(undefined)}>取消</Button></div>}
    </li>)}</ul>}
    {state.page.next_cursor&&<Button disabled={busy} onClick={more}>載入更多</Button>}
   </>}
+  {deniedNotice&&<p role="alert">你已沒有權限開啟這段對話。</p>}
   {busy&&<p role="status">正在處理…</p>}
-  {actionError&&<p role="alert">{actionError}<Button onClick={retry}>重試</Button></p>}
+  {actionError&&<p role="alert">{actionError}{retry&&<Button onClick={retry}>重試</Button>}</p>}
  </>;
  return <div className={`assistant-workspace${compact?' assistant-workspace-compact':''}${unavailable?' assistant-history-unavailable':''}`}>
   {!unavailable&&<>

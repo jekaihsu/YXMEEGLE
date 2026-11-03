@@ -184,3 +184,21 @@ def test_populated_postgres_page_plan(history_db):
     with engine.connect() as conn:
         plan = conn.exec_driver_sql('EXPLAIN (ANALYZE, BUFFERS) ' + sql, params).scalars().all()
     print('\nPostgreSQL populated history page plan:\n' + '\n'.join(plan))
+
+
+def test_authorized_projects_filter_before_ranking_and_paging(history_db):
+    seed_turn(history_db, 'hidden', 'hidden-chat', scope='project', project='hidden', question='Hidden secret')
+    seed_turn(history_db, 'visible', 'visible-chat', scope='project', project='visible', question='Visible title')
+    recorded = []
+    engine = history_db.kw['bind']
+    def record(conn, cursor, statement, *args):
+        recorded.append(statement)
+    event.listen(engine, 'before_cursor_execute', record)
+    try:
+        page = ledger.conversations(history_db, 'w', 'a', 'project', None, 1, None,
+            content_enabled=True, retention_days=90, allowed_project_ids={'visible'})
+    finally:
+        event.remove(engine, 'before_cursor_execute', record)
+    assert len(recorded) == 1
+    assert [(i['id'], i['title']) for i in page['items']] == [('visible-chat', 'Visible title')]
+    assert page['next_cursor'] is None

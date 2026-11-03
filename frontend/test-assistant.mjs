@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const result=await build({stdin:{contents:"export {readEvents} from './src/assistant/stream';export {createChatAdapter,ERROR_TEXT} from './src/assistant/runtime';export {rememberedModel} from './src/assistant/ModelSelector';export {AssistantChat} from './src/assistant/AssistantChat';export {parseRoute,normalizeRoute} from './src/api';export {routeLoaders,prefetchRoute} from './src/routeLoader';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const result=await build({stdin:{contents:"export {readEvents} from './src/assistant/stream';export {createChatAdapter,ERROR_TEXT} from './src/assistant/runtime';export {rememberedModel} from './src/assistant/ModelSelector';export {AssistantChat} from './src/assistant/AssistantChat';export {invalidateSessionEpoch} from './src/api';export {parseRoute,normalizeRoute} from './src/api';export {routeLoaders,prefetchRoute} from './src/routeLoader';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.assistant-test.mjs',import.meta.url);await fs.writeFile(path,result.outputFiles[0].text);
 let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
 const encoder=new TextEncoder();
@@ -56,11 +56,28 @@ for(const body of [{code:'ai_forbidden'}]){
 for(const code of ['ai_unconfigured','ai_quota','ai_busy','ai_upstream','ai_forbidden','ai_refused']){
  for(const http of [false,true]){globalThis.fetch=async()=>http?json({code,message:'private upstream details'},503):new Response(stream(event({type:'error',code,message:'private upstream details'})));const result=await run();assert.deepEqual(result.at(-1).status,{type:'incomplete',reason:'error',error:ui.ERROR_TEXT[code]})}
 }
-for(const [status,code] of [[503,'ai_upstream'],[503,'ai_forbidden'],[403,'other']]){let forbidden=0;globalThis.fetch=async()=>json({code},status);await run(messages,()=>forbidden++);assert.equal(forbidden,0,'only 403 ai_forbidden latches')}
+for(const [status,code] of [[503,'ai_upstream'],[503,'ai_forbidden']]){let forbidden=0;globalThis.fetch=async()=>json({code},status);await run(messages,()=>forbidden++);assert.equal(forbidden,0,'non-denial statuses do not latch')}
 globalThis.fetch=async()=>{throw new TypeError('Failed to fetch')};assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
 globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial'})));assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
-const runAbort=new AbortController();let fetchSignal;globalThis.fetch=async(_url,init)=>{fetchSignal=init.signal;return new Response(new ReadableStream())};const abortedRun=collect(ui.createChatAdapter(()=>'abort').run({messages,abortSignal:runAbort.signal,context:{}}));await new Promise(resolve=>setTimeout(resolve,0));runAbort.abort();await assert.rejects(()=>abortedRun,{name:'AbortError'});assert.equal(fetchSignal,runAbort.signal);
+const runAbort=new AbortController();let fetchSignal;globalThis.fetch=async(_url,init)=>{fetchSignal=init.signal;return new Response(new ReadableStream())};const abortedRun=collect(ui.createChatAdapter(()=>'abort').run({messages,abortSignal:runAbort.signal,context:{}}));await new Promise(resolve=>setTimeout(resolve,0));runAbort.abort();await assert.rejects(()=>abortedRun,{name:'AbortError'});assert.equal(fetchSignal.aborted,true);
 let expired=0;window.addEventListener('yx:session-expired',()=>expired++);globalThis.fetch=async()=>json({},401);await run();assert.equal(expired,1);
+let lateHeaders;
+globalThis.fetch=()=>new Promise(resolve=>{lateHeaders=resolve});
+const oldRun=run();ui.invalidateSessionEpoch();
+lateHeaders(new Response(stream(event({type:'text',delta:'old secret'})+event({type:'done'}))));
+await assert.rejects(oldRun,{name:'AbortError'});
+let lateBody;
+let epochFetchSignal;globalThis.fetch=async(_url,init)=>{epochFetchSignal=init.signal;return new Response(new ReadableStream({start(c){lateBody=c}}))};
+const oldBody=run();await new Promise(resolve=>setTimeout(resolve,0));ui.invalidateSessionEpoch();
+assert.equal(epochFetchSignal.aborted,true,'epoch immediately aborts the transport during a silent tool round');
+await assert.rejects(oldBody,{name:'AbortError'});
+let midStreamExpired=0;const expire=()=>midStreamExpired++;window.addEventListener('yx:session-expired',expire);
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'private partial'})+event({type:'error',code:'session_expired'})));
+const sessionUpdates=await run();assert.equal(midStreamExpired,1);assert.deepEqual(sessionUpdates.at(-1).content,[]);window.removeEventListener('yx:session-expired',expire);
+let deniedStream=0;
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial secret'})+event({type:'error',code:'ai_forbidden'})));
+const deniedUpdates=await run(messages,()=>deniedStream++);
+assert.equal(deniedStream,1);assert.deepEqual(deniedUpdates.at(-1).content,[],'SSE denial removes transient content');
 const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:false}]};
 localStorage.setItem('yx:ai-model','gpt');assert.equal(ui.rememberedModel(catalog),'claude');
 localStorage.setItem('yx:ai-model','garbage');assert.equal(ui.rememberedModel(catalog),'claude');
@@ -110,8 +127,15 @@ await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].cl
 globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'重試成功'})+event({type:'done'})));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);assert.match(document.body.textContent,/重試成功/);assert.equal(document.querySelector('textarea').disabled,false);
 globalThis.fetch=async()=>json({code:'ai_forbidden'},403);
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);
-assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
+assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea'),null,'chat denial discards composer and draft');assert.equal(document.querySelectorAll('.assistant-message').length,0,'chat denial discards transcript');
 assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
+for(const asStream of [false,true]){
+ globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):url.startsWith('/api/ai/conversations')?json({history_available:true,items:[],next_cursor:null}):asStream?new Response(stream(event({type:'error',code:'ai_forbidden',denial_scope:'conversation'}))):json({code:'ai_forbidden',denial_scope:'conversation'},403);
+ await flush(()=>root.render(React.createElement(ui.Assistant,{key:`denied-conversation-${asStream}`})),40);
+ await flush(()=>document.querySelector('.assistant-suggestions button').click(),60);
+ assert.ok(document.querySelector('textarea'),'a denied conversation leaves global assistant available');
+ assert.equal(document.querySelectorAll('.assistant-message').length,0);assert.match(document.body.textContent,/沒有權限/);
+}
 for(const detail of [undefined,'OpenAI 401 invalid_api_key <script>']){
  globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'error',code:'ai_upstream',...(detail?{detail}:{})})));
  await flush(()=>root.render(React.createElement(ui.Assistant,{key:detail||'no-detail'})),40);
