@@ -1,1 +1,0 @@
-reports stale notice: truthful state and retained timestamp

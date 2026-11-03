@@ -1,8 +1,0 @@
-npm notice run yongxiang-workspace-prototype@0.1.0 test:fetch-intent
-npm notice run node test-fetch-intent.mjs && node test-fetch-intent-react.mjs && node test-fetch-intent-audit.mjs
-Fetch intents: pinned 24h/events, single-flight, dependency writes, scope/epoch cancellation, unknown outcome, stale failures and 304 isolation passed
-K2: successor adoption, cancellation signals, retained failure states, Stale, prefix/tag/predicate fanout and string revisions passed
-K2 scoped ETag initial/304, grant namespace, explicit bypass and late user-A landing passed
-Fetch-intent React adapter: StrictMode readers coalesce, writes publish, unknown outcomes retain request ID, close clears visible data
-K2 owner hook: StrictMode, epoch rekey, Denied recovery and subscription disposal passed
-Fetch-intent audit: production trigger inventory matches reviewed legacy sites; forbidden-source fixtures detected
