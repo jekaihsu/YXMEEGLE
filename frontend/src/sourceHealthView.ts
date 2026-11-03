@@ -218,3 +218,11 @@ export function buildSourceHealthView(input: unknown, options: SourceHealthOptio
  const drawer = allRows.find(row => row.key === options.selectedKey) ?? null;
  return {page, diagnostic: {rows, summary: {last_success: oldest}, selectedKey: drawer?.key ?? null, drawer}};
 }
+
+/** An empty legacy definition list is not proof that a source read completed. */
+export function legacySourceTableCount(input:unknown):number|null {
+ const data=record(input);
+ if(!Array.isArray(data.tables))return null;
+ if(data.tables.length>0)return data.tables.length;
+ return timestamp(data.last_sync).value||timestamp(data.as_of).value?0:null;
+}

@@ -1,3 +1,4 @@
+import {DataState} from './design/DataState';
 import {useEffect,useRef,useState} from 'react';
 import {api,ApiError,fetchPilotShadow,getSessionEpoch,liveRefresh} from './api';
 import {statusNames,time} from './DataFreshness';
@@ -67,13 +68,13 @@ const errorMessages:Record<string,string>={pilot_disabled:'唯讀 Lark 試讀尚
 const errorMessage=(error:unknown)=>error instanceof ApiError?(error.code==='pilot_roster_stale'?`名冊核實已逾 ${error.ceiling_seconds??60} 秒，請重新核對名冊`:errorMessages[error.code||'']||'讀取失敗（原因不明）'):'讀取失敗（原因不明）';
 export function LarkPilotPanel({demo=false,c}:{demo?:boolean;c?:Context}){
  const [data,setData]=useState<PilotData>();const [message,setMessage]=useState('讀取中…');const [now,setNow]=useState(Date.now);
- const [reason,setReason]=useState<string>();const [retry,setRetry]=useState(0);const [busy,setBusy]=useState(false);
+ const [httpStatus,setHttpStatus]=useState<number>();const [reason,setReason]=useState<string>();const [retry,setRetry]=useState(0);const [busy,setBusy]=useState(false);
  const syncing=useRef(false);const recovery=useRef<AbortController>();
  useEffect(()=>()=>recovery.current?.abort(),[]);
  useEffect(()=>{
-  setData(undefined);setReason(undefined);setMessage(demo?'示範資料':'讀取中…');if(demo)return;
+  setData(undefined);setReason(undefined);setHttpStatus(undefined);setMessage(demo?'示範資料':'讀取中…');if(demo)return;
   const controller=new AbortController();const epoch=getSessionEpoch();let active=true;
-  void fetchPilotShadow(controller.signal).then(parsePilot).then(next=>{if(active&&epoch===getSessionEpoch()){setData(next);setNow(Date.now());setMessage('')}}).catch((error:unknown)=>{if(active&&epoch===getSessionEpoch()){setMessage(errorMessage(error));setReason(error instanceof ApiError?error.code:undefined)}});
+  void fetchPilotShadow(controller.signal).then(parsePilot).then(next=>{if(active&&epoch===getSessionEpoch()){setData(next);setNow(Date.now());setMessage('')}}).catch((error:unknown)=>{if(active&&epoch===getSessionEpoch()){setMessage(errorMessage(error));setHttpStatus(error instanceof ApiError?error.status:undefined);setReason(error instanceof ApiError?error.code:undefined)}});
   return()=>{active=false;controller.abort()};
  },[demo,retry]);
  const retryRoster=async()=>{
@@ -90,5 +91,5 @@ export function LarkPilotPanel({demo=false,c}:{demo?:boolean;c?:Context}){
   finally{syncing.current=false;if(current())setBusy(false)}
  };
  useEffect(()=>{if(!data?.fetched_at||!['fresh','partial'].includes(data.status))return;const oldest=Math.min(Date.parse(data.fetched_at),...Object.values(data.table_fetched_at).filter((s):s is string=>s!==null).map(s=>Date.parse(s)));const delay=Math.max(0,oldest+data.ttl_seconds*1000-Date.now()+1);const timer=setTimeout(()=>setNow(Date.now()),Math.min(delay,2147483647));return()=>clearTimeout(timer)},[data]);
- return demo||!data?<section className="lark-pilot" aria-label="唯讀 Lark 試讀"><h2>唯讀 Lark 試讀</h2><p role="status" aria-live="polite">{message}</p>{c&&['pilot_roster_stale','pilot_roster_missing'].includes(reason||'')&&<button disabled={busy} onClick={()=>void retryRoster()}>重新核對名冊後重試</button>}</section>:<PilotView data={data} now={now}/>;
+ return demo||!data?<section className="lark-pilot" aria-label="唯讀 Lark 試讀"><h2>唯讀 Lark 試讀</h2><DataState kind={demo?'Partial':reason==='pilot_roster_stale'||reason==='access_roster_expired'?'Stale':httpStatus===403?'Denied':message==='讀取中…'?'Loading':'Error'} title={reason==='pilot_roster_stale'||reason==='access_roster_expired'?'名冊核實已過期':httpStatus===403?'唯讀試讀權限不足（403）':'唯讀 Lark 試讀狀態'} body={message}/>{c&&['pilot_roster_stale','pilot_roster_missing'].includes(reason||'')&&<button disabled={busy} onClick={()=>void retryRoster()}>重新核對名冊後重試</button>}</section>:<PilotView data={data} now={now}/>;
 }

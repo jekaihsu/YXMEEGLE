@@ -22,7 +22,7 @@ await click([...document.querySelectorAll('button')].find(e=>e.textContent==='�
 assert.match(document.querySelector('[role=status]').textContent,/每 60 秒只能重新整理一次/);
 assert.equal(document.querySelector('tbody tr').querySelector('progress'),null);
 assert.match(document.querySelector('tbody tr').textContent,/未排計畫/);
-assert.equal(document.querySelectorAll('th')[2].textContent.includes('狀態'),true);
+assert.equal(document.querySelectorAll('th')[1].textContent.includes('狀態'),true);
 await click([...document.querySelectorAll('.reports-status-filters button')].find(e=>e.textContent.includes('執行中')));
 assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('status'),'執行中');
 const trigger=document.querySelector('tbody tr button');trigger.focus();await click(trigger);
@@ -39,7 +39,7 @@ assert.equal(pending[0].signal.aborted,true);
 await click(trigger);
 await act(async()=>pending[1].resolve(new Response(JSON.stringify({detail:'讀取失敗'}),{status:500})));
 assert.match(document.querySelector('[role=dialog]').textContent,/讀取失敗/);
-await click([...document.querySelectorAll('[role=dialog] button')].find(e=>e.textContent==='重試'));
+await click([...document.querySelectorAll('[role=dialog] button')].find(e=>e.textContent==='重新讀取'));
 await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
 await act(async()=>new Promise(r=>setTimeout(r,30)));
 assert.equal(pending[2].signal.aborted,true);

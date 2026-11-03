@@ -37,6 +37,14 @@ try{
  await render(React.createElement(LarkPilotPanel,{demo:false}));
  assert.equal(requests.length,1);assert.equal(requests[0].url,'/api/lark-pilot/shadow');
  assert.equal(requests[0].init.method,'GET');
+
+ for(const [code,kind,label] of [['source_authorization_denied','Denied','唯讀試讀權限不足（403）'],['pilot_roster_stale','Stale','名冊核實已過期']]){
+  await render(React.createElement(LarkPilotPanel,{demo:true}));
+  globalThis.fetch=async()=>new Response(JSON.stringify({code,detail:'拒絕讀取',ceiling_seconds:60}),{status:403});
+  await render(React.createElement(LarkPilotPanel,{demo:false}));
+  assert.equal(document.querySelector('.ds-data-state').dataset.kind,kind);
+  assert.ok(document.body.textContent.includes(label));
+ }
  assert.throws(()=>parsePilot({...payload(),source:'secret-source'}));
  console.log('F01-F07 synthetic rendering: states, time, TTL, no controls, GET only, demo isolation and semantic status passed.');
 }finally{await act(()=>root.unmount());dom.window.close()}
