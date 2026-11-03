@@ -26,7 +26,7 @@ export type HomeResponse = {
  items:HomeItem[]; next_cursor:string|null; has_more:boolean; complete:boolean; total_count:number|null;
  manager_view_available:boolean|null;
 };
-export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null;retry?:()=>void};
+export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null;denied?:boolean;retry?:()=>void};
 export type HomeQuery = {panel:HomePanel; scope?:'mine'|'team'; deadline?:string; q?:string; cursor?:string; kinds?:string; limit?:number};
 const object = (v:unknown):v is Record<string,unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nullableText = (v:unknown):v is string|null => v === null || typeof v === 'string';
@@ -122,5 +122,5 @@ export function useHomePanels(c:Ctx,query:HomeQuery,enabled=true,full=false):Pan
  const resource={endpoint:url.pathname,query:Object.fromEntries(url.searchParams)};
  const read=useHomeResource(c,resource,raw=>{const body=parseHomeResponse(raw);return homeValue(body,body.complete,body.as_of)},enabled);
  const denied=read.error instanceof ApiError&&(read.error.status===401||read.error.status===403);
- return {body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':`更新失敗${read.data?`；保留上次資料。資料時間：${read.dataTime??'未提供'}`:''}`:null,retry:read.retry};
+ return {denied,body:enabled&&!denied?read.data??null:null,pending:query.q!==undefined&&query.q!==search||read.loading,error:read.error?read.error instanceof ApiError&&read.error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':read.error instanceof ApiError&&read.error.status===409?'清單已更新，請回第一頁':`更新失敗${read.data?`；保留上次資料。資料時間：${read.dataTime??'未提供'}`:''}`:null,retry:read.retry};
 }

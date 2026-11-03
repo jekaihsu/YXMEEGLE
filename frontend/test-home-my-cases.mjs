@@ -51,4 +51,6 @@ for(const filtered of [{body:body([item(1)]),pending:false,error:null},{body:bod
  assert.equal(asNames(await render({body:all,pending:false,error:null},filtered)),asNames(unfiltered),'changing the 我的工作 type filter does not change 我的案件 membership');
 }
 assert.equal(asNames(unfiltered),'案件1,案件2');
+text=await withProjects([known('case9',{pm_id:'u1'})],{body:null,pending:false,error:'權限訊息已翻譯',denied:true});
+assert.doesNotMatch(text,/案件9/,'typed denied removes protected case previews regardless of localized error copy');
 console.log('home my-cases coverage checks passed');

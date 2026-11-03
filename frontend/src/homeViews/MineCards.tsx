@@ -2,6 +2,7 @@ import type {Ctx} from '../appCommon';
 import type {HomeCardId} from '../homeLayout';
 import type {PanelRead} from '../useHomePanels';
 import {workSource,sourceCount} from '../homeWorkSource';
+import {taipeiDate} from '../taipeiTime';
 import {overdueDays,dataTime} from './deadline';
 import {Card,WorkCard} from '../homeCards';
 import {Row} from '../design';
@@ -47,10 +48,10 @@ const myCases=(c:Ctx,assigned:PanelRead):CaseRow[]=>{
 export function MineCard({id,c,today,assigned,cases,confirmation,sharedNotice=false}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;cases:PanelRead;confirmation:PanelRead;sharedNotice?:boolean}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation} sharedNotice={sharedNotice}/>;
  if(id==='mycases'){
-  const rows=cases.error?.startsWith('無法核實')?[]:myCases(c,cases),coverage=caseCoverage(cases);
+  const rows=cases.denied?[]:myCases(c,cases),coverage=caseCoverage(cases);
   return <Card id={id} subtitle="你負責、釘選或有你任務的案件" href="#view=projects" action="開啟案件總覽">
    <p className="home-data-time">資料時間：{dataTime(c.w.as_of)}</p>
-   {rows.slice(0,8).map(p=>{const days=overdueDays(p.due_date,today,p.completed);return <Row key={p.id} label={<><small className="home-case-code">{p.code}</small><strong>{p.name}</strong></>} detail={<>{p.client&&<span className="home-case-client">{p.client}</span>}<span>{[p.pinned?'已釘選':p.assigned?'有你的任務':'',p.due_date?`案件期限 ${p.due_date.slice(0,10).replaceAll('-','/')}`:'案件期限待確認'].filter(Boolean).join(' · ')}</span></>} value={days?<span className="home-deadline" data-tone="critical">逾期 {days} 天</span>:undefined} href={p.href||`#view=project&project=${p.id}`}/>})}
+   {rows.slice(0,8).map(p=>{const days=overdueDays(p.due_date,today,p.completed);return <Row key={p.id} label={<><small className="home-case-code">{p.code}</small><strong>{p.name}</strong></>} detail={<>{p.client&&<span className="home-case-client">{p.client}</span>}<span>{[p.pinned?'已釘選':p.assigned?'有你的任務':'',taipeiDate(p.due_date,'')?`案件期限 ${taipeiDate(p.due_date)}`:'案件期限待確認'].filter(Boolean).join(' · ')}</span></>} value={days?<span className="home-deadline" data-tone="critical">逾期 {days} 天</span>:undefined} href={p.href||`#view=project&project=${p.id}`}/>})}
    {!sharedNotice&&coverage!=='complete'&&<p className="home-source-note" role="status">{COVERAGE_NOTE[coverage]}{coverage!=='loading'&&<> <a href="#view=work">開啟我的工作</a></>}</p>}
    {!rows.length&&coverage==='complete'&&<p className="home-source-note">目前沒有你負責、釘選或有你任務的案件。可在案件總覽釘選案件。</p>}
   </Card>;

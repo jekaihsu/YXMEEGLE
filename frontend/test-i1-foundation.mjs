@@ -5,7 +5,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {JSDOM} from 'jsdom';
-const bundle=await build({stdin:{contents:"export * from './src/design/recentCases';export * from './src/design/DataState';export * from './src/homeViews/deadline';export {AppShell} from './src/AppShell';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export * from './src/design/recentCases';export * from './src/design/DataState';export * from './src/homeViews/deadline';export {AppShell} from './src/AppShell';export {WorkPreview,dueText} from './src/homeCards';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.i1-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);let m;try{m=await import(file.href)}finally{await fs.unlink(file)}
 let ids=[];for(const id of ['a','b','c','d','e','f','c'])ids=m.openRecentCase(ids,id);assert.deepEqual(ids,['c','f','e','d','b']);
 const memory=new Map(),storage={getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};
@@ -20,6 +20,17 @@ for(const kind of ['Loading','Empty','Stale','Partial','Error','Denied','Conflic
 }
 assert.match(renderToStaticMarkup(React.createElement(m.DataState,{kind:'Error',title:'失敗',body:'內容',actions:React.createElement('button',null,'重試')})),/ds-data-state-actions/);
 assert.equal(m.overdueDays('2026-08-05','2026-11-02'),89);assert.equal(m.overdueDays('2026-11-01T17:00:00Z','2026-11-02'),null);assert.equal(m.overdueDays(null,'2026-11-02'),null);assert.equal(m.overdueDays('invalid','2026-11-02'),null);assert.equal(m.overdueDays('2026-08-05','2026-11-02',true),null);assert.equal(m.dataTime(null),'尚未取得');
+assert.equal(m.dataTime('2026-09-25T08:00:00'),'2026/09/25 08:00:00 (台北時間)');
+assert.equal(m.dataTime('2026-09-25 08:00:00'),'2026/09/25 08:00:00 (台北時間)');
+assert.equal(m.overdueDays('2026-11-01T23:00:00','2026-11-02'),1);
+assert.equal(m.dueText('2026-11-01T17:00:00Z','2026-11-02'),'今天到期');
+assert.equal(m.dueText('2026-11-02T17:00:00Z','2026-11-02'),'明天到期');
+const work={id:'done-1',kind:'task',title:'完成的工作',case:{name:'測試案件'},source_status:null,blocked_reasons:[],deadline:'2026-08-05',next_due:null};
+for(const status of ['done','completed'])for(const deadline of [null,'2026-08-05']){
+ const html=renderToStaticMarkup(React.createElement(m.WorkPreview,{item:{...work,status,deadline},today:'2026-11-02'}));
+ assert.match(html,/已完成/);assert.doesNotMatch(html,/期限待確認|home-deadline|逾期/);
+}
+assert.match(renderToStaticMarkup(React.createElement(m.WorkPreview,{item:{...work,status:'todo',deadline:null},today:'2026-11-02'})),/期限待確認/);
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','Event','HTMLElement','MutationObserver','sessionStorage'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 window.scrollTo=()=>{};globalThis.requestAnimationFrame=cb=>cb();globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -34,7 +45,47 @@ await act(async()=>document.dispatchEvent(new window.Event('pointerdown',{bubble
 assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'false');
 await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'project',project:'a'},children:React.createElement('h1',null,'案件A')})));
 assert.equal(document.querySelector('.recent-project').textContent,'A案件A');assert.equal(document.querySelector('.recent-empty'),null);assert.equal(document.title,'案件詳情｜詠翔工作台');
+const secondWorkspace={...props,s:{...props.s,workspace_id:'second'},w:{projects:[{id:'b',code:'B',name:'案件B'}]},route:{view:'project',project:'b'}};
+await act(async()=>root.render(React.createElement(m.AppShell,secondWorkspace)));
+assert.equal(document.querySelector('.recent-project').textContent,'B案件B');
+await act(async()=>root.render(React.createElement(m.AppShell,props)));
+assert.equal(document.querySelector('.recent-project').textContent,'A案件A','workspace round trip retains exactly that workspace MRU');
+await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'project',project:'a'}})));
 await act(async()=>m.invalidateSessionEpoch());assert.equal(document.querySelectorAll('.recent-project').length,1,'the currently open authorized case becomes first in the new epoch');
 await act(async()=>root.render(React.createElement(m.AppShell,{...props,s:{...props.s,user:{id:'v',name:'Other'}}})));
 assert.equal(document.querySelectorAll('.recent-project').length,0,'user switch removes previous recents');
-await act(async()=>root.unmount());console.log('I1 MRU, DataState, overdue, bottom-nav and identity tests passed');
+const page=(view,tab)=>({...props,route:{view,project:view==='project'?'a':undefined,tab},children:React.createElement(React.Fragment,null,React.createElement('h1',null,`頁面-${view}`),React.createElement('nav',{className:'pds-tabs',role:'tablist'},['one','two'].map(id=>React.createElement('button',{key:id,role:'tab','aria-selected':tab===id},`分頁-${id}`))))});
+for(const view of ['project','work','reports']){
+ await act(async()=>root.render(React.createElement(m.AppShell,page(view,'one'))));
+ const selected=document.querySelectorAll('.pds-tabs button')[1];selected.focus();
+ await act(async()=>root.render(React.createElement(m.AppShell,page(view,'two'))));
+ assert.equal(document.activeElement,selected,`${view}: selected tab keeps focus literally`);
+ assert.equal(document.activeElement.textContent,'分頁-two');
+ await act(async()=>root.render(React.createElement(m.AppShell,{...page(view,'two'),route:{view,project:'another',tab:'two',section:'query-change',q:'new'}})));
+ assert.equal(document.activeElement,selected,`${view}: same-view project/query/hash keeps focus`);
+}
+const originalRects=window.HTMLElement.prototype.getClientRects;
+window.HTMLElement.prototype.getClientRects=()=>[{width:44,height:44}];
+const replacement=page('reports','two');replacement.children=React.cloneElement(replacement.children,{key:'lazy-replacement'});
+await act(async()=>root.render(React.createElement(m.AppShell,replacement)));
+assert.equal(document.activeElement.textContent,'分頁-two','a lazy rail replacement restores the selected tab, never the heading');
+window.HTMLElement.prototype.getClientRects=originalRects;
+await act(async()=>document.querySelector('.skip-link').dispatchEvent(new window.MouseEvent('click',{bubbles:true})));
+assert.equal(document.activeElement.textContent,'頁面-reports','skip link focuses the literal H1');
+await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'howto'},ready:false})));
+const sidebarButton=document.querySelector('.nav-item');sidebarButton.focus();
+await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'howto'},children:React.createElement('h1',null,'延後載入的頁面')})));
+assert.equal(document.activeElement,sidebarButton,'late H1 never steals focus after the user has moved elsewhere');
+await act(async()=>root.unmount());
+const frames=new Map();let frameId=0;
+globalThis.requestAnimationFrame=callback=>{frames.set(++frameId,callback);return frameId};
+window.cancelAnimationFrame=id=>frames.delete(id);
+const deferredRoot=createRoot(document.getElementById('root'));
+await act(async()=>deferredRoot.render(React.createElement(m.AppShell,props)));
+assert.equal(frames.size,1);
+await act(async()=>deferredRoot.render(React.createElement(m.AppShell,{...props,route:{view:'work'},children:React.createElement('h1',null,'新的工作頁面')})));
+assert.equal(frames.size,1,'route cleanup cancels the previous pending animation frame');
+for(const [id,callback] of frames){frames.delete(id);callback()}
+assert.equal(document.activeElement.textContent,'新的工作頁面');
+await act(async()=>deferredRoot.unmount());
+console.log('I1 MRU, DataState, overdue, bottom-nav and identity tests passed');
