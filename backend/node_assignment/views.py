@@ -121,8 +121,8 @@ def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, ev
     }
 
 
-def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None, **policy):
-    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence, **policy)
+def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None, *, projection=None, **policy):
+    statuses, case = projection if projection is not None else case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence, **policy)
     status = statuses[key]
     tasks = []
     for task in sorted(snapshot.node_tasks(key), key=lambda t: task_sort_key(t, now_ms)):

@@ -14,6 +14,7 @@ from ..source_case_policy import local_viewer
 from ..sources import normalized_case
 from ..workflow import now
 from .catalog import digest, publish
+from .read_links import links_by_task
 from .case_stage import stage, start_node
 from .cleanup_migration import audit_history_detached
 from . import local_case, quotes, suggestions, local_nodes
@@ -332,11 +333,12 @@ class Service(EnrollmentService):
                      if t.project_id in projects and holds_task(t, user['id'])]
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == wid,
                                    TaskNodeLink.task_id.in_([t.id for t in tasks])).order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
+            grouped_links = links_by_task(links)
             def full_case(project):
                 case_access = (visible_project(state, project) or local_viewer(user, project)
                                or user['id'] in project.get('sop_task_delegate_ids', []))
                 return case_access and (has_reader_grant(user) or can_manage(SimpleNamespace(user=user, project=project)))
-            return [build_sop_home_task(projects[t.project_id], t, [l for l in links if l.task_id == t.id],
+            return [build_sop_home_task(projects[t.project_id], t, grouped_links[t.id],
                                        user, state.get('users', []), self.writes_enabled(),
                                        full_case(projects[t.project_id])) for t in tasks]
 
@@ -603,7 +605,7 @@ class Service(EnrollmentService):
             rows = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
                                                              TaskNodeLink.task_id.in_([t.id for t in tasks]))
                                    .order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
-            links = {t.id: [l for l in rows if l.task_id == t.id] for t in tasks}
+            links = links_by_task(rows)
         facts = self.facts(ctx)
         dismissed = self.decided(db, ctx, 'suggestion_dismissed')
         source = explicitly_granted(ctx.user, 'sop_task_read_source')
@@ -675,7 +677,7 @@ class Service(EnrollmentService):
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
                                                               TaskNodeLink.project_id == ctx.project['id'])
                                     .order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
-            by_task = {t.id: [l for l in links if l.task_id == t.id] for t in tasks}
+            by_task = links_by_task(links)
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
             enrollment = self.enrollment_status(db, ctx) if not ctx.assigned_only else None
