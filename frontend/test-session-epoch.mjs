@@ -14,8 +14,13 @@ let App;try{App=(await import(bundlePath.href)).default}finally{await fs.unlink(
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
 let checks=0;
 async function scenario(kind,change,status=200,body,hasDraft=false){
- const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects',pretendToBeVisual:true});
  for(const key of ['window','document','location','history','sessionStorage','FormData','Event'])globalThis[key]=dom.window[key];
+ // One-shot presentation frame; unlike JSDOM RAF, this does not install an interval.
+ dom.window.requestAnimationFrame=callback=>dom.window.setTimeout(()=>callback(dom.window.performance.now()),0);
+ dom.window.cancelAnimationFrame=id=>dom.window.clearTimeout(id);
+ globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
+ globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  let session={user:a,users:[a,b],mode:kind==='switch'?'demo':'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true};
  let current={...workspace,version:10};let release;let calls=0;

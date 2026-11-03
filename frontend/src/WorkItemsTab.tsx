@@ -35,7 +35,7 @@ function Reports({c,p,data,department,initialOpen}:{c:Ctx;p:Project;data:Project
 }
 export function WorkItemsTab({c,p,assignments,selectedKey}:Props) {
  const read=useProjectProgress(p.id),department=isProductionNode(selectedKey) ? selectedKey : 'field';
- const progressPending=read.state.kind==='loading';
+ const progressPending=read.state.kind==='loading'||read.refreshing;
  const goSection=(section?:string)=>c.go({...c.route,view:'project',project:p.id,tab:'items',node:department,section});
  const data=read.state.kind==='ready' && read.state.data.project_id===p.id ? read.state.data : undefined;
  const stale=data?.sources.source_status==='stale' || ('data' in assignments.state && assignments.state.data?.stale===true);

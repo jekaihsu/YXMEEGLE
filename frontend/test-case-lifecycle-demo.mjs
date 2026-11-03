@@ -35,7 +35,7 @@ try{
  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});for(const name of ['focus','visibilitychange','online','yx:mutation-state']){window.dispatchEvent(new Event(name));document.dispatchEvent(new Event(name))}});
  await page.getByRole('button',{name:'總覽',exact:true}).click();await page.getByRole('button',{name:'流程與任務',exact:true}).click();await page.waitForLoadState('networkidle');
  assert.equal(reads.length,initial,'ten minute away and tab round-trip add zero case reads');
- await freshness.getByRole('button',{name:'重新整理',exact:true}).click();await page.waitForFunction(()=>!document.body.textContent.includes('正在更新案件資料'));await page.waitForLoadState('networkidle');
+ await freshness.getByRole('button',{name:'重新讀取',exact:true}).click();await page.waitForFunction(()=>!document.body.textContent.includes('正在更新案件資料'));await page.waitForLoadState('networkidle');
  const batch=reads.slice(initial);assert.equal(batch.length,3,'one first-screen, assignees and progress refresh batch');assert.equal(new Set(batch).size,3);assert.equal(batch.filter(url=>url.endsWith('/first-screen')).length,1);
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({status:'passed',realDemo:true,case:id,initialReads:initial,afterTenMinutes:initial,idleReads:0,explicitRefreshBatches:1,refreshReads:batch,snapshotId,sourceLabel:await freshness.innerText()}));

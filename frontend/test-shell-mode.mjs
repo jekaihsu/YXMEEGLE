@@ -16,8 +16,13 @@ const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA'
  return {...summary,created_at:i?'2026-10-01':'2026-10-02',concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
 })};
 const json=(data,headers={})=>new Response(JSON.stringify(data),{status:200,headers});
-const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','FormData','Event','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement'])globalThis[key]=dom.window[key];
+// One-shot presentation frame; unlike JSDOM RAF, this does not install an interval.
+dom.window.requestAnimationFrame=callback=>dom.window.setTimeout(()=>callback(dom.window.performance.now()),0);
+dom.window.cancelAnimationFrame=id=>dom.window.clearTimeout(id);
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
@@ -60,7 +65,7 @@ try{
  assert.equal(window.shellContext.w.counts.my_overdue_tasks,1,'the shell still carries the server overdue count');assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期'),'the nav badge was removed in 155b65a');
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
  assert.equal(rows()[0].querySelector('.pl-current>span').textContent,'待核對'); // 目前作業 no longer repeats the workflow badge shown in the status column
- assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,9);assert.equal(rows()[0].querySelector('.pl-status').textContent,'流程進度：待核對');
+ assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,0,'list rows show only the current node');assert.equal(rows()[0].querySelector('.pl-status').textContent,'逾期');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  // The old home markup (.work-inbox, .dh-hero, .dh-waiting) was replaced by the unified home (155b65a and later); the shell contract kept here is that the dashboard renders from shell data alone.
@@ -70,6 +75,7 @@ try{
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
  const change=async(label,value)=>flush(()=>{const select=document.querySelector(`[aria-label="${label}"]`);select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
  const beforeFilters=requests.length;
+ await flush(()=>document.querySelector('.pl-filter-trigger').click());
  const attention=document.querySelector('.pl-check input');await flush(()=>{attention.checked=true;attention.dispatchEvent(new Event('change',{bubbles:true}))});
  await change('案件排序','created');assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
  await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
@@ -103,6 +109,7 @@ try{
  current={...shell,projects:many};etag='W/"shell-big"';await mount({workspace_shell:true});
  const portfolioReads=()=>requests.filter(r=>r.url==='/api/projects?view=portfolio&page=1').length;
  assert.equal(portfolioReads(),1);assert.equal(rows().length,3);
+ await flush(()=>document.querySelector('.pl-filter-trigger').click());
  await change('每組顯示筆數','10');assert.equal(rows().length,10);
  await flush(()=>document.querySelector('.pl-expand').click());assert.equal(rows().length,25);
  assert.match(document.querySelector('.pl-footer').textContent,/符合條件 25 筆/);

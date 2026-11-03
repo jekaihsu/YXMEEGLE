@@ -6,14 +6,20 @@ import {projectFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1&tab=items',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator','Element'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 let scrollResets=[];dom.window.scrollTo=position=>scrollResets.push(position);
-globalThis.getComputedStyle=dom.window.getComputedStyle;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+globalThis.getComputedStyle=dom.window.getComputedStyle;
+// One-shot presentation frame; unlike JSDOM RAF, this does not install an interval.
+dom.window.requestAnimationFrame=callback=>dom.window.setTimeout(()=>callback(dom.window.performance.now()),0);
+dom.window.cancelAnimationFrame=id=>dom.window.clearTimeout(id);
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const keyWarnings=[],originalError=console.error;console.error=(...args)=>{if(args.some(arg=>/same key|unique.*key/i.test(String(arg))))keyWarnings.push(args);originalError(...args)};
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {AppShell} from './src/AppShell';export {WorkItemsTab} from './src/WorkItemsTab';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {DetailRefreshProvider} from './src/detailRefresh';export {AppShell} from './src/AppShell';export {WorkItemsTab} from './src/WorkItemsTab';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.work-items-ui.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const fixture=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));fixture.project_id='p1';fixture.production.field.items=[5,10,50].map((q,i)=>({item_id:`id-${i}`,code:i?'C115264-1':'C115264-2',name:['C42FW','C44FW','C31FW'][i],planned_qty:String(q),link_basis:i===2?'ambiguous':'native'}));fixture.production.field.items_total=3;
 let root,c,data,status=200,hold=null,calls=[];const tick=()=>new Promise(r=>setTimeout(r,15));
-const render=()=>root.render(React.createElement(ui.AppShell,{s:c.s,w:c.w,route:c.route,error:'',ready:true,go:c.go},React.createElement(ui.WorkItemsTab,{c,p:c.w.projects[0],assignments:{state:{kind:'disabled'}},selectedKey:c.route.node || 'field'})));
+const render=()=>root.render(React.createElement(ui.DetailRefreshProvider,{scope:'fixture-workspace',identityFingerprint:c.s.user.id},React.createElement(ui.AppShell,{s:c.s,w:c.w,route:c.route,error:'',ready:true,go:c.go},React.createElement(ui.WorkItemsTab,{c,p:c.w.projects[0],assignments:{state:{kind:'disabled'}},selectedKey:c.route.node || 'field'}))));
 async function mount({patch=()=>{},section}={}){if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();data=structuredClone(fixture);data.sources.can_refresh_sources=true;data.production.control.items=[];data.production.control.items_total=0;patch(data);const base=projectFixture();c={w:base.workspace,s:{user:base.user,features:{}},route:{view:'project',project:'p1',tab:'items',section},go(route){c.route=route;render()}};c.w.projects[0].nodes[0].tasks=[{id:'exact-task',title:'ID linked task',work_item_id:'id-2',status:'pending'},{id:'wrong-task',title:'Wrong duplicate code task',work_item_id:'id-1',status:'pending'}];calls=[];globalThis.fetch=async(url)=>{calls.push(url);if(url==='/api/live/refresh')return new Response(JSON.stringify({freshness:{enabled:true,server_time:'2026-10-26T00:00:00Z',datasets:Object.fromEntries(['sources','roster','attendance'].map(k=>[k,{status:'fresh',ttl_seconds:60,age_seconds:0}]))}}));if(url.endsWith('/progress')){if(hold)await hold;return new Response(JSON.stringify(status===200?data:{detail:status===403?'Forbidden':'測試來源失敗'}),{status,headers:{'Content-Type':'application/json'}})}return new Response(JSON.stringify({items:[],total:0,summary:{}}),{headers:{'Content-Type':'application/json'}})};root=createRoot(document.getElementById('root'));await act(async()=>{render();await tick()})}
 const click=async el=>{assert.ok(el);await act(async()=>{el.click();await tick()})};
 await mount();assert.equal(document.querySelectorAll('table').length,1);assert.equal(document.querySelectorAll('[data-item-id]').length,3);assert.deepEqual([...document.querySelectorAll('[data-label="計畫量"]')].map(el=>el.textContent),['5','10','50']);assert.deepEqual([...document.querySelectorAll('[data-label="實際完成量"]')].map(el=>el.textContent),['未知','未知','未知']);assert.equal(calls.some(url=>url.includes('daily-reports')),false);
@@ -24,18 +30,19 @@ await mount({section:'item:id-2'});assert.match(document.querySelector('[role="d
 await mount({patch:d=>{d.production.field.items_truncated=true;d.production.field.items_total=12;d.sources.reports_status='restricted'}});assert.match(document.body.textContent,/僅顯示 3／12/);assert.match(document.body.textContent,/權限不足/);assert.equal(document.querySelectorAll('.wi-meta,.wi-empty').length,1);assert.doesNotMatch(document.querySelector('.wi-card').textContent,/筆數未知/);await click(document.querySelector('#project-reports summary'));assert.match(document.body.textContent,/日報代表作業活動/);assert.ok(calls.some(url=>url.includes('daily-reports')));const query=document.querySelector('.daily-filters input[placeholder]');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(query,'preserved filter');query.dispatchEvent(new Event('input',{bubbles:true}));await tick()});await click(document.querySelector('[data-item-id="id-1"] button'));await click(document.querySelector('[aria-label="關閉工項明細"]'));assert.equal(document.querySelector('.daily-filters input[placeholder]').value,'preserved filter');
 await mount({patch:d=>{d.sources.reports_status='restricted';d.sources.source_status='unknown';d.sources.source_synced_at=null;d.production.field.items=[];d.production.field.items_total=0}});{const text=document.querySelector('.work-items-tab').textContent;assert.match(text,/工項資料尚未取得（週報來源權限不足）/);assert.equal((text.match(/權限不足/g)||[]).length,1,'the permission reason is stated once, inside the combined message');assert.doesNotMatch(text,/狀態未知|工項來源同步|尚未提供/,'no stacked unknown/sync lines beside it');assert.equal(document.querySelectorAll('.wi-evidence').length,0,'the evidence badge does not repeat the state');}
 await mount({patch:d=>{d.sources.source_status='stale'}});assert.match(document.body.textContent,/上次成功來源資料/);
-status=403;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/權限不足/);status=500;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/工程證據暫不可用/);status=200;
-let release;hold=new Promise(resolve=>release=resolve);await mount();assert.match(document.querySelector('[role="status"]').textContent,/載入中/);await act(async()=>{release();await tick()});hold=null;
+status=403;await mount();assert.match(document.querySelector('.work-items-tab [role="alert"]').textContent,/權限不足/);status=500;await mount();assert.match(document.querySelector('.work-items-tab [role="alert"]').textContent,/工程證據暫不可用/);status=200;
+let release;hold=new Promise(resolve=>release=resolve);await mount();assert.match(document.querySelector('.work-items-tab [role="status"]').textContent,/載入中/);await act(async()=>{release();await tick()});hold=null;
 await mount({patch:d=>{d.sources.source_status='stale';d.sources.reports_stale=true}});
 await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
-assert.match(document.querySelector('[role="alert"]')?.textContent??'',/來源仍待更新/);
-assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/);
+assert.match(document.querySelector('.work-items-tab [role="alert"]')?.textContent??'',/來源仍待更新/);
+assert.match(document.querySelector('.work-items-tab [role="alert"]').textContent,/2026\/10\/17/);
 assert.equal(document.querySelectorAll('[data-item-id]').length,0,'stale retry never presents items as success');
 data.sources.source_status='ready';data.sources.reports_status='ok';data.sources.reports_stale=false;
 await click([...document.querySelectorAll('button')].find(b=>b.textContent==='重試工程證據'));
-assert.equal(document.querySelector('[role="alert"]'),null);assert.equal(document.querySelectorAll('[data-item-id]').length,3);
+assert.equal(document.querySelector('.work-items-tab [role="alert"]'),null);assert.equal(document.querySelectorAll('[data-item-id]').length,3);
 status=500;await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
-assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/,'failed refresh retains last good source time');
+assert.equal(document.querySelector('[role="alert"]').textContent,'工程進度更新失敗，顯示上次資料：測試來源失敗；最近成功讀取 · 2026/10/17 09:00:00 (台北時間)重試工程進度','failed refresh retains last good source time');
+assert.equal(document.querySelectorAll('[data-item-id]').length,3,'failed refresh keeps the last good items');
 status=200;
 for(const initialStatus of [200,500]){
  status=initialStatus;await mount();status=200;
@@ -48,7 +55,7 @@ for(const initialStatus of [200,500]){
  for(let i=0;i<5;i++)await click(refresh);
  assert.equal(calls.filter(url=>url.endsWith('/progress')).length-before,1,'rapid retry/refresh clicks start exactly one progress request');
  if(initialStatus===200){assert.equal(refresh.disabled,true,'progress control is disabled while the read is pending');assert.equal(refresh.getAttribute('aria-busy'),'true')}
- else assert.match(document.querySelector('[role="status"]').textContent,/載入中/);
+ else {assert.equal(document.querySelector('[role="status"]').textContent,'正在更新案件資料…');assert.equal(refresh.disabled,true);assert.equal(refresh.getAttribute('aria-busy'),'true')}
  await act(async()=>{finish();await tick()});hold=null;
  const settled=[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
  assert.equal(settled.disabled,false,'progress control is enabled after settlement');

@@ -8,7 +8,7 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {DetailRefreshProvider} from './src/detailRefresh';export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.task-list-context.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const tick=()=>new Promise(r=>setTimeout(r,15));
 const perNode={sales:5,pm:3,confirmation:3,field:3,control:3,mapping:2,report:2,pricing:2,settlement:1};
@@ -19,7 +19,7 @@ function localProject(){
  return base;
 }
 let root,c;
-const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
+const render=()=>root.render(React.createElement(ui.DetailRefreshProvider,{scope:c.s.workspace_id||'fixture-workspace',identityFingerprint:c.s.user.id},React.createElement(ui.ProjectDetail,{c})));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 async function mount(hash,{actor}={}){
