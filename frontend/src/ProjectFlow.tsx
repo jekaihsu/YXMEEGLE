@@ -1,4 +1,5 @@
 import {useCaseFlowModel} from './useCaseFlowModel';
+import {nodeReadBlock} from './nodeReadBlock';
 import {taipeiTime} from './taipeiTime';
 import {TaskCreator} from './NodeAssignmentForms';
 import {defaultChecklistState} from './sopTaskModel';
@@ -51,10 +52,13 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const stage=resolveStages({nodes:model.nodes,list,requested:selected.key});
  const category=productionKey(selected.key),detail=details.details[selected.key];
  const loading=assignments.state.kind==='loading';
- const nodeBusy=!!list?.stale || assignments.refreshing || !!assignments.pending || assignments.state.kind!=='ready';
+ const nodeBlock=nodeReadBlock(assignments,list);
+ const nodeBusy=!!nodeBlock;
  const busy=nodeBusy || !list?.writes_enabled;
- const reason=!list?.writes_enabled ? list?.writes_disabled_reason || '節點修改尚未開放。' : assignments.state.kind==='error' ? '節點來源更新失敗，請重試。' : '正在更新節點資料，請稍候。';
- const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy||!list?.writes_enabled?reason:''});
+ const reason=nodeBlock || (!list?.writes_enabled ? list?.writes_disabled_reason || '節點修改尚未開放。' : '');
+ const localNode=sopData?.localNodes?.find(n=>n.key===selected.key);
+ const localAuthority=localCase(p)||!!localNode;
+ const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:localNode,can:detail?.can,users:c.w.users,busy:localAuthority?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localAuthority?'':nodeBusy||!list?.writes_enabled?reason:''});
  const nodeLoading=loading&&!workbench.local;
  const [report,setReport]=useState<ProgressReportRow|null>(null);
  const keyboardMove=useRef(false),firstSelection=useRef(true);
