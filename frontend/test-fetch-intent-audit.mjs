@@ -12,7 +12,7 @@ const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
  'ProjectsList.tsx': 'd9735e31d189773325406771b6e34c517df4ed98322101a8352bea5c0f7964ed',
- 'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
+ 'assistant/ConversationHistory.tsx': 'de8172efc6d813dbeb0eda69dc298c286342f61352255088f05d858da1917e24',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
