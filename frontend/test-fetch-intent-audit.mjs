@@ -55,7 +55,7 @@ const legacy={
  "reloadGuard.ts": "1983950556280811e13d243bfcba34e97ce91814745e222e234e34f458750f0e",
  "assistant/ProjectChatLauncher.tsx": "df78000709295f98a73c8dc2f1f2a3dd078910e9cb830671fb0243e1151dcfde",
  "reports/ContactsTab.tsx": "f9669894e96f21adbecaa3dbd3b2ee64c53c6186722e601e9d4ccda4ebd839bc",
- "reports/useReport.ts": "43575fa63998c2ab6260120f103a4c9ad1030779609b0b9f693cfa4062d8028c"
+ "reports/useReport.ts": "5ca30dd6b109559a87001ab9decf6d18173a8fa055d92f18249fd45c9ac7c6ad"
 };
 export function triggers(source){
  const tree=ts.createSourceFile('source.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
