@@ -20,7 +20,7 @@ from .catalog import ModelId, registry
 from .providers import ADAPTERS
 from .project_context import ProjectContextCache, ContextUnavailable
 from .tools import ReadDenied, valid_case_id
-from ..production_access import hr_view_allowed
+from ..production_access import hr_view_allowed, reports_allowed
 
 
 class Message(BaseModel):
@@ -150,6 +150,8 @@ def register(app, *, identity, sessions, cfg):
         try:
             if 'attendance' in authority['workspace_reads'] and not hr_view_allowed(user,cfg):
                 raise HistoryDenied()
+            if any(marker.startswith('report:') for marker in authority['workspace_reads']) and not reports_allowed(user):
+                raise HistoryDenied()
             if authority['permission_keys'] - {permission_key(user)}:
                 raise HistoryDenied()
             require_cases(sessions, workspace_id, authority['case_ids'], cfg)
@@ -174,7 +176,7 @@ def register(app, *, identity, sessions, cfg):
             if allowed is not None and project_id is not None and project_id not in allowed:
                 raise HistoryDenied()
             result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before,
-                                          allowed_project_ids=allowed, permission_key=permission_key(user), viewer_can_hr=hr_view_allowed(user,cfg), **history_options())
+                                          allowed_project_ids=allowed, permission_key=permission_key(user), viewer_can_hr=hr_view_allowed(user,cfg), viewer_can_reports=reports_allowed(user), **history_options())
         except ValueError:
             raise HTTPException(422, '分頁游標錯誤') from None
         return JSONResponse(result, headers={'Cache-Control': 'no-store'})
@@ -281,6 +283,8 @@ def register(app, *, identity, sessions, cfg):
                 _, current_user = identity(request)
                 if 'attendance' in run.workspace_reads | authority['workspace_reads'] and not hr_view_allowed(current_user,cfg):
                     raise HistoryDenied(conversation_only=body.project_id is None)
+                if any(marker.startswith('report:') for marker in run.workspace_reads | authority['workspace_reads']) and not reports_allowed(current_user):
+                    raise HistoryDenied(conversation_only=body.project_id is None)
                 if permission_key(current_user) != initial_permission:
                     raise HistoryDenied()
                 if body.project_id is not None and run.case_ids == {body.project_id}:
@@ -347,7 +351,7 @@ def register(app, *, identity, sessions, cfg):
         exporting = request.url.path.endswith('/export')
         result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
             content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting, allowed_project_ids=referenced_visibility(sessions, data['wid'], cfg),
-            viewer_can_hr=hr_view_allowed(user,cfg))
+            viewer_can_hr=hr_view_allowed(user,cfg), viewer_can_reports=reports_allowed(user))
         if exporting:
             rows = result['rows']
             truncated = result['truncated']
@@ -367,7 +371,7 @@ def register(app, *, identity, sessions, cfg):
         result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=app.state.ai_store_content,
                                  retention_days=app.state.ai_content_retention_days,
                                  allowed_project_ids=referenced_visibility(sessions, data['wid'], cfg),
-                                 viewer_can_hr=hr_view_allowed(user,cfg))
+                                 viewer_can_hr=hr_view_allowed(user,cfg), viewer_can_reports=reports_allowed(user))
         if result is None:
             raise HTTPException(404, '找不到提問')
         return result

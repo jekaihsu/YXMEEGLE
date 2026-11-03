@@ -8,7 +8,7 @@ import logging
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect, true, Index, union
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect, true, union
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.schema import CreateColumn
 from ..models import Base
@@ -52,7 +52,7 @@ class AiUsageRow(Base):
 
 
 class AiCaseRead(Base):
-    """Server-observed reads, including inherited conversation dependencies."""
+    """Per-tool provenance retained for audit; conversation tables authorize reads."""
     __tablename__ = 'ai_case_read'
     usage_id = Column(String(36), primary_key=True)
     tool_call_id = Column(String(120), primary_key=True)
@@ -60,6 +60,7 @@ class AiCaseRead(Base):
 
 
 class AiWorkspaceRead(Base):
+    """Per-turn workspace provenance for audit, bounded by content retention."""
     __tablename__ = 'ai_workspace_read'
     usage_id = Column(String(36), primary_key=True)
     marker = Column(String(80), primary_key=True)
@@ -81,7 +82,15 @@ class AiConversationWorkspaceRead(Base):
     marker = Column(String(80), primary_key=True)
 
 
-Index('ix_ai_usage_conversation', AiUsageRow.workspace_id, AiUsageRow.actor_id, AiUsageRow.conversation_id)
+class AiSchemaMigration(Base):
+    __tablename__ = 'ai_schema_migration'
+    name = Column(String(120), primary_key=True)
+    completed_at = Column(DateTime(timezone=True), nullable=False)
+
+
+CONVERSATION_READ_BACKFILL = 'conversation-read-authority-v1'
+USAGE_CONVERSATION_INDEX = 'ix_ai_usage_conversation'
+
 
 
 def insert_once(db, table):
@@ -344,11 +353,11 @@ def daily_tokens(sessions, workspace_id, actor_id):
                                 AiUsageRow.day == today()))
 
 
-def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None, q=None, *, content_enabled=True, retention_days=90, export=False, allowed_project_ids=None, viewer_can_hr=True):
+def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None, q=None, *, content_enabled=True, retention_days=90, export=False, allowed_project_ids=None, viewer_can_hr=True, viewer_can_reports=True):
     row = AiUsageRow
     rating_row = AiFeedbackRow
     joined = row.__table__.outerjoin(rating_row, and_(row.id == rating_row.usage_id, row.actor_id == rating_row.actor_id))
-    authorized = content_authorized(row, allowed_project_ids, viewer_can_hr=viewer_can_hr)
+    authorized = content_authorized(row, allowed_project_ids, viewer_can_hr=viewer_can_hr, viewer_can_reports=viewer_can_reports)
     joined = joined.outerjoin(AiExchangeRow, and_(authorized, row.id == AiExchangeRow.usage_id,
         row.workspace_id == AiExchangeRow.workspace_id,
         AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days)))
@@ -440,7 +449,7 @@ def exchange_json(row, feedback, exchange, *, authorized=True):
         cost_usd=None if row.cost_micro_usd is None else row.cost_micro_usd / 1_000_000)
 
 
-def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retention_days=90, allowed_project_ids=None, viewer_can_hr=True):
+def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retention_days=90, allowed_project_ids=None, viewer_can_hr=True, viewer_can_reports=True):
     with sessions() as db:
         row = db.scalar(select(AiUsageRow).where(AiUsageRow.id == usage_id, AiUsageRow.workspace_id == workspace_id))
         if row is None:
@@ -449,7 +458,7 @@ def exchange(sessions, workspace_id, usage_id, *, content_enabled=True, retentio
         content = db.scalar(select(AiExchangeRow).where(AiExchangeRow.usage_id == usage_id,
             AiExchangeRow.workspace_id == workspace_id,
             AiExchangeRow.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days))) if content_enabled else None
-        authorized = db.scalar(select(content_authorized(AiUsageRow, allowed_project_ids, viewer_can_hr=viewer_can_hr)).where(AiUsageRow.id == usage_id))
+        authorized = db.scalar(select(content_authorized(AiUsageRow, allowed_project_ids, viewer_can_hr=viewer_can_hr, viewer_can_reports=viewer_can_reports)).where(AiUsageRow.id == usage_id))
         result = exchange_json(row, feedback, content, authorized=authorized)
         result.pop('question_preview')
         result.pop('answer_preview')
@@ -472,7 +481,7 @@ def column_ddl(name, dialect):
 
 def ensure_schema(engine):
     """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
-    Base.metadata.create_all(engine, tables=[AiConversationCaseRead.__table__, AiConversationWorkspaceRead.__table__, AiWorkspaceRead.__table__, AiCaseRead.__table__, AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    Base.metadata.create_all(engine, tables=[AiSchemaMigration.__table__, AiConversationCaseRead.__table__, AiConversationWorkspaceRead.__table__, AiWorkspaceRead.__table__, AiCaseRead.__table__, AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
     for table, names in ((AiConversationGeneration.__table__, ('active_runs', 'last_activity_at')),
                          (AiUsageRow.__table__, ADDED_USAGE_COLUMNS)):
         for name in names:
@@ -485,15 +494,7 @@ def ensure_schema(engine):
             except DBAPIError:
                 if name not in {c['name'] for c in inspect(engine).get_columns(table.name)}:
                     raise
-    with engine.begin() as connection:
-        if connection.dialect.name == 'postgresql':
-            from sqlalchemy.dialects.postgresql import insert
-        else:
-            from sqlalchemy.dialects.sqlite import insert
-        u,r = AiUsageRow,AiCaseRead
-        source = select(u.workspace_id,u.actor_id,u.conversation_id,r.project_id).join(r,r.usage_id == u.id).where(func.coalesce(u.error_code,'') != 'ai_forbidden').distinct().order_by(u.workspace_id,u.actor_id,u.conversation_id,r.project_id)
-        connection.execute(insert(AiConversationCaseRead).from_select(
-            ['workspace_id','actor_id','conversation_id','project_id'],source).on_conflict_do_nothing())
+    backfill_conversation_reads(engine)
     with engine.begin() as connection:
         missing = select(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).exists()
         if connection.scalar(select(missing)):
@@ -506,8 +507,61 @@ def ensure_schema(engine):
             if existing.get(index.name) != [c.name for c in index.columns]:
                 raise
 
+    ensure_usage_conversation_index(engine)
 
-def content_authorized(row, allowed_project_ids=None, permission_key=None, viewer_can_hr=True):
+
+def backfill_conversation_reads(engine):
+    with engine.begin() as connection:
+        if connection.dialect.name == 'postgresql':
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        claimed = connection.scalar(insert(AiSchemaMigration).values(
+            name=CONVERSATION_READ_BACKFILL, completed_at=datetime.now(timezone.utc)
+        ).on_conflict_do_nothing().returning(AiSchemaMigration.name))
+        if claimed is None:
+            return
+        u = AiUsageRow
+        for audit, authority, field in ((AiCaseRead, AiConversationCaseRead, 'project_id'),
+                                         (AiWorkspaceRead, AiConversationWorkspaceRead, 'marker')):
+            column = getattr(audit, field)
+            source = select(u.workspace_id,u.actor_id,u.conversation_id,column).join(
+                audit,audit.usage_id == u.id).where(func.coalesce(u.error_code,'') != 'ai_forbidden'
+                ).distinct().order_by(u.workspace_id,u.actor_id,u.conversation_id,column)
+            connection.execute(insert(authority).from_select(
+                ['workspace_id','actor_id','conversation_id',field],source).on_conflict_do_nothing())
+
+
+def ensure_usage_conversation_index(engine):
+    if engine.dialect.name != 'postgresql':
+        if any(index['name'] == USAGE_CONVERSATION_INDEX for index in inspect(engine).get_indexes('ai_usage')):
+            return
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f'CREATE INDEX IF NOT EXISTS {USAGE_CONVERSATION_INDEX} ON ai_usage (workspace_id, actor_id, conversation_id)')
+        return
+    try:
+        with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
+            try:
+                connection.exec_driver_sql("SET lock_timeout = '1s'")
+                connection.exec_driver_sql("SET statement_timeout = '15s'")
+                valid = connection.exec_driver_sql(
+                    "SELECT indisvalid FROM pg_index WHERE indexrelid=to_regclass('ix_ai_usage_conversation') AND indrelid=to_regclass('ai_usage')").scalar()
+                if valid is True:
+                    return
+                if valid is False:
+                    connection.exec_driver_sql(f'DROP INDEX CONCURRENTLY IF EXISTS {USAGE_CONVERSATION_INDEX}')
+                connection.exec_driver_sql(f'CREATE INDEX CONCURRENTLY IF NOT EXISTS {USAGE_CONVERSATION_INDEX} ON ai_usage (workspace_id, actor_id, conversation_id)')
+            finally:
+                try:
+                    connection.exec_driver_sql('RESET lock_timeout')
+                    connection.exec_driver_sql('RESET statement_timeout')
+                except DBAPIError:
+                    connection.invalidate()
+    except DBAPIError:
+        logger.warning('ai_usage_conversation_index_retry_on_next_startup')
+
+
+def content_authorized(row, allowed_project_ids=None, permission_key=None, viewer_can_hr=True, viewer_can_reports=True):
     conditions = []
     if allowed_project_ids is not None:
         c = AiConversationCaseRead
@@ -520,6 +574,10 @@ def content_authorized(row, allowed_project_ids=None, permission_key=None, viewe
         c = AiConversationWorkspaceRead
         conditions.append(~select(c.marker).where(c.workspace_id == row.workspace_id,c.actor_id == row.actor_id,
             c.conversation_id == row.conversation_id,c.marker == 'attendance').exists())
+    if not viewer_can_reports:
+        c = AiConversationWorkspaceRead
+        conditions.append(~select(c.marker).where(c.workspace_id == row.workspace_id,c.actor_id == row.actor_id,
+            c.conversation_id == row.conversation_id,c.marker.like('report:%')).exists())
     return and_(*conditions) if conditions else true()
 
 
@@ -572,7 +630,7 @@ def conversation_title(question):
     return ' '.join(question.split())[:60]
 
 
-def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days, allowed_project_ids=None, permission_key=None, viewer_can_hr=True):
+def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days, allowed_project_ids=None, permission_key=None, viewer_can_hr=True, viewer_can_reports=True):
     import base64
     cursor = None
     if before:
@@ -601,6 +659,9 @@ def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, be
     if not viewer_can_hr:
         c = AiConversationWorkspaceRead
         blocked.append(select(c.conversation_id).where(c.workspace_id == workspace_id,c.actor_id == actor_id,c.marker == 'attendance'))
+    if not viewer_can_reports:
+        c = AiConversationWorkspaceRead
+        blocked.append(select(c.conversation_id).where(c.workspace_id == workspace_id,c.actor_id == actor_id,c.marker.like('report:%')))
     if blocked:
         stmt = stmt.where(u.conversation_id.not_in(union(*blocked)))
     if project_id is not None:

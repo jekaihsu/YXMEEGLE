@@ -72,4 +72,6 @@ def permission_key(user):
     import json
     values = [user.get('permission_version', user.get('authz_version', 0)), user.get('role'), sorted(user.get('capabilities', [])),
               user.get('active', True), user.get('company_admin_authorization')]
+    if user.get('manager_revoked'):
+        values.append(['manager_revoked', True])
     return hashlib.sha256(json.dumps(values, sort_keys=True, default=str).encode()).hexdigest()

@@ -21,6 +21,15 @@ def observed(path, data, params=None):
         if workspace_sink is not None:
             workspace_sink('attendance')
         return
+    if path == '/api/daily-reports':
+        if workspace_sink is not None:
+            workspace_sink('daily_reports')
+        if sink is not None:
+            ids = {item.get('project_id') for item in data.get('items', [])[:100]}
+            ids.update((params or {}).get(key) for key in ('project_id', 'case_id'))
+            for project_id in ids - {None, ''}:
+                sink(project_id)
+        return
     if sink is None:
         return
     for field in ('project_id', 'case_id'):
@@ -31,4 +40,4 @@ def observed(path, data, params=None):
     if len(parts) >= 3 and parts[:2] in (['api', 'projects'], ['api', 'case-detail']):
         sink(unquote(parts[2]))
     elif workspace_sink is not None:
-        workspace_sink('daily_reports' if path == '/api/daily-reports' else 'workspace')
+        workspace_sink('workspace')

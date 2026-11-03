@@ -1,7 +1,7 @@
 """Ordinary data and bounded dependency regressions from review round two."""
 from datetime import datetime,timedelta,timezone
 import pytest
-from sqlalchemy import select,func,event
+from sqlalchemy import select,delete,func,event
 from .test_ai_database import app,client,ai_database_url
 from .test_ai_api import BODY,Fake,events,rows,wid,dataset_call
 from .test_ai_project import project
@@ -215,6 +215,7 @@ def test_dependency_migration_deduplicates_and_excludes_denied_rows(tmp_path):
     for ident in ('read','inherited','denied'):
         seed_turn(sessions,ident,'conversation')
     with sessions.begin() as db:
+        db.execute(delete(ledger.AiSchemaMigration).where(ledger.AiSchemaMigration.name == ledger.CONVERSATION_READ_BACKFILL))
         db.get(ledger.AiUsageRow,'denied').error_code='ai_forbidden'
         db.add_all([ledger.AiCaseRead(usage_id='read',tool_call_id='tool',project_id='p1'),
                     ledger.AiCaseRead(usage_id='inherited',tool_call_id='conversation',project_id='p1'),

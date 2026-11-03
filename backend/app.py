@@ -32,7 +32,7 @@ from .learning import apply_learning
 from .approval_capabilities import approval_connection
 from .avatar import avatar_url
 from .workspace_projection import public_copy, strip_migration_archive, filter_private_workspace, public_person
-from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
+from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority,reports_allowed
 from . import audit
 from .input_validation import json_object
 from .file_categories import categories, validate_category, save_category
@@ -1957,7 +1957,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
     from .reports.routes import register as register_reports
     register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
-                     allow=lambda data,user:user['role'] in ('pm','manager','工務助理') or any(user.get(k) in ('工務助理','郭倢瑛','朱雅琪','林瑩瑄') for k in ('name','display_name','group','department')) or capable(user,'manage_sources'),
+                     allow=lambda data,user:reports_allowed(user),
                      links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
