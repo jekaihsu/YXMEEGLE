@@ -44,11 +44,11 @@ function CreateTask({projectId,node,sop,onClose,testOperator}:{projectId:string;
  }}>{testOperator && <label className="na-wide"><input type="checkbox" role="switch" checked={isTest} onChange={e=>setIsTest(e.target.checked)}/>測試任務<small>僅供驗收，不會同步至 Lark。建立後可填寫原因清除。</small></label>}</TaskCreateForm>;
 }
 
-export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=false,overview=false,emptyOverview=true,setupNotice=true}: {setupNotice?:boolean;emptyOverview?:boolean;overview?:boolean;remote?:boolean;c: Ctx; p: Pick<Project,'id'>; nodeKey: string; sop: Sop; importing: SopImportTarget; setImporting: (target: SopImportTarget) => void}) {
+export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=false,overview=false,emptyOverview=true,setupNotice=true,initialCreating=false}: {initialCreating?:boolean;setupNotice?:boolean;emptyOverview?:boolean;overview?:boolean;remote?:boolean;c: Ctx; p: Pick<Project,'id'>; nodeKey: string; sop: Sop; importing: SopImportTarget; setImporting: (target: SopImportTarget) => void}) {
  const [wholeCase, setWholeCase] = useState(false);
  const [filters, setFilters] = useState<SopFilter[]>([]);
  const [history, setHistory] = useState(false);
- const [creating, setCreating] = useState(false);
+ const [creating, setCreating] = useState(initialCreating);
  const [cleanupFocus,setCleanupFocus]=useState(false);
  const [selected,setSelected]=useState<Set<string>>(new Set());
  const [review,setReview]=useState<string[]|null>(null);

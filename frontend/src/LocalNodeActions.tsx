@@ -7,8 +7,8 @@ import {NODE_ACTIONS,type NodeWorkbench} from './nodeWorkbenchModel';
 import {sopApi,sopErrorText} from './sopTaskApi';
 import type {useSopTasks} from './useSopTasks';
 
-export function LocalNodeActions({workbench,sop,projectId}:{workbench:NodeWorkbench;sop:ReturnType<typeof useSopTasks>;projectId:string}) {
- const [form,setForm]=useState<'assign'|'complete'|'reject'|null>(null),[person,setPerson]=useState(''),[reason,setReason]=useState('');
+export function LocalNodeActions({workbench,sop,projectId,initialAssign=false}:{workbench:NodeWorkbench;sop:ReturnType<typeof useSopTasks>;projectId:string;initialAssign?:boolean}) {
+ const [form,setForm]=useState<'assign'|'complete'|'reject'|null>(initialAssign?'assign':null),[person,setPerson]=useState(''),[reason,setReason]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const local=workbench.local;
  const trigger=useRef<HTMLElement|null>(null);
@@ -25,7 +25,7 @@ export function LocalNodeActions({workbench,sop,projectId}:{workbench:NodeWorkbe
  const actionButton=([id,label]:typeof NODE_ACTIONS[number],closeMenu?:()=>void)=>{const action=workbench.actions[id];return <FlowAction key={id} allowed={action.enabled&&!busy} reason={busy?'正在儲存，請稍候':action.disabledReason} primary={id==='complete'} onClick={()=>{closeMenu?.();trigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;if(id==='assign'||id==='complete'||id==='reject')commands[id]()}}>{label}</FlowAction>};
  return <div className="nw-local-actions"><div className="nw-actions">{available.filter(([id])=>id==='complete').map(action=>actionButton(action))}{available.some(([id])=>id!=='complete')&&<DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作">{closeMenu=><div>{available.filter(([id])=>id!=='complete').map(action=>actionButton(action,closeMenu))}</div>}</DetailsMenu>}</div>
  {form && <form className="nw-local-form" aria-label={form==='assign'?'指派節點負責人':form==='complete'?'確認完成節點':'退回節點'} onKeyDown={e=>{if(e.key==='Escape'&&!busy){e.preventDefault();close()}}} onSubmit={e=>{e.preventDefault();void submit()}}>
-  {form==='assign'?<label>節點負責人<FormSelect aria-label="節點負責人" value={person} disabled={busy} onChange={e=>setPerson(e.target.value)}><option value="">選擇負責人</option>{sop.assignees.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</FormSelect></label>:<label>{form==='complete'?'完成依據':'退回原因'}<textarea aria-label={form==='complete'?'完成依據':'退回原因'} autoFocus rows={2} required maxLength={1000} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label>}
+  {form==='assign'?<label>節點負責人<FormSelect aria-label="節點負責人" autoFocus={initialAssign} value={person} disabled={busy} onChange={e=>setPerson(e.target.value)}><option value="">選擇負責人</option>{sop.assignees.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</FormSelect></label>:<label>{form==='complete'?'完成依據':'退回原因'}<textarea aria-label={form==='complete'?'完成依據':'退回原因'} autoFocus rows={2} required maxLength={1000} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label>}
   <Button disabled={busy} onClick={close}>取消</Button><Button type="submit" variant="primary" disabled={busy||(form==='assign'?!person:!reason.trim())} disabledReason={form==='assign'?'請選擇負責人':'請填寫原因'}>確認{form==='assign'?'指派':form==='complete'?'完成':'退回'}</Button>
  </form>}{error && <p role="alert">{error}</p>}{sop.assigneeError && <p role="alert">{sop.assigneeError}</p>}</div>;
 }
