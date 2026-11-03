@@ -15,8 +15,8 @@ const legacy={
  // explicit assignment notification and feedback patch microtasks,
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
- // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': '8c1494ed7819f3c14f9e130dd1b79aeecc0e56f4a7caabb5c0d259d83ca35a4e',
+ // I1: MRU, cancelable/bounded view-focus observer and input-modality listeners are presentation-only; no data reads.
+ 'AppShell.tsx': 'b8c9b74f741d46d4dda8a13af21079c68d002ff877056249eb0d7c7d18af5e89',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
