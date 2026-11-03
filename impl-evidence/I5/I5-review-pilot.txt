@@ -1,0 +1,1 @@
+F01-F07 synthetic rendering: states, time, TTL, no controls, GET only, demo isolation and semantic status passed.

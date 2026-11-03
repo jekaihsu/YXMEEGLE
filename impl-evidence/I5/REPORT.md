@@ -123,3 +123,30 @@ Verification (all executed against the merged worktree):
 - Additional diagnostic `node test-p2-routes.mjs`: FAIL on the pre-existing assertion that navigation must not contain `{view:'work',label:`. Both this test and AppShell.tsx are byte-identical to integration (verified against the merge parent); integration now deliberately includes the work destination. No unrelated file or assertion was changed. This diagnostic failure does not affect the passing I4-focused checks above.
 
 The `I5-followup-*.txt` transcripts are included alongside this report. A temporary demo backend on port 8796 was used only for the required browser fetch-intent test and stopped afterward. No additional application files were edited beyond the two conflict resolutions. This entire evidence directory, including screenshots and REPORT.md, is copied to `/Users/vc/.local/state/t3-pstack/orchestrate/yx-redesign/impl-evidence/I5/` for coordinator review.
+
+
+## Claude review follow-up — 2026/11/03
+
+Scope: the three small items explicitly requested from IMPL-batch1-review.md, I5 P3-17/18 and P3-19's report-week date. Integration merged FIRST and fast-forwarded cleanly to `aeee3a24`; no conflicts or audit fingerprint edits were needed. Code commit: `be00c28943c612266aec8b8c3c4af51f5e094867`. Final evidence commit head is in the worker handoff.
+
+Changes:
+
+1. Unknown responsible cells now display 待核對. A verifiably empty source string (including whitespace-only) with a valid nonblocking state is projected as known / 未填. Null, not-loaded, unavailable and withheld labels remain unknown. The current backend's missing-authorized-label reason therefore produces 待核對; no backend data or inference was changed.
+2. Summary cards share the enclosing snapshot time once at section level. Unknown cards contain only — and 尚未載入, never a fabricated per-card data time. Known cards with the common timestamp also avoid repetition; a known card carrying a genuinely different data time retains that distinct provenance.
+3. Reports Home formats its seven-day report interval as `2026/10/26–11/01`. The pure UTC calendar helper rejects invalid dates, handles leap days and shows the full end year across a year boundary (`2026/12/28–2027/01/03`). No query, week selection or fetch behavior changed.
+
+Files: ManagerOverview.tsx, managerOverviewView.ts, reports/HomeTab.tsx, reports/reportsView.ts, test-i5-redesign.mjs and test-manager-overview-view.mjs. No other review items or application files were changed.
+
+Tests/results:
+
+- PASS `node test-i5-redesign.mjs`: literal unknown/blank owner cells, one summary timestamp, no unknown-card timestamp, shared vs distinct known-card time, exact formatted week, invalid date and leap/year boundaries, plus existing I5 state/population/reveal tests.
+- PASS the same suite with `TZ=America/Los_Angeles`.
+- PASS `node test-manager-overview-view.mjs`: 34 tests, 173 checks, including explicit empty-string/whitespace source values and unknown/not-loaded/withheld reasons.
+- PASS `npm run test:reports`, `npm run test:reports-progress`, `node test-reports-stale-notice.mjs`.
+- PASS source-health view/UI, Lark pilot, source lifecycle/build visibility and Home report suites.
+- PASS all four `test-fetch-intent*.mjs`: core/React/audit via `npm run test:fetch-intent`; browser test run with `YX_FETCH_INTENT_API_URL=http://127.0.0.1:8796` against an isolated demo with Dispatch enabled. Built Home, Case and Dispatch have zero idle requests and no runtime errors. No audit exemptions were added or changed.
+- PASS `npx tsc -b`, `npm run build`, `git diff --check`. Existing Assistant chunk-size warning only.
+
+Visual verification: T3 preview on isolated demo API 8796 and Vite 5295, incognito localhost profile. The temporary `review-shell-fixture.html` archives a reproduction harness based on the real index bootstrap and real App/AppShell: it supplies a synthetic dated report response, and changes two isolated demo owner fields to explicit unknown / explicit blank. It does not bypass the view model, write data or contact staging/production. The app renders PM 週報 / 管理總覽 H1s, full shell, real filters and reread controls. Browser checks confirm owner cells `待核對`, `未填`, then the actual demo owner; exactly one 資料時間 in the summary section; and `報告週 2026/10/26–11/01`. No document overflow or framework overlay at 390px. Screenshots at CSS 1440×900 and 390×844, light/dark: `review-home-shell-*`, `review-overview-summary-*`, `review-overview-owners-*`. These supplement the older component-only evidence and address the review's shell-evidence clarification. All captures were taken after theme transitions settled. The temporary frontend entrypoint and local services were removed/stopped after verification.
+
+The remaining optional I5 P3 observations (KPI links/units, zero-quality-reminder copy, money typography, rail scroll behavior and tab semantics) are outside these three requested fixes and remain coordinator follow-ups. No new source contract or capability was introduced.
