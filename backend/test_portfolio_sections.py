@@ -103,3 +103,35 @@ def test_cold_overlay_does_not_decode_source_or_daily_evidence(portfolio_case, m
 def test_malformed_section_filters_are_rejected(tmp_path, filters):
     with scaled_client(tmp_path, 2, **ON) as (_, client):
         assert client.get('/api/projects', params=dict(view='portfolio',sections='true',page=1,filters=filters)).status_code == 422
+
+
+@pytest.mark.parametrize('due,expected', [('2026-10-12T23:00:00Z', True), ('2026-10-20T23:00:00Z', False)])
+def test_global_attention_filter_uses_taipei_calendar_day(due, expected):
+    from .portfolio_sections import filtered
+    # 23:00 UTC is the next Taipei day, including at the +7 day boundary.
+    item = dict(id='p', code='p', name='case', client='', pm_id='', case_type='formal',
+        due_date=due, overdue_tasks=0, execution_status='in_progress', lifecycle_state='進行中', portfolio_nodes=[])
+    body = filtered(dict(items=[item],total=1), dict(attention=True), '2026-10-13')
+    assert bool(body['items']) is expected
+
+
+def test_global_node_filter_does_not_assign_an_unknown_case_to_a_current_node():
+    from .portfolio_sections import filtered
+    item = dict(id='p',code='p',name='case',client='',pm_id='',case_type='formal',
+        lifecycle_state='待核對',portfolio_nodes=[dict(key='sales',status='unknown')])
+    assert filtered(dict(items=[item],total=1),dict(node='sales'),'2026-10-13')['total'] == 0
+    assert filtered(dict(items=[item],total=1),dict(node='unknown'),'2026-10-13')['total'] == 1
+
+
+@pytest.mark.parametrize('shape', ['missing', 'duplicate', 'reordered'])
+def test_structurally_incomplete_nodes_never_certify_a_lifecycle(shape):
+    from .portfolio_sections import lifecycle
+    from .node_assignment.domain import CHAIN
+    nodes = [dict(key=k, status='completed') for k in CHAIN]
+    if shape == 'missing': nodes.pop()
+    elif shape == 'duplicate': nodes[-1]['key'] = nodes[0]['key']
+    else:
+        nodes[1]['status'] = 'pending_review'
+        nodes[2]['status'] = 'pending'
+        nodes.reverse()
+    assert lifecycle(nodes, complete=True) == ('待審核' if shape == 'reordered' else '待核對')

@@ -6,7 +6,11 @@ ACTIVE = {'in_progress', 'pending_review', 'awaiting_review', 'paused', '進行�
 
 
 def lifecycle(nodes, *, complete):
-    statuses = [n.get('status') for n in nodes]
+    from .node_assignment.domain import CHAIN
+    by_key = {n.get('key'): n for n in nodes}
+    if len(nodes) != len(CHAIN) or set(by_key) != set(CHAIN):
+        return '待核對'
+    statuses = [by_key[key].get('status') for key in CHAIN]
     if not complete or not statuses or any(s not in FINISHED | WAITING | ACTIVE for s in statuses):
         return '待核對'
     if all(s in FINISHED for s in statuses):
@@ -46,15 +50,16 @@ def section_counts(db, items):
 def filtered(result, filters, today):
     """Filter the complete capture before paging, retaining its immutable identity."""
     from datetime import date, timedelta
+    from .ai.tools import calendar_day
     q = str(filters.get('q', '')).strip().lower()
     soon = (date.fromisoformat(today) + timedelta(days=7)).isoformat()
     def attention(p):
         closed = p['lifecycle_state'] == '已完成'
-        due = (p.get('due_date') or '')[:10]
+        due = calendar_day(p.get('due_date')) or ''
         return not closed and (p.get('overdue_tasks', 0) > 0 or bool(due and due < today) or p.get('execution_status') in ('paused', 'blocked') or bool(due and today <= due <= soon))
     def matches(p):
         nodes = p['portfolio_nodes']
-        current = next((n.get('key') for n in nodes if n.get('status') not in FINISHED), None)
+        current = None if p['lifecycle_state'] == '待核對' else next((n.get('key') for n in nodes if n.get('status') not in FINISHED), None)
         node = filters.get('node')
         return (q in ' '.join(str(p.get(k) or '') for k in ('code', 'name', 'client')).lower()
             and (not filters.get('client') or p['client'] == filters['client'])
@@ -71,7 +76,7 @@ def filtered(result, filters, today):
     absent = [p for p in items if not p.get(field)]
     present.sort(key=lambda p: p[field], reverse=filters.get('direction') == -1)
     items = present + absent
-    if field == 'due_date': items.sort(key=lambda p: not (p.get('overdue_tasks', 0) > 0 or bool(p.get('due_date') and p['due_date'][:10] < today) and p['lifecycle_state'] != '已完成'))
+    if field == 'due_date': items.sort(key=lambda p: not (p.get('overdue_tasks', 0) > 0 or bool(calendar_day(p.get('due_date')) and calendar_day(p['due_date']) < today) and p['lifecycle_state'] != '已完成'))
     result.update(items=items, workspace_total=result['total'], total=len(items))
     return result
 
