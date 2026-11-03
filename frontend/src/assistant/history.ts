@@ -49,7 +49,7 @@ export async function deleteConversation(id:string,signal?:AbortSignal,projectId
  if(!response.ok)throw new ApiError(response.status,'無法刪除對話，請重試。');
 }
 export function historyMessages(detail:ConversationDetail):ThreadMessageLike[]{
- return detail.messages.map((message,index)=>({id:`${detail.id}-${index}`,role:message.role,content:[{type:'text',text:message.content}],createdAt:new Date(message.at),...(message.role==='assistant'?{status:{type:'complete',reason:'stop'},metadata:{custom:{usage_id:message.usage_id}}}:{})}));
+ return detail.messages.map((message,index)=>({id:`${detail.id}-${index}`,role:message.role,content:[{type:'text',text:message.content}],createdAt:new Date(message.at),...(message.role==='assistant'?{status:{type:'complete',reason:'stop'},metadata:{custom:{usage_id:message.usage_id,saved_answer_at:message.at??null}}}:{})}));
 }
 export function relativeTime(at:string,now=Date.now()){
  const minutes=Math.max(0,Math.floor((now-Date.parse(at))/60000));

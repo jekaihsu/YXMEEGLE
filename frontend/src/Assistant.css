@@ -77,3 +77,6 @@
 }
 
 .assistant-chat[data-input=keyboard] .assistant-composer:focus-within{box-shadow:0 0 0 2px var(--accent)}
+
+.assistant-saved-date{color:var(--label-2);font-size:12px;line-height:1.7;margin:0 0 12px}
+.assistant-saved-date strong{color:var(--label);font-weight:600}

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+const b=await build({stdin:{contents:"export * from './src/caseRetainedFacts';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
+const {mergeCaseFacts,caseNextExplanation,financeSources}=await import('data:text/javascript;base64,'+Buffer.from(b.outputFiles[0].text).toString('base64'));
+const known={project:{id:'115575',name:'本案',nodes:[],current_stage:'field'},snapshot:{as_of:'2026-11-03T02:41:47Z',completeness:'partial',stale:true}};
+const merged=mergeCaseFacts(known,{project:{id:'115575',name:'新名稱',nodes:[]}});
+assert.equal(merged.project.current_stage,'field');assert.equal(merged.project.name,'新名稱');
+assert.equal(merged.snapshot.as_of,'2026-11-03T02:41:47Z');assert.equal(merged.snapshot.completeness,'partial');assert.equal(merged.snapshot.stale,true);
+assert.equal(mergeCaseFacts(known,{project:{id:'C115264',nodes:[]}}).snapshot,undefined);
+assert.equal(caseNextExplanation({label:'外業',owners:[],finalDeadline:null},'執行歸屬待核對'),'外業尚未指派負責人；尚未排定節點期限；執行歸屬待核對');
+assert.deepEqual(financeSources({contract_amount:47000,source_projection:{finance:{contract_amount:94000}}}),{basic:47000,contract:94000,conflict:true});
+assert.equal(financeSources({contract_amount:null}).conflict,false);
+console.log('LIVE3 retained facts, missing facts and named amounts pass');

@@ -108,4 +108,22 @@ try{
   await button.hover();await checks(`dark admin hover ${await button.textContent()}`);
  }
 
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000});
+  for(const [tab,content] of [
+   ['items','<div class="work-items-tab"><div class="wi-toolbar"><label>部門<select><option>外業</option></select></label></div><section class="wi-card"><h2>工項</h2><p class="wi-meta">來源時間待核對</p><table class="wi-table"><tbody><tr><td>控制工項</td></tr></tbody></table></section></div>'],
+   ['people','<section class="detail-page-content"><h2>排程與人員</h2><table class="data-table people-table"><tbody><tr><td>尚未指派</td><td class="muted">未排定</td></tr></tbody></table></section>'],
+   ['files','<section class="detail-page-content"><h2>文件與交付</h2><p class="muted">來源附件完整性未知</p><button class="ds-button" disabled>上傳</button></section>'],
+   ['data','<section class="detail-page-content"><h2>基本資料</h2><dl class="definition-grid"><dt>合約金額</dt><dd>NT$47,000</dd></dl><input value="來源資料" /></section>']]){
+   await page.setContent(`<html data-theme="dark"><style>${appCss}</style><body><div class="app-shell"><main class="workspace"><div class="project-detail project-detail-calm">${content}</div></main></div></body></html>`);
+   const samples=await page.locator('.project-detail :is(h2,p,td,dt,dd,button,select,input,label)').evaluateAll(es=>es.map(e=>{
+    const s=getComputedStyle(e);let a=e,bg='';while(a){const v=getComputedStyle(a).backgroundColor;if(v!=='rgba(0, 0, 0, 0)'&&v!=='transparent'){bg=v;break}a=a.parentElement}
+    const hex=v=>'#'+v.match(/[\d.]+/g).slice(0,3).map(x=>Number(x).toString(16).padStart(2,'0')).join('');
+    return {text:e.textContent,fg:hex(s.color),bg:hex(bg),opacity:s.opacity};
+   }));
+   for(const sample of samples)assert.ok(ratio(sample.fg,sample.bg)>=4.5,`dark ${tab} ${width} ${sample.text}: ${ratio(sample.fg,sample.bg)}`);
+   console.log(`dark ${tab} ${width}: ${samples.length} samples >=4.5:1`);
+  }
+ }
+
 }finally{await browser.close()}
