@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from .test_ai_database import app, client, ai_database_url
-from .test_ai_attendance import attendance_route, call
+from .test_ai_attendance import attendance_route, call, refresh_attendance_fixture
 from .test_ai_tools import tool
 from .ai.tools import ATTENDANCE_LABELS
 
@@ -16,6 +16,7 @@ def test_explained_independent_punches(attendance_route, monkeypatch):
     a, c = attendance_route
     a.state.attendance_fixture_punches.append(dict(user_id='employee-0', day=20261012,
         records=[dict(check_in_result='Late', check_out_result='Normal', check_out_result_supplement='Leave')]))
+    refresh_attendance_fixture(*attendance_route)
     source = c.get('/api/people/attendance?week=2026-10-12').json()
     assert set(source['people'][0]['attendance'][0].split('、')) == {'遲到', '請假'}
     data = call(attendance_route, dict(range='today', date='2026-10-12'))
@@ -158,6 +159,7 @@ def test_explanation_preserves_each_independent_evidence(attendance_route, resul
     a.state.attendance_fixture_punches.append(dict(user_id='employee-0', day=20261012,
         records=[dict(check_in_result=result, check_in_result_supplement=supplement,
                       check_out_result='Normal', check_out_result_supplement='Leave')]))
+    refresh_attendance_fixture(*attendance_route)
     data = call(attendance_route, dict(range='today', date='2026-10-12'))
     assert data[group] == [dict(id='ou_0', name='同事0')]
     assert dict(id='ou_0', name='同事0') in data['on_leave']
