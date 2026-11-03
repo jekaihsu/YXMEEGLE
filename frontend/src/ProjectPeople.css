@@ -11,9 +11,9 @@
  .project-detail-calm .table-scroll>table.data-table.people-table{min-width:0;display:block;border:0}
  .people-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
  .people-table tbody,.people-table tr{display:block}
- .people-table tr{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px 14px;margin-bottom:10px}
+ .people-table tr{border:1px solid var(--sep);border-radius:12px;background:var(--surface);padding:10px 14px;margin-bottom:10px}
  .people-table td{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:8px;padding:4px 0;border:0;align-items:baseline;overflow-wrap:anywhere}
- .people-table td::before{content:attr(data-label);font-size:12px;color:#667085}
+ .people-table td::before{content:attr(data-label);font-size:12px;color:var(--label-2)}
  .people-table td:first-child{grid-template-columns:minmax(0,1fr);font-weight:600;padding-bottom:6px}
  .people-table td:first-child::before{display:none}
  .people-table .person-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-right:8px}

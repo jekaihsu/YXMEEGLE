@@ -1,3 +1,6 @@
+import {taipeiTime} from './taipeiTime';
+import {CaseFinanceSources} from './CaseFinanceSources';
+import {mergeCaseFacts} from './caseRetainedFacts';
 import {resolveStages,sourceStatusPending} from './stageModel';
 import {FlowPeopleLink,FlowAction} from './FlowActions';
 import {DetailsMenu} from './design/DetailsMenu';
@@ -7,7 +10,7 @@ import {EnsureSopStatus} from './EnsureSopStatus';
 import {InlineTaskEditor} from './InlineTaskEditor';
 import {withLocalChecklist,editorFields,localCase,checklistProject,type TaskDraft} from './nodeWorkbenchModel';
 import {ProjectOverview} from './ProjectOverview';
-import {ProjectCaseHeader,ProjectDetailShell,ProjectWorkflowHeader,ProjectExecutionDetails} from './ProjectDetailShell';
+import {ProjectCaseHeader,ProjectDetailShell,ProjectExecutionDetails} from './ProjectDetailShell';
 import {useSopTasks,canReadSop,prefetchSopTasks} from './useSopTasks';
 import {peekProjectProgress,prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
 import type {ProjectProgress} from './projectProgressApi';
@@ -57,7 +60,7 @@ const OpsField=lazy(()=>import('./Operations').then(m=>({default:m.Field})));
 
 export function localTaskOrder(a:TaskRow,b:TaskRow){const priority:Record<string,number>={paused:0,rework:1,in_progress:2,pending:3,completed:4,superseded:5};const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);const overdue=(t:Task)=>!!t.due_date&&t.due_date.slice(0,10)<today&&!['completed','superseded'].includes(t.status);return Number(overdue(b.t))-Number(overdue(a.t))||Number(!a.t.due_date)-Number(!b.t.due_date)||(a.t.due_date||'').localeCompare(b.t.due_date||'')||(priority[a.t.status]??6)-(priority[b.t.status]??6)||a.t.id.localeCompare(b.t.id)}
 const basicValue=(value:unknown,format?:()=>string)=>value==null||String(value).trim()===''?'來源未提供':format?format():String(value).trim();
-type CaseSlice=ProjectSlice&{snapshot?:CaseSnapshot};
+type CaseSlice=ProjectSlice&{snapshot?:CaseSnapshot;regionSnapshots?:Partial<Record<'workflow'|'detail',CaseSnapshot>>};
 type FirstScreenPart={status:number;body:unknown;snapshot?:CaseSnapshot};
 type FirstScreen={project:CaseSlice;assignments:FirstScreenPart;tasks:FirstScreenPart;start:FirstScreenPart;snapshot?:CaseSnapshot};
 const projectResource=(id:string,overview:boolean)=>({endpoint:`project:${id}:${overview}`});
@@ -73,11 +76,11 @@ const readProject=async(id:string,overview:boolean,workspace:string,owner:PageDa
     if(payload.start.status===200)seedStartSop(id,parseSopPreview(payload.start.body),owner,payload.start.snapshot,batch);
    }
    return {...payload.project,snapshot:payload.snapshot?{...payload.snapshot,stale:stale||payload.snapshot.stale}:undefined};
-  }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error}
+  }catch(error){if(!(error instanceof ApiError)||error.status!==404||error.message==='case_not_found'||error.code==='case_not_found')throw error}
  }
  try{return await api<CaseSlice>(`/api/projects/${encodeURIComponent(id)}${overview?'?overview=true':''}`,{cache:'reload',timeoutMs:20000,signal,headers},current)}
  catch(error){
-  if(!(error instanceof ApiError)||error.status!==404)throw error;
+  if(!(error instanceof ApiError)||error.status!==404||error.message==='case_not_found'||error.code==='case_not_found')throw error;
   const sop=await prefetchSopTasks(id,workspace,false,false,owner);const project=checklistProject(sop);if(!project)throw error;
   return {scope:'project',version:0,project};
  }
@@ -95,33 +98,56 @@ function ProjectDetailContent({c}:{c:Ctx}){
  const owner=useCaseData();
  const shell=c.w.scope==='shell'||!!c.route.project&&!c.w.projects.some(p=>p.id===c.route.project);const id=c.route.project||'';const {tab}=projectFlowRoute(c.route);const overview=['overview','flow'].includes(tab);
  const resource=projectResource(id,overview);
- const load=useCallback(async(signal:AbortSignal,current:()=>boolean,intent:FetchIntent,batch?:symbol)=>caseValue(await readProject(id,overview,c.s.workspace_id||'',owner,current,intent,batch,signal)),[id,overview,c.s.workspace_id,owner]);
+ const known=useRef<CaseSlice>();
+ const terminalMissing=useRef<ApiError>();
+ const knownEpoch=useRef(getSessionEpoch());
+ if(knownEpoch.current!==getSessionEpoch()){known.current=undefined;terminalMissing.current=undefined;knownEpoch.current=getSessionEpoch()}
+ const load=useCallback(async(signal:AbortSignal,current:()=>boolean,intent:FetchIntent,batch?:symbol)=>{
+  if(terminalMissing.current&&intent.reason==='initial_open')throw terminalMissing.current;
+  terminalMissing.current=undefined;
+  let next:CaseSlice;
+  try{next=await readProject(id,overview,c.s.workspace_id||'',owner,current,intent,batch,signal)}
+  catch(error){
+   if(current()&&error instanceof ApiError&&error.status===404)terminalMissing.current=error;
+   throw error;
+  }
+  const region=overview?'workflow':'detail';
+  const priorRegion=known.current?.regionSnapshots?.[region];
+  const regionSnapshot=next.snapshot?{...priorRegion,...Object.fromEntries(Object.entries(next.snapshot).filter(([,value])=>value!=null))}:priorRegion??{completeness:'unknown' as const};
+  const regionSnapshots={...known.current?.regionSnapshots,[region]:regionSnapshot};
+  const merged=mergeCaseFacts(known.current,{...next,regionSnapshots,snapshot:regionSnapshots.workflow??next.snapshot});
+  if(current())known.current=merged;
+  return caseValue(merged);
+ },[id,overview,c.s.workspace_id,owner]);
  const detail=usePageResource<CaseSlice|undefined>(owner,resource,{reason:'initial_open'},shell?load:async()=>caseValue(undefined));
  const reloadSnapshot=useCallback((batch:symbol)=>trackCaseResource(owner,resource.endpoint,load,true)(batch),[owner,id,overview,load]);
  useEffect(()=>{if(shell)trackCaseResource(owner,resource.endpoint,load,true)},[shell,owner,id,overview,load]);
  const refreshDetail=useDetailRefresh(reloadSnapshot,shell,'',false,true);
  useEffect(()=>{
-  if(!shell||!id||overview)return;
+  if(!shell||!id||overview||!('value' in detail&&detail.value.data))return;
   if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{})&&['items','people'].includes(tab))void prefetchNodeAssignments(id,false,owner).catch(()=>{});
   if(tab==='items')void prefetchProjectProgress(id,false,undefined,undefined,owner).catch(()=>{});
- },[shell,id,tab,overview,c.s.features?.node_assignment,owner]);
+ },[shell,id,tab,overview,c.s.features?.node_assignment,owner,detail.kind]);
  const retained='value' in detail?detail.value:'previous' in detail?detail.previous:undefined;
- const snapshot=retained?.data;
+ const snapshot=retained?.data?mergeCaseFacts(known.current,retained.data):known.current;
  useEffect(()=>{if(shell&&snapshot)perfMark('project-detail-render')},[shell,snapshot]);
+ if(detail.kind==='Denied')known.current=undefined;
  if(detail.kind==='Denied')return <CaseStateFrame c={c} denied><DataState kind="Denied" title="無法查看此案件" body="目前身分無權查看，已停止顯示案件資料。" actions={<Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button>}/></CaseStateFrame>;
  if(!shell)return <ProjectDetail key={id} c={c}/>;
  if(detail.kind==='Closed')return <CaseStateFrame c={c} denied><Empty title="案件資料已關閉" detail="登入身分已變更，請重新開啟案件。"/></CaseStateFrame>;
  const error='error' in detail?detail.error instanceof Error?detail.error.message:String(detail.error):'';
  if(detail.kind==='UnknownOutcome'&&!snapshot)return <CaseStateFrame c={c}><DataState kind="UnknownOutcome" title="儲存結果尚未確認" body="請先查詢最新結果，避免重複送出。" actions={<Button onClick={()=>void refreshDetail?.(false)}>查詢最新結果</Button>}/></CaseStateFrame>;
+ if(error==='case_not_found'||('error' in detail&&detail.error instanceof ApiError&&detail.error.status===404))return <CaseStateFrame c={c}><DataState kind="Error" title="找不到案件" body={<>案件連結可能已失效，請回到案件總覽重新開啟。<details><summary>支援診斷</summary><code>{error}</code></details></>} actions={<Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button>}/></CaseStateFrame>;
  if(!snapshot)return <CaseStateFrame c={c}>{error?<DataState kind={detail.kind==='Conflict'?'Conflict':'Error'} title="案件讀取失敗" body={error} actions={<><Button onClick={()=>void refreshDetail?.(false)}>重新讀取</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></>}/>:<><DataState kind="Loading" title="正在載入案件" body="正在核對節點與任務…"/><div className="i3-loading-card" aria-hidden="true"><Skeleton height="2rem"/><Skeleton lines={3} width="100%"/><Skeleton height="12rem" width="100%"/></div><FlowWorkspaceSkeleton/></>}</CaseStateFrame>;
 
  const {scope:_scope,version:_version,as_of:_asOf,snapshot:_snapshot,project,...records}=snapshot;
  const stale=!!error||retained?.stale===true||snapshot.snapshot?.stale===true;
  const sourceAt=snapshot.snapshot?.as_of??retained?.fetchedAt??null;
- return <>{detail.kind==='UnknownOutcome'&&<DataState kind="UnknownOutcome" title="儲存結果尚未確認" body="以下保留上次資料，請先查詢最新結果。" actions={<Button onClick={()=>void refreshDetail?.(false)}>查詢最新結果</Button>}/>}{error&&<DataState kind={detail.kind==='Conflict'?'Conflict':'Stale'} title="案件更新未完成" body={`以下保留上次資料：${error}`} actions={<Button onClick={()=>void refreshDetail?.(false)}>重新讀取</Button>}/>}<ProjectDetail key={project.id} snapshotId={retained?.snapshotId??snapshot.snapshot?.snapshot_id} snapshotTime={sourceAt} snapshotNote={`${stale?' · 資料待更新':''}${retained?.completeness==='partial'?' · 部分資料':retained?.completeness==='unknown'?' · 完整性未確認':''}`} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
+ return <>{detail.kind==='UnknownOutcome'&&<DataState kind="UnknownOutcome" title="儲存結果尚未確認" body="以下保留上次資料，請先查詢最新結果。" actions={<Button onClick={()=>void refreshDetail?.(false)}>查詢最新結果</Button>}/>}{error&&<DataState kind={detail.kind==='Conflict'?'Conflict':'Stale'} title="案件更新未完成" body={`以下保留上次資料：${error}`} actions={<Button onClick={()=>void refreshDetail?.(false)}>重新讀取</Button>}/>}<ProjectDetail key={project.id} snapshotId={retained?.snapshotId??snapshot.snapshot?.snapshot_id} snapshotTime={sourceAt} snapshotNote={`${snapshot.regionSnapshots?.workflow?' · 流程與任務來源':''}${snapshot.regionSnapshots?.detail?` · 案件基本資料來源時間 ${taipeiTime(snapshot.regionSnapshots.detail.as_of,'來源未提供')}（${snapshot.regionSnapshots.detail.completeness==='complete'?'完整':snapshot.regionSnapshots.detail.completeness==='partial'?'部分資料':'完整性未確認'}）`:''}${stale?' · 資料待更新':''}${snapshot.snapshot?.completeness==='partial'?' · 部分資料':snapshot.snapshot?.completeness==='unknown'?' · 完整性未確認':''}`} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
 
 }
 export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;snapshotId?:string|null;snapshotTime?:string|null;snapshotNote?:string}){
+ const retainedCurrent=useRef<import('./flowModel').FlowNode>();
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus&&!assignmentTarget(c.route,p?.nodes)?'complete-node':'');useEffect(()=>{if(c.route.focus&&!assignmentTarget(c.route,p?.nodes))setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');
 
  const sopTasks=useSopTasks(p?.id||'',c.s.workspace_id||'',!!p&&canReadSop(c.s.user)&&['overview','flow'].includes(projectFlowRoute(c.route).tab));
@@ -132,10 +158,13 @@ export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;sn
  const selectedKey=selectedFlowNode(p,c.route.node,'data' in assignments.state ? assignments.state.data : undefined);
  const selected=p.nodes.find(n=>n.key===selectedKey);
  const headerList='data' in assignments.state?assignments.state.data:undefined;
- const headerFlow=buildFlowModel({project:assignments.state.kind==='disabled'?p:{...p,nodes:[]},assignments:headerList,today:c.w.as_of,users:c.w.users});
+ const headerFlow=buildFlowModel({project:assignments.state.kind==='disabled'&&!(c.s.features?.node_assignment&&!localCase(p))?p:{...p,nodes:[]},assignments:headerList,today:c.w.as_of,users:c.w.users});
  const headerNodes=withLocalChecklist(headerFlow.nodes,'data' in sopTasks.state?sopTasks.state.data:undefined,sopTasks.assignees);
  const headerStage=resolveStages({nodes:headerNodes,list:headerList});
- const current=headerNodes.find(n=>n.key===headerStage.currentIds[0]);
+ const workflowTab=['overview','flow'].includes(projectFlowRoute(c.route).tab);
+ const computedCurrent=headerNodes.find(n=>n.key===headerStage.currentIds[0]);
+ if(workflowTab&&headerStage.currentKnown&&computedCurrent)retainedCurrent.current=computedCurrent;
+ const current=retainedCurrent.current??(headerStage.currentKnown?computedCurrent:undefined);
  const target=assignmentTarget(c.route,p.nodes,workflowKeys('data' in assignments.state ? assignments.state.data : undefined));const changeEnabled=c.s.features?.change_extension===true;
  const route=projectFlowRoute(c.route),tab=route.tab;const dataSection=tab==='data'?(route.section||'basic'):'';const selectedTask=target&&c.s.features?.node_assignment?undefined:p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);
  const closeTask=()=>c.go({...c.route,node:c.route.node||selectedTask?.n.id,task:undefined,task_source:undefined,comment:undefined});
@@ -148,7 +177,7 @@ export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;sn
  {!['pricing','settlement'].includes(selected.key)&&<FlowAction allowed={!c.busy&&selected.status!=='completed'&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':selected.status==='completed'?'節點已完成。':executionReason(p)} onClick={()=>{close();setModal('complete-node')}}>完成節點</FlowAction>}
  </div>}</DetailsMenu>}</div>;
 
- return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectCaseHeader c={c} p={p}>{['overview','flow'].includes(tab)?<ProjectWorkflowHeader c={c} p={p} tab={tab} assignments={assignments} sopTasks={sopTasks} selectedKey={selectedKey} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote}/>:<ProjectDetailShell c={c} p={p} tab={tab} current={current} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/>}</ProjectCaseHeader>
+ return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectCaseHeader c={c} p={p}><ProjectDetailShell c={c} p={p} tab={tab} current={current} snapshotId={snapshotId} snapshotTime={snapshotTime} snapshotNote={snapshotNote} onPrefetch={()=>{}} onCancelPrefetch={()=>{}}/></ProjectCaseHeader>
  {(tab==='overview'||tab==='flow')&&<EnsureSopStatus c={c} p={p} sop={sopTasks} assignments={assignments}/>}
  {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} workbench={()=><ProjectFlow c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} inline emptyActions={selected&&isProjectLead(c.s,p)&&!localCase(p)?<div className="nw-actions"><FlowAction allowed={!c.busy&&executionAllowed(p,c.w)} reason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</FlowAction></div>:null} secondary={null} legacyActions={localActions}/>}/>}
  {tab==='items'&&<WorkItemsTab key={p.id} c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/>}
@@ -166,7 +195,7 @@ export function ProjectDetail({c,snapshotId,snapshotTime,snapshotNote}:{c:Ctx;sn
  ['合約金額',amountWithheld(p)?'未核准顯示':basicValue(p.contract_amount,()=>money(p.contract_amount))],['預估營業額',basicValue(p.estimated_points,()=>`${points(p.estimated_points)} 點`)],
  ['目前有效期限',basicValue(p.due_date,()=>date(p.due_date))],['原始期限',basicValue(p.original_due_date,()=>date(p.original_due_date))],
  ['開始日期',basicValue(p.started_at,()=>date(p.started_at))],['資料來源',sourceKindLabel(p.source_kind)]
- ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</div><details className="description-block"><summary>案件說明與來源關係</summary><p>{basicValue(p.description)}</p><p>報價總表 → 工程確認單 → 合約明細工項 → 合約填報工項 → 工作單 → 成本單。節點指派與任務另有 Lark record 關聯，日報不自動完成任務。</p></details><div className="info-callout"><Network size={19}/><div><strong>金額、成本與點數分開追蹤</strong><p>合約金額為案件層資料。子任務點數依來源或指派設定，不重複累加為合約營收。</p></div></div></div></>}
+ ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</div><CaseFinanceSources p={p}/><details className="description-block"><summary>案件說明與來源關係</summary><p>{basicValue(p.description)}</p><p>報價總表 → 工程確認單 → 合約明細工項 → 合約填報工項 → 工作單 → 成本單。節點指派與任務另有 Lark record 關聯，日報不自動完成任務。</p></details><div className="info-callout"><Network size={19}/><div><strong>金額、成本與點數分開追蹤</strong><p>合約金額為案件層資料。子任務點數依來源或指派設定，不重複累加為合約營收。</p></div></div></div></>}
  {dataSection==='activity'&&<div className="detail-page-content"><h2>討論與紀錄</h2><Comments c={c} p={p}/><EventList c={c} project={p.id}/><AuditTrail key={p.id} w={c.w} p={p}/></div>}{dataSection==='sources'&&<div className="detail-page-content"><h2>資料來源與同步</h2>{sourceKindLabel(p.source_kind).startsWith('來源類型待核對')&&<p role="status">{sourceKindLabel(p.source_kind)}：此案件的來源類型未被辨識，請向系統管理者確認。</p>}<p>最後成功來源同步 {c.w.source_status.last_sync||'尚未提供'} · {c.w.source_status.message||'狀態尚未提供'}</p><ItemsSourceSync projectId={p.id}/>{safeUrl(p.source_url)&&<a href={p.source_url} target="_blank" rel="noreferrer">查看案件來源</a>}</div>}{(tab==='flow'&&c.route.section==='approvals'||dataSection==='approvals')&&<div className="detail-page-content"><div className="section-heading"><div><h2>關聯審批</h2><p>審批通過後，由負責人明確套用新版本或新期限。</p></div><div className="heading-actions">{changeEnabled?<><button className="button" onClick={()=>{setApprovalType('extension');setModal('approval')}}><Clock3 size={16}/>申請展延</button><Primary onClick={()=>{setApprovalType('change');setModal('approval')}}><GitBranch size={16}/>設計變更</Primary></>:<span>變更與展延尚未開放</span>}</div></div>{changeEnabled?<ApprovalList c={c} approvals={approvals}/>:<details><summary>變更與展延歷史，只讀</summary>{approvals.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id)).map(a=><p key={a.id}>{a.title} · {a.status}</p>)}</details>}<FinancialApprovalRequests c={c} p={p}/></div>}
  {selectedTask&&<TaskInspector key={selectedTask.t.id} c={c} row={selectedTask} onClose={closeTask} onExtension={()=>{closeTask();setApprovalType('extension');setModal('approval')}}/>}
  {c.route.task&&c.route.task_source!=='sop_local'&&!selectedTask&&!target&&<div className="error-banner"><TriangleAlert size={17}/>找不到此任務，請從列表重新選擇。</div>}
