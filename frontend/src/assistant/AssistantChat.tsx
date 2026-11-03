@@ -3,6 +3,7 @@ import {createContext,useContext,useSyncExternalStore,useCallback,useEffect,useM
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
 import {useInputModality} from './useInputModality';
+import {SavedAnswerDate} from './SavedAnswerDate';
 import {ConversationHistory} from './ConversationHistory';
 import {historyMessages,assistantScopeVersion,subscribeAssistantScope,denyAssistantScope,type ConversationDetail} from './history';
 import {assistantRemarkPlugins} from './markdown';
@@ -37,8 +38,10 @@ function UserMessage(){
 const ForbiddenContext=createContext(false);
 function AssistantMessage(){
  const forbidden=useContext(ForbiddenContext);
+ const savedAt=useAuiState(s=>s.message.metadata.custom?.saved_answer_at);
  const thinking=useAuiState(s=>s.message.status?.type==='running'&&!s.message.content.some(p=>p.type==='text'&&p.text.length>0));
  return <MessagePrimitive.Root data-slot="aui_assistant-message-root" data-role="assistant" className="assistant-message">
+  {savedAt!==undefined&&<SavedAnswerDate at={typeof savedAt==='string'?savedAt:null}/>}
   {thinking&&<ThinkingIndicator/>}
   <MessagePrimitive.Parts components={{Text:Markdown,tools:{by_name:toolUIs,Fallback:ToolResult}}}/>
   <AnswerError/>

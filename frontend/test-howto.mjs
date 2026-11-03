@@ -15,6 +15,8 @@ const pageModule=await ui.routeLoaders.HowToUse();
 const doc=new JSDOM(renderToStaticMarkup(React.createElement(pageModule.default))).window.document;
 assert.equal(doc.querySelector('h1').textContent,'使用說明');
 const sections=[...doc.querySelectorAll('.howto-section')];
+assert.match(doc.querySelector('#refresh').textContent,/離開或返回視窗、分頁.*不會自動重新讀取/);
+assert.doesNotMatch(doc.querySelector('#refresh').textContent,/約一分鐘|結束後再更新/);
 const links=[...doc.querySelectorAll('nav[aria-label="使用說明目錄"] a')];
 assert.equal(sections.length,8);assert.equal(links.length,8);
 assert.equal(new Set(sections.map(s=>s.id)).size,8,'section ids are unique');
@@ -25,10 +27,10 @@ for(const [index,link] of links.entries()){
 }
 for(const section of sections){
  assert.ok(section.querySelector('h2').textContent.trim());
- assert.ok(section.querySelector('figure figcaption').textContent.trim());
+ assert.ok(section.querySelector('figure figcaption,aside').textContent.trim());
  const steps=[...section.querySelectorAll('.howto-steps li')];
  assert.ok(steps.length>=2&&steps.length<=5);assert.ok(steps.every(step=>step.textContent.trim()));
- assert.ok(section.querySelector('img'),'every section has a screenshot');
+ assert.ok(section.id==='refresh'?section.querySelector('aside'):section.querySelector('img'),'refresh uses a current policy demonstration; other sections have screenshots');
  assert.equal(section.tabIndex,-1,'anchor destinations can receive keyboard focus');
 }
 for(const img of doc.querySelectorAll('img')){
@@ -59,4 +61,4 @@ try{
  assert.equal(document.querySelectorAll('.howto-section').length,8);
  assert.equal(document.activeElement.id,'howto-title','returning to the TOC restores focus at the top');
 }finally{await flush(()=>root.unmount());dom.window.close()}
-console.log('How-to: App route/lazy loader, skeleton, sidebar, 8 matching TOC anchors, focus, 2–5 steps per section and 9 accessible image files (<200 KB) passed');
+console.log('How-to: App route/lazy loader, skeleton, sidebar, 8 matching TOC anchors, focus, 2–5 steps per section and 8 accessible image files (<200 KB) passed');

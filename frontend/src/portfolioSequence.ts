@@ -38,3 +38,25 @@ export async function readPortfolioSequence(initial:PortfolioPage, fetchPage:(pa
   }
  }
 }
+
+/** One explicit section action; conflicts restart the first window at most twice. */
+export async function readPortfolioWindow(first:PortfolioPage, section:string, page:number, fetchWindow:(section:string,page:number,snapshot?:string)=>Promise<PortfolioPage>,signal:AbortSignal):Promise<PortfolioPage> {
+ const current=()=>{if(signal.aborted)throw new DOMException('Aborted','AbortError')};
+ try{
+  const next=await fetchWindow(section,page,first.snapshot);current();
+  if(next.snapshot_replaced||next.snapshot===first.snapshot)return next;
+  throw new ApiError(409,'案件快照已更新');
+ }catch(error){
+  current();
+  if(!(error instanceof ApiError)||error.status!==409)throw error;
+ }
+ for(let attempt=0;;attempt++){
+  try{
+   const replacement=await fetchWindow('',1);current();
+   return {...replacement,snapshot_replaced:true};
+  }catch(error){
+   current();
+   if(!(error instanceof ApiError)||error.status!==409||attempt>=1)throw error;
+  }
+ }
+}

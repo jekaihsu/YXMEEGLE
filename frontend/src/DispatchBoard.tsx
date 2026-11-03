@@ -1,3 +1,4 @@
+import {dispatchGapLabel} from './adminDispatchLabels';
 import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {CalendarDays,ChevronLeft,ChevronRight,RefreshCw,X} from 'lucide-react';
 import {api,getSessionEpoch} from './api';
@@ -226,7 +227,7 @@ export function DispatchBoardFrame({from,read,onWeek,projects=[],onAssign}:{from
    </header>
    {hidden?<p className="db-muted">權限不足，無法顯示來源資訊。</p>:skeleton?<Skeleton lines={2}/>:<ul className="db-gaps-list">
     <li>沒有能力與資格來源，所有資格檢核均待確認。</li>
-    {board?.gaps.filter(g=>g.code!=='no_capability_source').map((g,i)=><li key={i}>{g.message}</li>)}
+    {board?.gaps.filter(g=>g.code!=='no_capability_source').map((g,i)=><li key={i}>{dispatchGapLabel(g.code)}</li>)}
     {board&&Object.values(board.source.joins).some(s=>s!=='ok')&&<li>部分人員、案件或資源名稱尚未載入，暫以待確認顯示。</li>}
     {slots.some(s=>!s.interval.start||!s.interval.end)&&<li>部分預排缺少有效日期，保留於摘要與待派清單，無法放入日期格。</li>}
    </ul>}

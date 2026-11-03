@@ -3,8 +3,8 @@ import {buildFlowModel, type FlowNode} from './flowModel';
 import {compareTableValues, tableCalendarDay, tableDate} from './companyDashboardCache';
 
 export type PortfolioNode = {key:string;status:string;owner_id:string|null;collaborator_ids:string[]};
-export type PortfolioProject = Project & {duplicate_count?:number;source_removed_at?:string;portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
-export type PortfolioPage = {items:PortfolioProject[];total:number;hidden_duplicates?:number;hidden_removed?:number;node_status_degraded?:boolean;source_synced_at?:string;as_of:string;basis:string;page?:number;next_page?:number|null;snapshot?:string;snapshot_replaced?:boolean;stale?:boolean};
+export type PortfolioProject = Project & {lifecycle_state?:CaseState;lifecycle_section?:GroupKey;duplicate_count?:number;source_removed_at?:string;portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
+export type PortfolioPage = {items:PortfolioProject[];total:number;unknown_total?:number;counts?:{active:number|null;sop:number|null};facets?:{clients:string[];owners:string[]};sections?:Record<GroupKey,{total:number;next_page:number|null}>;hidden_duplicates?:number;hidden_removed?:number;node_status_degraded?:boolean;source_synced_at?:string;as_of:string;basis:string;page?:number;next_page?:number|null;snapshot?:string;snapshot_replaced?:boolean;stale?:boolean};
 export type CaseState = '進行中'|'待審核'|'尚未開始'|'已完成'|'待核對'|'暫停';
 export type CaseRow = {project:PortfolioProject;nodes:FlowNode[];current:FlowNode|undefined;state:CaseState;mine:boolean;sop:boolean|null};
 export type GroupKey = 'sop'|'notStarted'|'done'|'other';
@@ -28,8 +28,8 @@ export function caseRow(project:PortfolioProject,users:User[],viewer:string,toda
  const local=source ? {...project,nodes:source.map(n=>({id:n.key,name:n.key,key:n.key,status:n.status,owner_id:n.owner_id||'',collaborator_ids:n.collaborator_ids,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,tasks:[]}))} : {...project,nodes:project.nodes||[]};
  const nodes=buildFlowModel({project:local,users,today}).nodes.map(n=>n.legacy?.status==='paused'?{...n,state:'暫停'}:n);
  const result=currentNode(nodes);
- const current=result.current;
- const state:CaseState=!nodes.some(n=>n.assignment||n.legacy)&&project.progress_status?({pending:'尚未開始',in_progress:'進行中',engineering_complete:'進行中',completed:'已完成',paused:'暫停'} as const)[project.progress_status]??result.state:result.state;
+ const current=project.lifecycle_state==='待核對'?undefined:result.current;
+ const state:CaseState=project.lifecycle_state==='待核對'?'待核對':result.state;
  const mine=!!viewer && (project.pm_id===viewer || project.owner_id===viewer ||
   Array.isArray(project.collaborator_ids)&&project.collaborator_ids.includes(viewer) ||
   current?.legacy?.collaborator_ids?.includes(viewer)===true || current?.owners.some(p=>p.open_id===viewer)===true);
@@ -40,6 +40,7 @@ export function groupKey(row:CaseRow,_pins:ReadonlySet<string>):GroupKey {
  // Precedence is exclusive. Closed and unstarted cases retain their lifecycle group, even when owned or managed.
  if(row.state==='已完成')return 'done';
  if(row.state==='尚未開始')return 'notStarted';
+ if(row.state==='待核對')return 'other';
  if(row.sop)return 'sop';
  return 'other';
 }

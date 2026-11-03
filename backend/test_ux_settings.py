@@ -69,3 +69,17 @@ def test_complete_empty_partial_stale_and_failed_sources():
                             {'sources': {'status': 'fresh'}})
     assert result['sources'][0]['readState'] == 'partial'
     assert result['sources'][0]['loaded_count'] == 2
+
+
+def test_admin_cards_use_snapshot_counts_and_keep_missing_unknown():
+    state = {'environment': 'demo', 'people_directory_status': {'source_count': 82, 'valid_people': 67, 'issues': [{}] * 15},
+             'users': [{'id': 'one'}], 'sop_templates': [{'version': 1, 'status': 'published'}, {'version': 2, 'status': 'draft'}],
+             'jobs': [{'error': 'blocked_feature'}, {'status': 'blocked_feature'}] * 3}
+    result = build_overview({'mode': 'demo'}, {'role': 'manager'}, state, {})
+    assert result['directory']['linked_identities'] == 0
+    assert result['directory']['review_items'] == 15
+    assert result['admin_summary']['templates'] == [{'version': 1, 'status': 'published'}, {'version': 2, 'status': 'draft'}]
+    assert result['admin_summary']['jobs'] == {'loaded': 6, 'blocked': 6}
+    missing = build_overview({'mode': 'demo'}, {'role': 'manager'}, {'environment': 'demo'}, {})
+    assert missing['directory']['linked_identities'] is None
+    assert missing['admin_summary']['templates'] is None

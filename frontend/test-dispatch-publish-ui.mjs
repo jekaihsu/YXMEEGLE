@@ -31,7 +31,7 @@ globalThis.fetch=async(url,init={})=>{
  else if(url.endsWith('/commits')){body=response(commitExample);status=commitStatus;if(body.command)body.command.command_id=call.body.command_id}
  else if(url.includes('/commands/')){status=commandStatus;body=response(url.endsWith('/reconcile')?'reconcile: row found by 命令編號, committed':'command status for a manager: reconcile offered');body.command.command_id=url.split('/')[4]}
  else if(url.includes('/drafts/')){status=saveConflict?409:200;body=response(saveConflict?'draft: save with a stale version':'draft: save')}
- else if(url.includes('/dispatch/work')){status=workStatus;body=status===200?response('work queue: PM'):{detail:'來源暫時失敗',code:'sources_unavailable'}}
+ else if(url.includes('/dispatch/work')){status=workStatus;body=status===200?{...response('work queue: PM'),source:{...response('work queue: PM').source,fetched_at:'2026-11-03T02:52:27+00:00'}}:{detail:'來源暫時失敗',code:'sources_unavailable'}}
  return new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 };
 const settle=()=>new Promise(r=>setTimeout(r,0));
@@ -67,7 +67,7 @@ await click('核准此席');assert.equal(calls.at(-1).body.seat,'group_leader_co
 await act(async()=>{root.render(React.createElement(m.DispatchWork,{from:'2026-10-19',write:false,onProposal(){},onAction(){}}));await settle()});
 assert.ok(document.querySelector('.dp-progress').textContent.includes('9 件'));assert.ok(document.body.textContent.includes('預覽提案'));assert.equal(document.querySelectorAll('.dp-needs .dp-work-row').length,3);
 const scopeSelect=document.querySelector('.dp-filters select');await act(async()=>{scopeSelect.value='all';scopeSelect.dispatchEvent(new Event('change',{bubbles:true}));await settle()});
-await act(async()=>{root.render(React.createElement(m.DispatchWork,{from:'2026-10-19',write:false,refreshVersion:1,onProposal(){},onAction(){}}));await settle()});assert.equal(document.querySelector('.dp-filters select').value,'all');assert.ok(calls.at(-1).url.includes('scope=all'));
+await act(async()=>{root.render(React.createElement(m.DispatchWork,{from:'2026-10-19',write:false,refreshVersion:1,onProposal(){},onAction(){}}));await settle()});assert.match(document.querySelector('.dp-source').textContent,/2026\/11\/03 10:52:27（台北時間）/);assert.doesNotMatch(document.querySelector('.dp-source').textContent,/T02:52/);assert.equal(document.querySelector('.dp-filters select').value,'all');assert.ok(calls.at(-1).url.includes('scope=all'));
 workStatus=503;await click('更新工作進度');assert.ok(document.querySelector('.dp-source').textContent.includes('保留上次成功快照'));assert.ok(document.querySelector('.dp-progress').textContent.includes('9 件'));
 workStatus=403;await click('更新工作進度');assert.equal(document.querySelectorAll('.dp-work-row').length,0);assert.equal(document.querySelector('.dp-progress').textContent,'進度 · —');
 await act(async()=>root.render(React.createElement(m.WorkDetail,{row,write:true,onClose(){},onAction(){}})));assert.equal(document.querySelectorAll('.dp-fields dt').length,26);assert.ok(document.body.textContent.includes('讀回時間（系統唯讀）'));

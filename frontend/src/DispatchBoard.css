@@ -829,3 +829,6 @@
   }
 }
 }
+
+@layer polish { .dp-page :is(button,select,input,summary,a), .db-page :is(button,select,input,summary,a) {min-height:44px;min-width:44px;} }
+@layer polish { .dp-page>.dispatch-board {width:100%;max-width:100%;box-sizing:border-box;} }

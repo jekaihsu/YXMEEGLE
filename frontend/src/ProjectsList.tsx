@@ -1,5 +1,5 @@
-import {readPortfolioSequence,type PortfolioSequence} from './portfolioSequence';
-import {api} from './api';
+import {readPortfolioWindow} from './portfolioSequence';
+import {api,ApiError} from './api';
 import {CaseStatus} from './CaseStatus';
 import {PickerPopover} from './design/PickerPopover';
 import {Select as FormSelect} from './design/Select';
@@ -15,11 +15,11 @@ import {Ctx} from './appCommon';
 import {Skeleton,DataState,Sheet} from './design';
 import {createPortal} from 'react-dom';
 import {QuoteCreateSheet} from './QuoteCreateSheet';
-import {caseRow, caseBadge, revealedCount, caseAttention, filterRows, groupRows, portfolioCounts, pinStorageKey, readPins, writePins, verification, DEFAULT_FILTERS, type CaseFilters, type CaseRow, type PortfolioPage} from './projectsListModel';
+import {caseRow, caseBadge, revealedCount, caseAttention, filterRows, groupRows, portfolioCounts, pinStorageKey, readPins, writePins, verification, DEFAULT_FILTERS, type CaseFilters, type CaseRow, type PortfolioPage,type GroupKey} from './projectsListModel';
 import './ProjectsList.css';
 
 const GROUP_ICONS:Record<string,typeof Pin>={pinned:Pin,mine:UserRound,sop:Settings2,notStarted:Clock3,done:CircleCheck,other:FileText};
-const PROJECT_URL='/api/projects?view=portfolio&page=1';
+const PROJECT_URL='/api/projects?view=portfolio&page=1&sections=true';
 const readLimit=()=>{try{const value=Number(window.localStorage.getItem('yx.projects.groupSize'));return [3,5,10,25,50,100].includes(value)?value:3}catch{return 3}};
 function Select({label,value,onChange,children}:{label:string;value:string;onChange:(value:string)=>void;children:ReactNode}) {
  return <label className="pl-select"><span className="sr-only">{label}</span><FormSelect aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{children}</FormSelect></label>;
@@ -75,29 +75,42 @@ export function Projects({c}:{c:Ctx}) {
  const shell=c.w.scope==='shell',scope=JSON.stringify([c.s.user?.id,c.s.user?.role,c.s.user?.authz_version,c.s.user?.capabilities,c.s.access_mode,c.s.workspace_id,c.w.workspace_id]);
  const owner=usePageOwner({workspace:c.s.workspace_id||c.w.workspace_id||'',identityFingerprint:scope,openId:'projects'});
  const [refreshId,setRefreshId]=useState(0),[refreshCause,setRefreshCause]=useState<'explicit_refresh'|'own_write_committed'>('explicit_refresh');
- const resource={endpoint:PROJECT_URL};
- const result=usePageResource<PortfolioPage|undefined>(owner,resource,refreshId||c.reloadVersion?{reason:refreshCause,id:`${c.reloadVersion??0}:${refreshId}`}:{reason:'initial_open'},async(signal,current,intent)=>{
-  const data=shell?await api<PortfolioPage>(PROJECT_URL,{signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':intent.reason}},current):undefined;
-  return {data,snapshotId:data?.snapshot??null,fetchedAt:data?.as_of??null,verifiedAt:null,changedAt:null,completeness:data?.next_page?'partial':'complete',localRevision:null,empty:data?.total===0,stale:data?.stale===true};
+ const query=JSON.stringify(filters);
+ const [refreshQuery,setRefreshQuery]=useState('');
+ const queryOrigin=useRef({scope,query});if(queryOrigin.current.scope!==scope)queryOrigin.current={scope,query};
+ const projectUrl=`${PROJECT_URL}&filters=${encodeURIComponent(query)}`;
+ const resource={endpoint:projectUrl};
+ const result=usePageResource<PortfolioPage|undefined>(owner,resource,refreshId&&refreshQuery===query||c.reloadVersion?{reason:refreshCause,id:`${c.reloadVersion??0}:${refreshId}`}:{reason:query===queryOrigin.current.query?'initial_open':'user_query_change'},async(signal,current,intent)=>{
+  const data=shell?await api<PortfolioPage>(projectUrl,{signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':intent.reason}},current):undefined;
+  return {data,snapshotId:data?.snapshot??null,fetchedAt:data?.as_of??null,verifiedAt:null,changedAt:null,completeness:data&&data.items.length<data.total?'partial':'complete',localRevision:null,empty:data?.total===0,stale:data?.stale===true};
  });
  const firstDenied=result.kind==='Denied';
  const value='value' in result?result.value:!firstDenied&&'previous' in result?result.previous:undefined;
  const initialData=value?.data;
- const [remaining,setRemaining]=useState<{origin:PortfolioPage;value:PortfolioSequence}>();
- useEffect(()=>{
-  if(!shell||!initialData?.next_page)return;
-  const first=initialData,controller=new AbortController();
-  const publish=(value:PortfolioSequence)=>{if(!controller.signal.aborted)setRemaining({origin:first,value})};
-  publish({first,items:[],complete:false,error:''});
-  void readPortfolioSequence(first,(page,snapshot)=>api<PortfolioPage>(`/api/projects?view=portfolio&page=${page}${snapshot?`&snapshot=${encodeURIComponent(snapshot)}`:''}`,{signal:controller.signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':refreshId||c.reloadVersion?refreshCause:'initial_open'}}),controller.signal,publish);
-  return()=>controller.abort();
- },[shell,initialData,scope]);
- const tail=remaining?.origin===initialData?remaining?.value:undefined;
- const data=tail?.first??initialData;
- const read={data,loading:result.kind==='Loading',error:'error' in result?String(result.error instanceof Error?result.error.message:result.error):'',reload:()=>{setRefreshCause('explicit_refresh');setRefreshId(v=>v+1)},afterWrite:()=>{setRefreshCause('own_write_committed');setRefreshId(v=>v+1)}};
- const denied=firstDenied||tail?.denied===true;
- const complete=!shell||!data?.next_page||tail?.complete===true;
- const projects=useMemo(()=>denied?undefined:shell?data?[...data.items,...(tail?.items||[])]:undefined:c.w.projects,[denied,shell,data,tail,c.w.projects]);
+ const [remaining,setRemaining]=useState<{origin:PortfolioPage;data:PortfolioPage}>();
+ const [moreDenied,setMoreDenied]=useState(false);
+ const [moreState,setMoreState]=useState<{loading:string;error:string}>({loading:'',error:''});
+ const moreController=useRef<AbortController>();
+ useEffect(()=>{setMoreDenied(false);setMoreState({loading:'',error:''});return()=>moreController.current?.abort()},[initialData]);
+ const data=remaining&&remaining.origin===initialData?remaining.data:initialData;
+ const read={data,loading:result.kind==='Loading',error:'error' in result?String(result.error instanceof Error?result.error.message:result.error):'',reload:()=>{moreController.current?.abort();setRefreshQuery(query);setRefreshCause('explicit_refresh');setRefreshId(v=>v+1)},afterWrite:()=>{moreController.current?.abort();setRefreshQuery(query);setRefreshCause('own_write_committed');setRefreshId(v=>v+1)}};
+ const denied=firstDenied||moreDenied;
+ const complete=!shell||!!data&&data.items.length>=data.total;
+ const projects=useMemo(()=>denied?undefined:shell?data?.items:c.w.projects,[denied,shell,data,c.w.projects]);
+ const loadMore=async(key:GroupKey,targetVisible:number)=>{
+  const page=data?.sections?.[key].next_page;
+  if(!data||!initialData||!page||moreState.loading)return;
+  const origin=initialData,controller=new AbortController();moreController.current=controller;
+  setMoreState({loading:key,error:''});
+  try{
+   const next=await readPortfolioWindow(data,key,page,(section,page,snapshot)=>api<PortfolioPage>(`/api/projects?view=portfolio&sections=true&filters=${encodeURIComponent(query)}&page=${page}${section?`&section=${section}`:''}${snapshot?`&snapshot=${encodeURIComponent(snapshot)}`:''}`,{signal:controller.signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':'user_query_change'}}),controller.signal);
+   if(controller.signal.aborted)return;
+   setRevealAnnouncement(a=>({id:a.id+1,text:`已顯示 ${Math.min(targetVisible,next.sections?.[key].total??next.items.length)} / ${next.sections?.[key].total??next.total} 筆`}));
+   if(next.snapshot_replaced)setRemaining({origin,data:next});
+   else setRemaining({origin,data:{...data,stale:data.stale||next.stale,items:[...data.items,...next.items.filter(p=>!data.items.some(old=>old.id===p.id))],sections:{...data.sections!,[key]:next.sections![key]}}});
+  }catch(error){if(!controller.signal.aborted&&error instanceof ApiError&&[401,403].includes(error.status))setMoreDenied(true);if(!controller.signal.aborted)setMoreState({loading:'',error:error instanceof Error?error.message:String(error)})}
+  finally{if(!controller.signal.aborted)setMoreState(v=>({...v,loading:''}))}
+ };
  const asOf=data?.as_of||c.w.as_of;
  const filtersRef=useRef(filters),viewRef=useRef(view),expandedRef=useRef(expanded);filtersRef.current=filters;viewRef.current=view;expandedRef.current=expanded;
  const pinKey=pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous');
@@ -112,18 +125,18 @@ export function Projects({c}:{c:Ctx}) {
  useEffect(()=>()=>{writeLibraryMemory({scope:libraryScope,filters:filtersRef.current,view:viewRef.current,expanded:expandedRef.current,scrollY:scrollY.current})},[libraryScope]);
  const update=(key:keyof CaseFilters,value:string|number|boolean)=>{setFilters(f=>({...f,[key]:value}));setExpanded([])};
  const modeled=useMemo(()=>(projects??[]).map(p=>caseRow(p,c.w.users,c.s.user?.id||'',asOf)),[projects,c.w.users,c.s.user?.id,asOf]);
- const rows=useMemo(()=>filterRows(modeled,filters,asOf),[modeled,filters,asOf]);
- const degraded=shell&&data?.node_status_degraded===true;
- const groups=groupRows(rows,new Set(pins)),counts=portfolioCounts(rows),ready=!denied&&(!shell||!!data);
- const clients=useMemo(()=>[...new Set((projects??[]).map(p=>p.client).filter(Boolean))].sort(),[projects]);
- const pmIds=useMemo(()=>[...new Set((projects??[]).map(p=>p.pm_id).filter(Boolean))],[projects]);
+ const rows=useMemo(()=>data?.sections?modeled:filterRows(modeled,filters,asOf),[modeled,filters,asOf,data]);
+ const degraded=shell&&(data?.unknown_total??0)>0;
+ const groups=groupRows(rows,new Set(pins)),counts=data?.counts??portfolioCounts(rows),ready=!denied&&(!shell||!!data);
+ const clients=useMemo(()=>data?.facets?.clients??[...new Set((projects??[]).map(p=>p.client).filter(Boolean))].sort(),[projects,data]);
+ const pmIds=useMemo(()=>data?.facets?.owners??[...new Set((projects??[]).map(p=>p.pm_id).filter(Boolean))],[projects,data]);
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
  const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
  const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await refreshSources('sources',{url:'/api/sources/sync',body:'{}'});await c.refresh();read.afterWrite();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(error instanceof Error&&error.message.includes('結果尚未確認')?error.message:`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
  useEffect(()=>{if(!ready||restored.current)return;restored.current=true;const top=scrollY.current;if(top>0)requestAnimationFrame(()=>window.scrollTo({top,left:0,behavior:'instant'}))},[ready]);
  const hasFilters=Object.entries(filters).some(([k,v])=>v!==Object.entries(DEFAULT_FILTERS).find(([key])=>key===k)?.[1]);
  const filterCount=(['q','client','owner','node','state','kind','attention'] as const).filter(key=>filters[key]!==DEFAULT_FILTERS[key]).length;
- const selectedGroups=groups.filter(g=>g.rows.length>0&&(lifecycle==='all'||lifecycle===g.key));
+ const selectedGroups=groups.filter(g=>(g.rows.length>0||!!data?.sections?.[g.key]?.total)&&(lifecycle==='all'||lifecycle===g.key));
  const selectedRows=lifecycle==='all'?rows:groups.find(g=>g.key===lifecycle)?.rows??[];
  const basicFilters=<>
    <Select label="客戶" value={filters.client} onChange={v=>update('client',v)}><option value="">客戶</option>{clients.map(client=><option key={client}>{client}</option>)}</Select>
@@ -134,10 +147,9 @@ export function Projects({c}:{c:Ctx}) {
  return <div className="pl-page">
   <header className="pl-header"><div><h1>案件總覽</h1><p className="pl-scope">{ready?(data?.total??modeled.length):'未知'} 件 · 資料時間 {taipeiTime(asOf,'來源未提供')}</p></div><div className="pl-header-actions"><label className="pl-search"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案件、客戶或案號…" maxLength={240} value={filters.q} onChange={e=>update('q',e.target.value)}/>{filters.q&&<button aria-label="清除搜尋" onClick={()=>update('q','')}><X size={15}/></button>}</label><div className="pl-header-secondary" data-open={headerOpen} onKeyDown={e=>{if(e.key==='Escape'){setHeaderOpen(false);e.currentTarget.querySelector<HTMLButtonElement>('.pl-actions-trigger')?.focus()}}}><button className="pl-actions-trigger" aria-expanded={headerOpen} aria-controls="pl-secondary-actions" onClick={()=>setHeaderOpen(v=>!v)}>操作</button><div id="pl-secondary-actions" className="pl-secondary-content"><a className="button" href="#view=confirmations">工程確認單</a><div className="pl-view" role="group" aria-label="案件顯示方式"><button aria-label="清單檢視" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="卡片檢視" aria-pressed={view==='grid'} onClick={()=>setView('grid')}><LayoutGrid size={17}/></button></div><button className="pl-sync" disabled={read.loading} onClick={read.reload}>重新讀取</button>{canSync&&<button className="pl-sync" aria-label="重新同步 Lark" disabled={syncing} onClick={()=>void sync()}>{syncing?'同步中…':'重新同步 Lark'}</button>}</div></div>{canCreate&&<button className="pl-create" onClick={()=>setCreating(true)}><Plus size={17}/>新增案件</button>}</div></header>
   <p className="pl-sync-status sr-only" role="status" aria-live="polite">{syncStatus}</p>
-  {!denied&&data?.stale&&<DataState kind="Stale" title="案件快照較舊" body={`顯示本次讀取的快照；來源同步時間：${data.source_synced_at?`${taipeiDate(data.source_synced_at)} ${taipeiTime(data.source_synced_at)}`:'未知'}。`} actions={<button onClick={read.reload}>重新讀取</button>}/>}
-  {!denied&&!complete&&<DataState kind={tail?.error?'Error':'Partial'} title={tail?.error?'部分案件無法載入':'案件尚未完整載入'} body={`已載入 ${projects?.length??0} / ${data?.total??'未知'} 件；搜尋僅涵蓋已載入快照，來源表筆數：${data?.total??'未知（讀取中）'}。${tail?.error||''}`} actions={tail?.error?<button onClick={read.reload}>重新讀取</button>:undefined}/>}
-  <section className="pl-kpis" aria-label="生命週期篩選">{[{key:'all',label:'全部',count:rows.length},...groups.map(g=>({key:g.key,label:g.key==='sop'?'SOP 納管':g.label,count:g.rows.length}))].map(k=><button key={k.key} aria-pressed={lifecycle===k.key} onClick={()=>setLifecycle(k.key)}>{k.label} <strong>{!ready?'未知':!complete?`${k.count} 已載入`:k.count}</strong></button>)}</section>
-  <p className="pl-count-detail">非互斥統計：進行中 {ready&&complete?counts.active??'未知':'未知'} · SOP 納管未完成 {ready&&complete?counts.sop??'未知':'未知'}（可重疊，依目前篩選）</p>
+  {shell&&(read.error||moreState.error)?<DataState kind={denied?'Denied':'Error'} title="案件讀取失敗" body={read.error||moreState.error} actions={<button onClick={read.reload}>重新讀取</button>}/>:degraded?<DataState kind="Partial" title="節點進度待核對" body={`部分節點資料尚未核實；待核對案件 ${data?.unknown_total??modeled.filter(r=>r.state==='待核對').length} 件，已載入 ${projects?.length??0} / ${data?.total??'未知'} 件。`} actions={<button onClick={read.reload}>重新讀取</button>}/>:!denied&&(data?.stale||result.kind==='Stale')?<DataState kind="Stale" title="案件快照較舊" body={`${read.loading?'正在重新讀取；':''}來源同步時間：${taipeiTime(data?.source_synced_at,'未知')}。`} actions={<button onClick={read.reload}>重新讀取</button>}/>:null}
+  <section className="pl-kpis" aria-label="生命週期篩選">{[{key:'all',label:'全部',count:data?.sections?data.total:rows.length},...groups.map(g=>({key:g.key,label:g.key==='sop'?'SOP 納管':g.label,count:data?.sections?.[g.key]?.total??g.rows.length}))].map(k=><button key={k.key} aria-pressed={lifecycle===k.key} onClick={()=>setLifecycle(k.key)}>{k.label} <strong>{!ready?'未知':!complete&&!data?.sections?`${k.count} 已載入`:k.count}</strong></button>)}</section>
+  <p className="pl-count-detail">非互斥統計：進行中 {ready&&(complete||data?.counts)?counts.active??'未知':'未知'} · SOP 納管未完成 {ready&&(complete||data?.counts)?counts.sop??'未知':'未知'}（可重疊，依目前篩選）</p>
   <button className="pl-filter-trigger" onClick={e=>{e.currentTarget.focus();setFilterOpen(true)}}>篩選（{filterCount}）</button>
   <div className="pl-inline-filters" role="group" aria-label="基本案件篩選">{basicFilters}<button onClick={e=>{e.currentTarget.focus();setFilterOpen(true)}}>更多篩選與排序（{filterCount}）</button></div>
   {filterOpen&&createPortal(<Sheet title="案件篩選與排序" onClose={()=>setFilterOpen(false)}><div className="pl-filters" role="group" aria-label="案件篩選">
@@ -146,13 +158,10 @@ export function Projects({c}:{c:Ctx}) {
    {hasFilters&&<button className="pl-clear" onClick={()=>{setFilters({...DEFAULT_FILTERS});setExpanded([])}}>清除全部<X size={13}/></button>}
   <button onClick={()=>setFilterOpen(false)}>套用篩選</button></div></Sheet>,document.body)}
   {notice&&<p role="status">{notice}</p>}
-  {result.kind==='Stale'&&!read.error&&<DataState kind="Stale" title="保留上次讀取資料" body="正在重新讀取，下方保留上次快照；資料時間見頁首。"/>}
-  {degraded&&<DataState kind="Partial" title="節點進度待核對" body="節點摘要不完整，目前分組可能不正確。" actions={<button onClick={read.reload}>重新讀取</button>}/>}
-  {shell&&(read.error||tail?.denied)&&<DataState kind={denied?'Denied':data?'Stale':'Error'} title="案件讀取失敗" body={<>{read.error||tail?.error}{!denied&&data&&'；下方保留上次資料。'}</>} actions={<button onClick={read.reload}>重新讀取</button>}/>}
-  {shell&&read.loading&&!data?<DataState kind="Loading" title="正在載入案件" body={<Skeleton lines={5}/>}/>:ready?<div className={`pl-groups ${view==='grid'?'pl-grid':''}`}>{selectedGroups.map(group=>{const Icon=GROUP_ICONS[group.key],visible=revealedCount(limit,reveal[group.key]??0,group.rows.length);return <section className="pl-group" key={group.key} aria-label={group.label}><header><h2 tabIndex={-1}><Icon size={19}/>{group.label}<span>{group.rows.length}{!complete?' 已載入':''}</span></h2><span>顯示 {visible} / {group.rows.length}{!complete?' 已載入':''}</span>{visible<group.rows.length&&<button className="pl-expand" onClick={e=>{pendingReveal.current=visible+25>=group.rows.length?{section:e.currentTarget.closest('section')!,previous:visible}:null;setExpanded(previous=>[...previous.filter(key=>key!==group.key&&!key.startsWith(`${group.key}:`)),`${group.key}:${(reveal[group.key]??0)+1}`]);setRevealAnnouncement(a=>({id:a.id+1,text:`已顯示 ${Math.min(visible+25,group.rows.length)} / ${group.rows.length} 筆`}))}}>顯示更多（再 {Math.min(25,group.rows.length-visible)} 筆）<ArrowRight size={15}/></button>}</header><div className="pl-column-labels" aria-hidden="true"><span/><span>案件</span><span>負責 PM</span><span>目前節點</span><span>狀態</span><span/></div><div className="pl-group-rows" role="list">{group.rows.slice(0,visible).map(row=><div role="listitem" key={row.project.id}><CaseCard row={row} c={c} today={asOf} pinned={pins.includes(row.project.id)} onPin={()=>togglePin(row.project.id)}/></div>)}</div></section>})}</div>:null}
+  {shell&&read.loading&&!data?<DataState kind="Loading" title="正在載入案件" body={<Skeleton lines={5}/>}/>:ready?<div className={`pl-groups ${view==='grid'?'pl-grid':''}`}>{selectedGroups.map(group=>{const Icon=GROUP_ICONS[group.key],visible=revealedCount(limit,reveal[group.key]??0,group.rows.length),total=data?.sections?.[group.key]?.total??group.rows.length;return <section className="pl-group" key={group.key} aria-label={group.label}><header><h2 tabIndex={-1}><Icon size={19}/>{group.label}<span>{total}</span></h2><span>顯示 {visible} / {total}</span>{visible<total&&<button className="pl-expand" disabled={!!moreState.loading} onClick={e=>{if(visible+25>group.rows.length&&data?.sections?.[group.key]?.next_page)void loadMore(group.key,visible+25);pendingReveal.current=visible+25>=group.rows.length?{section:e.currentTarget.closest('section')!,previous:visible}:null;setExpanded(previous=>[...previous.filter(key=>key!==group.key&&!key.startsWith(`${group.key}:`)),`${group.key}:${(reveal[group.key]??0)+1}`]);setRevealAnnouncement(a=>({id:a.id+1,text:`已顯示 ${Math.min(visible+25,group.rows.length)} / ${group.rows.length} 筆`}))}}>顯示更多（再 {Math.min(25,total-visible)} 筆）<ArrowRight size={15}/></button>}</header><div className="pl-column-labels" aria-hidden="true"><span/><span>案件</span><span>負責 PM</span><span>目前節點</span><span>狀態</span><span/></div><div className="pl-group-rows" role="list">{group.rows.slice(0,visible).map(row=><div role="listitem" key={row.project.id}><CaseCard row={row} c={c} today={asOf} pinned={pins.includes(row.project.id)} onPin={()=>togglePin(row.project.id)}/></div>)}</div></section>})}</div>:null}
   <p className="pl-reveal-status sr-only" role="status" aria-atomic="true"><span key={revealAnnouncement.id}>{revealAnnouncement.text}</span></p>
-  {ready&&!selectedRows.length&&<DataState kind={complete?'Empty':'Partial'} title={complete?(rows.length?'此分類沒有符合條件的案件':'沒有符合條件的案件'):'已載入的案件尚無符合項目'} body={complete?'試試其他關鍵字或清除篩選條件。':`已載入 ${projects?.length??0} / ${data?.total??'未知'} 件，尚不能判定全部搜尋結果。`}/>}
-  <footer className="pl-footer">{ready?`${complete?'符合條件':'目前已載入符合條件'} ${selectedRows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{!complete?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}{data?.source_synced_at&&taipeiTime(data.source_synced_at,'')&&` · 上次同步 Lark：${taipeiTime(data.source_synced_at,'').slice(11,16)}`}{!!data?.hidden_removed&&` · 已隱藏 ${data.hidden_removed} 筆已從 Lark 移除的報價`}</footer>
+  {ready&&!selectedRows.length&&!read.error&&!moreState.error&&!degraded&&!data?.stale&&result.kind!=='Stale'&&(!data?.sections||data.total===0||lifecycle!=='all'&&data.sections[lifecycle as GroupKey]?.total===0)&&<DataState kind={complete?'Empty':'Partial'} title={complete?(rows.length?'此分類沒有符合條件的案件':'沒有符合條件的案件'):'已載入的案件尚無符合項目'} body={complete?'試試其他關鍵字或清除篩選條件。':`已載入 ${projects?.length??0} / ${data?.total??'未知'} 件，尚不能判定全部搜尋結果。`}/>}
+  <footer className="pl-footer">{ready&&data?.sections?`已載入 ${projects?.length??0} / ${data.total} 件 · `:''}{ready?`${complete?'符合條件':'目前已載入符合條件'} ${selectedRows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{!complete&&!data?.sections?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}{data?.source_synced_at&&taipeiTime(data.source_synced_at,'')&&` · 上次同步 Lark：${taipeiTime(data.source_synced_at,'').slice(11,16)}`}{!!data?.hidden_removed&&` · 已隱藏 ${data.hidden_removed} 筆已從 Lark 移除的報價`}</footer>
   {!denied&&<details className="pl-admission"><summary>執行歸屬核定與案件生命週期</summary><p>工程確認單成案，報價資料先保留為待確認接案。來源商務狀態與工作台節點狀態分開顯示，詳見各案件的更多操作。</p><ExecutionAdmissionQueue w={c.w} s={c.s} run={(action,payload,scope)=>c.run(action,payload,scope)} busy={c.busy}/></details>}
   {creating&&<QuoteCreateSheet users={c.w.users} canImport={c.s.features?.sop_task_writes===true&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('sop_task_import')===true)} onClose={()=>setCreating(false)} onCreated={read.afterWrite} onOpen={ref=>{setCreating(false);c.go({view:'quotes',project:ref,tab:'flow'})}}/>}
  </div>;
