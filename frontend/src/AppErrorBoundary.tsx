@@ -1,22 +1,22 @@
 import {Button} from './design';
 import {CircleAlert,Copy,RotateCw,ArrowLeft,Check} from 'lucide-react';
 import './AppErrorBoundary.css';
-import {Component,type ErrorInfo,type ReactNode} from 'react';
+import {Component,createRef,type ErrorInfo,type ReactNode} from 'react';
 
 type State={failed:boolean;detail:string;copyStatus:'idle'|'copied'|'failed'};
 
 // Reports stay collapsed and are copied only at the user's request.
 export class AppErrorBoundary extends Component<{children:ReactNode},State>{
+ titleRef=createRef<HTMLHeadingElement>();
  state:State={failed:false,detail:'',copyStatus:'idle'};
  static getDerivedStateFromError(){return {failed:true}}
- componentDidCatch(error:Error,info:ErrorInfo){this.setState({detail:[`時間：${new Date().toISOString()}`,`網址：${location.href}`,`訊息：${error.message}`,`堆疊：\n${error.stack||'（無）'}`,`元件堆疊：${info.componentStack||'（無）'}`].join('\n')})}
+ componentDidCatch(error:Error,info:ErrorInfo){this.titleRef.current?.focus();this.setState({detail:[`時間：${new Date().toISOString()}`,`網址：${location.href}`,`訊息：${error.message}`,`堆疊：\n${error.stack||'（無）'}`,`元件堆疊：${info.componentStack||'（無）'}`].join('\n')})}
  copy=async()=>{try{await navigator.clipboard.writeText(this.state.detail);this.setState({copyStatus:'copied'})}catch{this.setState({copyStatus:'failed'})}};
  render(){
   if(!this.state.failed)return this.props.children;
-  return <main className="error-page"><section className="error-panel glass" aria-labelledby="error-title">
+  return <main className="error-page"><section className="error-panel" aria-labelledby="error-title">
    <div className="error-symbol" aria-hidden="true"><CircleAlert size={28} strokeWidth={1.6}/></div>
-   <p className="error-eyebrow">暫時發生問題</p>
-   <h1 id="error-title">這個畫面暫時無法開啟</h1>
+   <h1 id="error-title" tabIndex={-1} ref={this.titleRef}>這個畫面暫時無法開啟</h1>
    <p className="error-description">請重新載入頁面再試一次，或先返回工作總覽。</p>
    <div className="error-actions"><Button variant="primary" onClick={()=>location.reload()}><RotateCw size={16}/>重新載入頁面</Button><a className="ds-button" href="/#view=dashboard"><ArrowLeft size={16}/>返回工作總覽</a></div>
    <p className="error-help">若問題持續，請展開下方資訊，複製給管理員協助查詢。</p>

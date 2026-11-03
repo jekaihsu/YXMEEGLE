@@ -43,17 +43,17 @@ export function filterQuery(filters:Filters):string {
  if(filters.rating)q.set('rating',filters.rating);
  if(filters.actor)q.set('actor',filters.actor);if(filters.provider)q.set('provider',filters.provider);return q.toString();
 }
-export const formatNumber = (value:number) => new Intl.NumberFormat('zh-TW',{maximumFractionDigits:0}).format(value);
+export const formatNumber = (value:number|null|undefined) => value==null||!Number.isFinite(value)?'待確認':new Intl.NumberFormat('zh-TW',{maximumFractionDigits:0}).format(value);
 export const formatPercent = (value:number|null|undefined) => value==null?'尚無評分':new Intl.NumberFormat('zh-TW',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}).format(value);
-export const satisfaction = (row:FeedbackCounts) => {const rated=(row.up??0)+(row.down??0);return formatPercent(rated?(row.up??0)/rated:null)};
+export const satisfaction = (row:FeedbackCounts) => {if(row.up==null||row.down==null)return '待確認';const rated=(row.up??0)+(row.down??0);return formatPercent(rated?(row.up??0)/rated:null)};
 export const reasonLabels:Record<FeedbackReason,string> = {wrong:'答錯',incomplete:'不完整',slow:'太慢',other:'其他'};
-export function reasonSeries(reasons:Usage['reasons'],down=0) {
- const named=(Object.keys(reasonLabels) as FeedbackReason[]).map(key=>({key,label:reasonLabels[key],value:reasons?.[key]??0}));
- const unspecified=reasons?.unspecified??Math.max(0,down-named.reduce((sum,item)=>sum+item.value,0));
- return [...named,{key:'unspecified',label:'未填寫',value:unspecified}];
+export function reasonSeries(reasons:Usage['reasons'],_down?:number) {
+ const named=(Object.keys(reasonLabels) as FeedbackReason[]).map(key=>({key,label:reasonLabels[key],value:reasons?.[key]}));
+ return [...named,{key:'unspecified',label:'未填寫',value:reasons?.unspecified}];
 }
 export function sortProviders(rows:Usage['by_provider'],key:'up'|'down',direction:'asc'|'desc') {return [...rows].sort((a,b)=>((a[key]??0)-(b[key]??0))*(direction==='asc'?1:-1)||a.provider.localeCompare(b.provider))}
-export const formatCost = (value:number|null) => value===null?'未計價':new Intl.NumberFormat('zh-TW',{style:'currency',currency:'USD',minimumFractionDigits:Math.abs(value)<1?4:2,maximumFractionDigits:Math.abs(value)<1?4:2}).format(value);
+export const formatCost = (value:number|null|undefined) => value===null?'未計價':value===undefined||!Number.isFinite(value)?'待確認':new Intl.NumberFormat('zh-TW',{style:'currency',currency:'USD',minimumFractionDigits:Math.abs(value)<1?4:2,maximumFractionDigits:Math.abs(value)<1?4:2}).format(value);
+export const formatReadTime=(value:string)=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value));
 export const formatTime = (value:string) => value?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value)):'尚無紀錄';
 export function sortPeople(rows:PersonUsage[],key:SortKey='cost_usd',direction:'asc'|'desc'='desc') {
  return [...rows].sort((a,b)=>{const av=a[key]??(key==='up'||key==='down'?0:''),bv=b[key]??(key==='up'||key==='down'?0:'');const comparison=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv),'zh-TW');return (direction==='desc'?-comparison:comparison)||a.actor_id.localeCompare(b.actor_id)});
@@ -63,19 +63,16 @@ export function rangeError(range:{from:string;to:string}):string|null {
  return (Date.parse(range.to)-Date.parse(range.from))/86400000+1>366?'日期範圍最多 366 天。':null;
 }
 export function chartSeries(rows:DayUsage[],range:{from:string;to:string}) {
- const days=new Map(rows.map(row=>[row.day,row]));const result:DayUsage[]=[];
- for(let day=range.from;day<=range.to;day=shift(day,1)){
-  const row=days.get(day)||{day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0};
-  result.push({...row,up:row.up??0,down:row.down??0});
+ // Missing days remain unknown, including gaps between observed weekly buckets.
+ const result=rows.filter(row=>row.day>=range.from&&row.day<=range.to).sort((a,b)=>a.day.localeCompare(b.day));
+ if((Date.parse(range.to)-Date.parse(range.from))/86400000+1<=62)return result;
+ const weeks=new Map<number,DayUsage>();
+ for(const row of result){
+  const index=Math.floor((Date.parse(row.day)-Date.parse(range.from))/86400000/7);
+  const before=weeks.get(index);
+  if(!before){weeks.set(index,{...row,day:shift(range.from,index*7)});continue}
+  for(const key of ['questions','input_tokens','output_tokens','cost_usd'] as const)before[key]+=row[key];
+  for(const key of ['up','down'] as const){const a=before[key],b=row[key];before[key]=a==null||b==null?undefined:a+b}
  }
- if(result.length<=62)return result;
- const weeks:DayUsage[]=[];
- for(let index=0;index<result.length;index+=7){
-  const bucket={day:result[index].day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0,up:0,down:0};
-  for(const row of result.slice(index,index+7)){
-   bucket.up+=row.up??0;bucket.down+=row.down??0;bucket.questions+=row.questions;bucket.input_tokens+=row.input_tokens;bucket.output_tokens+=row.output_tokens;bucket.cost_usd+=row.cost_usd;
-  }
-  weeks.push(bucket);
- }
- return weeks;
+ return [...weeks.values()];
 }
