@@ -37,4 +37,13 @@ await act(async()=>{render();await tick()});assert.match(document.body.textConte
 await act(async()=>{button('重試').click();await tick()});assert.deepEqual(calls[1].body,{enrollment_id:'job'});
 enrollment={...enrollment,canRetry:false};await act(async()=>{render();await tick()});assert.ok(!button('重試'));
 await act(async()=>{root.render(React.createElement(ui.SopReadiness));await tick()});assert.match(document.body.textContent,/SOP 帶入狀態.*已納管.*帶入失敗.*已嘗試 1 次/s);
-await act(async()=>root.unmount());console.log('PASS managed/legacy/review/pending/template status, protected node picker, confirmation, authority UI, readiness and retry');
+await act(async()=>root.unmount());
+const root2=createRoot(document.getElementById('root'));
+globalThis.fetch=async()=>new Response(JSON.stringify({items:Array.from({length:524},(_,i)=>({project_id:`p${i}`,code:`C${i}`,name:'案件',policy:{policy:'managed'},enrollments:[attempt]}))}),{status:200});
+await act(async()=>{root2.render(React.createElement(ui.SopReadiness));await tick()});
+assert.equal(document.querySelectorAll('.sop-readiness-list>li').length,25);
+assert.match(document.body.textContent,/25 \/ 524/);
+await act(async()=>button('顯示更多（再顯示 25 案）').click());
+assert.equal(document.querySelectorAll('.sop-readiness-list>li').length,50);
+await act(async()=>root2.unmount());console.log('PASS SOP initial25/local50 over 524 loaded cases');
+console.log('PASS managed/legacy/review/pending/template status, protected node picker, confirmation, authority UI, readiness and retry');

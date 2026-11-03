@@ -38,7 +38,9 @@ def build_overview(data, user, state, cfg, snapshot=None, freshness=None):
         directory = { 'status': status.get('status', 'unknown'),
                       'last_success_at': _time(status.get('last_success_at')),
                       'roster_size': _count(status.get('source_count')),
-                      'matched_accounts': _count(status.get('valid_people')) }
+                      'matched_accounts': _count(status.get('valid_people')),
+                      'linked_identities': sum(bool(person.get('directory_source')) for person in state['users']) if 'users' in state else None,
+                      'review_items': len(status['issues']) if isinstance(status.get('issues'), list) else None }
     checks = []
     if diagnostics:
         tables = snapshot.get('tables', []) if formal and snapshot else []
@@ -63,6 +65,11 @@ def build_overview(data, user, state, cfg, snapshot=None, freshness=None):
             'features': {'node_assignment': config.enabled, 'change_extension': False, 'routines': False},
             'sources': sources, 'sources_access': 'maintenance' if diagnostics else 'restricted',
             'directory': directory, 'datasets': datasets, 'node_connection': checks,
+            'admin_summary': {
+                'templates': [{'version': t.get('version'), 'status': t.get('status')} for t in state['sop_templates']] if manager and 'sop_templates' in state else None,
+                'jobs': {'loaded': len(state['jobs']), 'blocked': sum((j.get('error') == 'blocked_feature' or j.get('status') == 'blocked_feature') for j in state['jobs'])} if manager and 'jobs' in state else None,
+                'attendance': {'ready': _count(state.get('attendance_schedule_status', {}).get('ready_count')), 'manual': _count(state.get('attendance_schedule_status', {}).get('manual_override_count'))} if manager else None,
+            },
             'manager_details_available': bool(manager and formal)}
 
 
@@ -84,8 +91,12 @@ def register(app, identity, load, sessions, workspace_model, cache_model, cfg, p
         data, user = identity(request)
         with (phase(request, 'load') if phase else nullcontext()), sessions() as db:
             row = db.get(workspace_model, data['wid'])
-            # Summary needs only metadata, never business collections or upgrade().
-            state = {key: deepcopy(row.data.get(key)) for key in ('environment', 'people_directory_status') if key in row.data}
+            # Summary excludes project trees and source records; no upgrade().
+            state = {key: deepcopy(row.data.get(key)) for key in ('environment', 'people_directory_status', 'attendance_schedule_status') if key in row.data}
+            # Only small administrative collections; never materialize case/source records.
+            if user.get('role') == 'manager' and not user.get('manager_revoked'):
+                administrative = load(db, row, collections=('users', 'sop_templates', 'jobs'))
+                state.update({key: administrative[key] for key in ('users', 'sop_templates', 'jobs') if key in administrative})
             normalize_environment(state, data['wid'], cfg)
             snapshot = None
             diagnostics = (user.get('role') == 'manager' and not user.get('manager_revoked')) or 'manage_sources' in user.get('capabilities', [])

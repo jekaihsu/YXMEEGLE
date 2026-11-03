@@ -21,8 +21,10 @@ def test_settings_summary_never_reads_project_trees(tmp_path):
             event.remove(app.state.engine, 'before_cursor_execute', capture)
         assert response.status_code == 200
         assert len(response.content) < 3000
-        assert len(statements) == 1  # identity's users, no summary business reads
+        assert len(statements) == 2  # identity plus small administrative collections; no project trees
         assert statements[0][1][-2:] == ('users', '')
+        assert all(kind not in str(statements[1][1]) for kind in ('projects', 'work_schedules', 'source_quotes'))
+        assert all(kind in str(statements[1][1]) for kind in ('users', 'sop_templates', 'jobs'))
 
 
 def test_project_scopes_filter_sql_and_keep_shared_policy_inputs(tmp_path):
@@ -96,7 +98,7 @@ def test_formal_settings_reads_snapshot_summary_without_source_records(tmp_path)
                 'records': [{'private': 'NEVER_DECODE_THIS_RECORD'}]}))
         api = FastAPI()
         register(api, lambda _: ({'wid': 'formal', 'mode': 'lark'}, {'role': 'manager', 'name': 'reader'}),
-                 lambda *_: (_ for _ in ()).throw(AssertionError('no full load')),
+                 lambda *_, collections: ({key: [] for key in collections} if collections == ('users', 'sop_templates', 'jobs') else (_ for _ in ()).throw(AssertionError('no business load'))),
                  app.state.sessions, WorkspaceRow, CacheRow, {})
         statements = []
         def capture(conn, cursor, sql, parameters, context, many):
