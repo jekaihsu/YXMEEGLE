@@ -119,7 +119,7 @@ class HomePanels:
         except Failure:
             return {}, True
 
-    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+    def lark_items(self, state, data, user, scope, team, hidden_confirmations, *, assigned_only=False):
         if reason := self.assignment_unavailable(state, data):
             return [], {}, None, reason
         sources, roster = self.assignment_sources(scope, include_roster=True)
@@ -130,6 +130,9 @@ class HomePanels:
         nodes_read, tasks_read = sources['node_assignments'], sources['tasks']
         raw_nodes = [] if isinstance(nodes_read, Failure) else nodes_read.value
         raw_tasks = [] if isinstance(tasks_read, Failure) else tasks_read.value
+        if assigned_only and not team:
+            from .home_assignment_candidates import assigned_rows
+            raw_nodes, raw_tasks = assigned_rows(raw_nodes, raw_tasks, user['id'])
         bulk = AssignmentChains(self.nodes, state, data, user, raw_nodes, raw_tasks)
         nodes, tasks = bulk.nodes, bulk.tasks
         raw_by_id, task_fields = bulk.node_fields, bulk.task_fields
@@ -273,7 +276,7 @@ class HomePanels:
         if panel in ('proxy', 'local') or params.get('kinds') == 'sop_task':
             items, sources, manager, reason = [], {}, None, None
         else:
-            items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations)
+            items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations, assigned_only=panel == 'assigned')
         if panel == 'confirmation' and manager is None and reason is None:
             reason = 'authorization_unavailable'
         if scope_name == 'team' and manager is not True:
@@ -349,8 +352,10 @@ class HomePanels:
 
     def read_workspace(self, request, data, user):
         with self.sessions() as db:
-            row = db.get(self.workspace_model, data['wid'])
-            state = self.load(db, row, collections=('users', 'projects'))
+            from .read_roots import read_root
+            row = read_root(db,self.workspace_model, data['wid'])
+            from .home_read_inputs import probe_root
+            state = self.load(db, probe_root(row), collections=('users', 'projects'))
             params = request.query_params
             panel = 'completed' if params.get('status') == 'done' else params.get('panel', 'assigned')
             sop_only = params.get('kinds') == 'sop_task'
@@ -363,7 +368,10 @@ class HomePanels:
                                 'project_finance_versions', 'project_payment_batches', 'project_delivery_batches')
                 if self.assignment_unavailable(state, data):
                     omitted += ('project_daily_reports',)
-                state = self.load(db, row, omit_kinds=omitted)
+                if panel == 'assigned':
+                    from .home_read_inputs import assigned_omissions
+                    omitted = tuple(dict.fromkeys((*omitted, *assigned_omissions())))
+                state = self.load(db, row, omit_kinds=omitted, case_sources='sop' if panel == 'assigned' else False)
         return self.read(request, data, user, state)
 
     def read(self, request, data, user, state):

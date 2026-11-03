@@ -126,6 +126,7 @@ class RequestTimingMiddleware:
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
         timing = Timings()
+        timing.method = scope.get('method')
         timing.started = scope.get('request_received_at', timing.started)
         gc_before = _gc_seconds
         request_id = uuid4().hex

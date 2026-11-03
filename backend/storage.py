@@ -451,7 +451,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         project_children=project_children,filter_project_rows=filter_project_rows,
         project_details=project_details,case_sources=case_sources)
 
-def load(db,model,row,*,omit_kinds=(),row_snapshot=None):
+def load(db,model,row,*,omit_kinds=(),row_snapshot=None,case_sources=False):
     """Materialize a workspace, optionally omitting read-only presentation inputs."""
     omit_kinds=tuple(omit_kinds)
     allowed=set(COLLECTIONS)|{'project_'+child for child in PROJECT_CHILDREN}|{'tasks','review_cycles'}
@@ -468,9 +468,14 @@ def load(db,model,row,*,omit_kinds=(),row_snapshot=None):
                 for p in result.get('projects',[]): p[kind.removeprefix('project_')]=[]
         if omit_kinds: result['_partial']={'omitted_kinds':list(omit_kinds)}
         return result
+    if case_sources:
+        from .workspace_read_rows import read_rows
+        rows=read_rows(db,model,row,omit_kinds,case_sources)
+    else:
+        rows=db.execute(select(model.kind,model.entity_id,model.parent_id,model.ordinal,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal))
     result=deepcopy(row.data); records={}
     # Column selection decodes fresh JSON without aliasing identity-map objects.
-    for kind,ident,parent,ordinal,data in db.execute(select(model.kind,model.entity_id,model.parent_id,model.ordinal,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal)):
+    for kind,ident,parent,ordinal,data in rows:
         if row_snapshot is not None and kind!='events':
             row_snapshot[(kind,ident)]=SimpleNamespace(kind=kind,entity_id=ident,parent_id=parent,ordinal=ordinal,data=deepcopy(data))
         records.setdefault((kind,parent),[]).append(data)

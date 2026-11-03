@@ -347,6 +347,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
+    from .read_roots import read_root, read_root_header
+
     def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
         from .read_snapshots import capture
         shared = capture.get()
@@ -367,9 +369,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def load_state(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
         from .request_timing import measure
+        if project_ids is None and collections is not None and set(collections) <= {'users','delegations','approved_leave_delegations'}:
+            from .home_read_inputs import probe_root
+            row=probe_root(row)
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.CASE_DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details,case_sources=case_sources)
         elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
-        elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
+        elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds,case_sources=case_sources)
         else: state=storage.load(db,BusinessRow,row)
         with measure('upgrade'):
             state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
@@ -449,11 +454,13 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if data.get('mode')=='lark':
                 auth=db.get(AuthRow,data.get('sid')); require(auth is not None and auth.data.get('expires',0)>datetime.now(timezone.utc).timestamp(),'登入已過期，請重新登入',401)
                 require(auth.data['wid']==data['wid'],'工作區驗證失敗',401)
-            row=db.get(WorkspaceRow,data['wid']); require(row is not None,'工作區不存在',401)
             if data.get('mode')=='lark':
+                require(db.scalar(select(WorkspaceRow.id).where(WorkspaceRow.id==data['wid'])) is not None,'工作區不存在',401)
                 profile=db.get(PersonRow,(organization(data),data['uid']))
-                user=deepcopy(profile.data) if profile else find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
-            else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
+                user=deepcopy(profile.data) if profile else find(load(db,read_root(db,WorkspaceRow,data['wid']),collections=('users',))['users'],data['uid'],'登入人員')
+            else:
+                row=read_root(db,WorkspaceRow,data['wid']); require(row is not None,'工作區不存在',401)
+                user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
                     and request.url.path not in NO_ROSTER_REFRESH_PATHS):
                 from .live_read.admission import ensure_roster_for_admission
@@ -729,7 +736,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         wid=data['wid']
         if not hr_visible(user): return None
         with sessions() as db:
-            row=db.get(WorkspaceRow,wid)
+            row=read_root(db,WorkspaceRow,wid)
             with phase(request,'load'):
                 if not index_reads.ready(db,BusinessRow,row): return None
                 state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
@@ -753,7 +760,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             return EncodedSnapshot(b'',b'',validator,as_of).response(request,'validated')
         def build():
             with sessions() as db, phase(request,'project'):
-                current=db.get(WorkspaceRow,wid)
+                current=read_root(db,WorkspaceRow,wid)
                 result=shell.build(db,BusinessRow,current,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
             restrict_hr(result,user)
             result['freshness']=freshness
@@ -882,7 +889,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """
         data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
         with sessions() as db:
-            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id],case_sources=overview)
+            with phase(request,'load'): state=load(db,read_root(db,WorkspaceRow,data['wid']),project_ids=[project_id],case_sources=overview)
             with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
         require(len(result['projects'])==1,'找不到這個案件',404)
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
@@ -1342,10 +1349,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def p2_generation(db,wid):
         version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
-        # The generation fence needs four scalars, not the large source snapshot.
-        keys=('status','last_attempt_at','last_sync','as_of')
-        cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
-        return (version,*(tuple(cache) if cache else (None,)*len(keys)))
+        # Extract once: four separate PostgreSQL JSON operators each parse
+        # the complete raw source document even though they return scalars.
+        from .source_metadata_reads import read_generation
+        return (version,*read_generation(db,CacheRow,wid))
+
 
     def p2_related_project_ids(state,project_id):
         """Other projects whose visibility a scoped case read still needs.
@@ -1382,7 +1390,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     cache_data=load_source_metadata(db,CacheRow,wid)
                 else:
                     cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
-                row=db.get(WorkspaceRow,wid)
+                row=read_root(db,WorkspaceRow,wid)
                 state=load(db,row,project_ids=[project_id] if project_id is not None else None,case_sources=case_sources)
                 extra=p2_related_project_ids(state,project_id) if project_id is not None else []
                 if extra: state=load(db,row,project_ids=[project_id,*extra],case_sources=case_sources)
@@ -1478,7 +1486,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         source_fence=json.dumps({k:v for k,v in source_freshness.items() if k!='age_seconds'},sort_keys=True)
         with sessions() as db:
             source_generation=p2_generation(db,data['wid'])
-            row=db.get(WorkspaceRow,data['wid'])
+            row=read_root_header(db,WorkspaceRow,data['wid'])
             version=row.version
             from . import index_reads
             cacheable=index_reads.ready(db,BusinessRow,row)
@@ -1831,7 +1839,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def node_assignment_case(data,user,project_id):
         from .source_case_policy import visible_project
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id],case_sources=True)
+        with sessions() as db: state=load(db,read_root(db,WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id],case_sources=True)
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
@@ -1839,7 +1847,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees,case_sources='sop' if read_tasks else False)
+        with sessions() as db: state=load(db,read_root(db,WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees,case_sources='sop' if read_tasks else False)
         project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
         if not (visible_project(state,project) or local_viewer(user,project)):
@@ -2010,7 +2018,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data, user = identity(request)
         require(len(project_id) <= 200 and not request.query_params, '查詢參數錯誤', 422)
         with sessions() as db:
-            root = db.get(WorkspaceRow, data['wid'])
+            root = read_root_header(db,WorkspaceRow, data['wid'])
             version = root.version
             from .sop_import.models import CaseState, CasePolicy
             revision = db.get(CaseState, (data['wid'], project_id))
@@ -2029,7 +2037,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 # The unchanged generation needs only a scalar fence. The root
                 # JSON can contain every case's plan; read it only on change.
                 visibility = visibility_revision if current_version == version else snapshot_visibility(
-                    db, db.get(WorkspaceRow, data['wid']), project_id)
+                    db, read_root(db,WorkspaceRow, data['wid']), project_id)
                 actual = (current_version, (current.checklist_revision, current.identity_revision) if current else None,
                           policy.revision if policy else None, visibility)
                 # Authority changes must never serve the previous viewer's body.
@@ -2053,7 +2061,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             token = capture.set(shared)
             try:
                 with sessions() as db:
-                    shared['state'] = load(db, db.get(WorkspaceRow, data['wid']), project_ids=[project_id], case_sources='sop')
+                    shared['state'] = load(db, read_root(db,WorkspaceRow, data['wid']), project_ids=[project_id], case_sources='sop')
                 if shared['state']['version'] != version and not accept_stale:
                     raise SnapshotRevisionChanged()
                 result = {'project': json.loads(project_detail(child, project_id, overview=True).body)}
