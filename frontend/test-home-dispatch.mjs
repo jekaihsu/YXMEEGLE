@@ -67,7 +67,9 @@ try{
  for(const role of ['pm','manager','member']){
   await act(async()=>root.render(React.createElement(m.AppShell,{s:{...c.s,user:{name:'測試',role}},route:{view:'dashboard'},error:'',ready:true,go(){},children:null})));
   const nav=document.querySelector('.workspace-nav-groups').textContent;
-  for(const gone of ['派工看板','我的工作','工程確認單'])assert.equal(nav.includes(gone),false,gone+' is not in the navigation');
+  const work=[...document.querySelectorAll('.workspace-nav-groups button')].find(b=>b.textContent.trim()==='我的工作');assert.ok(work);
+  let target;await act(async()=>root.render(React.createElement(m.AppShell,{s:{...c.s,user:{name:'測試',role}},route:{view:'dashboard'},error:'',ready:true,go:r=>target=r,setMobile(){},children:null})));await act(async()=>work.click());assert.deepEqual(target,{view:'work'});
+  for(const gone of ['派工看板','工程確認單'])assert.equal(nav.includes(gone),false,gone+' is not in the navigation');
  }
 }finally{await act(async()=>root.unmount());dom.window.close()}
 console.log('Dispatch stays off the home page and out of the navigation.');

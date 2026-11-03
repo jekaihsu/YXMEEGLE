@@ -37,16 +37,18 @@ try {
  assert.equal(cachedPanel('/api/synthetic-panel','user-a'),undefined);
  console.log('PASS scoped panel reads. Coalescing, one-reader cancellation, scope isolation and session invalidation.');
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
- for(const key of ['window','document','location','localStorage','HTMLElement','Event'])globalThis[key]=dom.window[key];
- globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ for(const key of ['window','document','location','localStorage','HTMLElement','Element','Node','Event'])globalThis[key]=dom.window[key];
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;HTMLElement.prototype.scrollIntoView=function(){};
  const w=structuredClone(workspace),base=w.projects[0];w.as_of='2026-10-16';
  const project=(id,name,due)=>({...base,id,code:id,name,case_type:'formal',source_status:'執行中',due_date:due,nodes:[]});
  w.projects=[project('A','Overdue','2026-10-14T18:00:00Z'),project('B','Next','2026-10-17'),project('Z','Undated',null),
   ...Array.from({length:48},(_,i)=>project(`F${String(i).padStart(2,'0')}`,`Future ${i}`,'2027-01-01'))];
  const root=createRoot(document.getElementById('root'));
  await act(async()=>{root.render(React.createElement(Projects,{c:{w,s:{user:a,workspace_id:'synthetic'},route:{view:'projects'},go:()=>{},run:async()=>{},reloadVersion:0,busy:false}}));await new Promise(r=>setTimeout(r,10))});
- const size=document.querySelector('[aria-label="每組顯示筆數"]');
- await act(async()=>{size.value='50';size.dispatchEvent(new Event('change',{bubbles:true}))});
+ const changePicker=async(label,value)=>{await act(async()=>document.querySelector(`select[aria-label="${label}"]`).parentElement.querySelector("button").click());const native=document.querySelector(`select[aria-label="${label}"]`);const text=[...native.options].find(o=>o.value===value).text;await act(async()=>[...document.querySelectorAll('[role=option]')].find(o=>o.textContent===text).click());assert.equal(native.value,value)};
+await act(async()=>document.querySelector('.pl-filter-trigger').click());
+const size=document.querySelector('[aria-label="每組顯示筆數"]');
+ await changePicker('每組顯示筆數','50');await act(async()=>document.querySelector('[aria-label="關閉"]').click());
  assert.equal(document.querySelectorAll('.pl-case').length,50);
  assert.equal(size.value,'50');
  assert.deepEqual([...document.querySelectorAll('.pl-case .case-link')].slice(0,2).map(a=>a.textContent),['Overdue','Next']);

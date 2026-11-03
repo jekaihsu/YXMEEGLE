@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {projectFixture} from './fixtures/node-assignments.mjs';
-const bundle=await build({stdin:{contents:"export {ProjectDetailShell} from './src/ProjectDetailShell';export {DisabledActionReasons} from './src/design';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectChatLauncher} from './src/assistant/ProjectChatLauncher';export {DisabledActionReasons} from './src/design';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.project-chat-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
 let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
@@ -20,7 +20,7 @@ const {project,user,workspace}=projectFixture();
 const c={w:workspace,s:{user},go(){},notify(){}};
 const root=createRoot(document.getElementById('root'));
 const flush=async(fn=()=>{},delay=30)=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,delay))});
-const render=(p=project,tab='overview')=>flush(()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.ProjectDetailShell,{c,p,tab,onPeople(){},onPrefetch(){},onCancelPrefetch(){}}))));
+const render=(p=project,tab='overview')=>flush(()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.ProjectChatLauncher,{projectId:p.id,projectCode:p.code,projectName:p.name}))));
 const bubble=()=>document.querySelector('.project-chat-launcher');
 const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true}]};
 const json=data=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
