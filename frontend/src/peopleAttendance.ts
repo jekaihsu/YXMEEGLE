@@ -11,7 +11,7 @@ const string=(value:unknown):string|null=>typeof value==='string'&&value?value:n
 const strings=(value:unknown):string[]=>Array.isArray(value)?value.filter((item:unknown):item is string=>typeof item==='string'):[];
 const count=(value:unknown):number|null=>typeof value==='number'&&Number.isInteger(value)&&value>=0?value:null;
 const status=(value:unknown):AttendanceStatus=>attendanceStatuses.find(s=>s===value)??'read-failed';
-export const attendanceValue=(value:number|string|boolean|null|undefined):string=>value===null||value===undefined||value===''?'—':typeof value==='boolean'?value?'在職':'離職':String(value);
+export const attendanceValue=(value:number|string|boolean|null|undefined):string=>value===null||value===undefined||value===''?'待核對':typeof value==='boolean'?value?'在職':'離職':String(value);
 export function taipeiWeek(value=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'})):string{
  const date=new Date(value+'T00:00:00Z');
  date.setUTCDate(date.getUTCDate()-((date.getUTCDay()+6)%7));
@@ -23,13 +23,13 @@ export function parsePeopleAttendance(raw:unknown):PeopleAttendance{
  const summary=field(raw,'summary');
  const people:AttendancePerson[]=[];const trips:AttendanceTrip[]=[];const leaves:AttendanceLeave[]=[];
  const rawPeople=field(raw,'people');
- if(Array.isArray(rawPeople))for(const row of rawPeople){
+ if(known&&Array.isArray(rawPeople))for(const row of rawPeople){
   const id=string(field(row,'id'));if(!id)continue;
   const service=field(row,'in_service'),days=field(row,'attendance'),photo=string(field(row,'avatar_url'));
   people.push({id,name:string(field(row,'name')), ...(photo ? {avatar_url:photo} : {}),group:string(field(row,'group')),in_service:typeof service==='boolean'?service:null,attendance:Array.isArray(days)?days.map((d:unknown)=>string(d)):[]});
  }
  const rawTrips=field(raw,'trips');
- if(Array.isArray(rawTrips))for(const row of rawTrips){
+ if(known&&Array.isArray(rawTrips))for(const row of rawTrips){
   const id=string(field(row,'person_id')),kind=field(row,'kind'),start=string(field(row,'start')),end=string(field(row,'end'));
   if(id&&(kind==='trip'||kind==='out')&&start&&end)trips.push({person_id:id,name:string(field(row,'name')),group:string(field(row,'group')),kind,start,end});
  }
@@ -45,7 +45,7 @@ export async function fetchPeopleAttendance({week,signal,current}:{week?:string;
  const query=week?'?'+new URLSearchParams({week}):'';
  return parsePeopleAttendance(await api<unknown>('/api/people/attendance'+query,{signal},current));
 }
-export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊快照，更新中', 'needs-permission':'缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};
+export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊資料 · 資料待更新', 'needs-permission':'缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};
 
 export function attendanceReadPresentation(error:unknown,data?:PeopleAttendance){
  const denied=error instanceof ApiError&&error.status===403;

@@ -21,7 +21,7 @@ const done=row(make('done',9,{pm_id:'viewer',sop_summary:{policy:'managed',impor
 const sop=row(make('sop',3,{sop_summary:{policy:'managed',imported_tasks:false}}));
 const imported=row(make('imported',3,{sop_summary:{policy:'legacy',imported_tasks:true}}));
 const other=row(make('other'));
-assert.equal(m.groupKey(owned,new Set()),'mine');assert.equal(m.groupKey(owned,new Set(['owned'])),'pinned');
+assert.equal(m.groupKey(owned,new Set()),'sop');assert.equal(m.groupKey(owned,new Set(['owned'])),'sop');
 assert.equal(m.groupKey(done,new Set()),'done');assert.equal(m.groupKey(row({...unstarted,pm_id:'viewer',sop_summary:{policy:'managed',imported_tasks:false}}),new Set()),'notStarted');
 assert.equal(m.groupKey(sop,new Set()),'sop');assert.equal(m.groupKey(imported,new Set()),'sop');assert.equal(m.groupKey(other,new Set()),'other');
 const rows=[owned,done,sop,imported,other,row(unstarted)];
@@ -47,9 +47,17 @@ store.set(key,'broken');assert.deepEqual(m.readPins(storage,key),[]);store.set(k
 assert.equal(m.writePins({setItem(){throw Error('quota')}},key,['a']),false);
 console.log('PASS projects list model. Current node, all-done, unstarted, unknown, skip, review, exclusive precedence, KPI reconciliation, combined filters and scoped pin persistence.');
 
-// LC/L6: KPI spans all non-completed SOP cases; exclusive sections hide
-// owned and pinned SOP rows in their higher-precedence sections.
-const lcRows=[owned,sop,imported],lcPins=new Set(['imported']);
+// Pins and current ownership never move lifecycle membership.
+const lcRows=[owned,sop,imported];
 assert.equal(m.portfolioCounts(lcRows).sop,3);
-assert.equal(m.groupRows(lcRows,lcPins).find(g=>g.key==='sop').rows.length,1);
-assert.deepEqual(lcRows.map(r=>m.groupKey(r,lcPins)),['mine','sop','pinned']);
+assert.equal(m.groupRows(lcRows,new Set(['imported'])).find(g=>g.key==='sop').rows.length,3);
+assert.deepEqual(lcRows.map(r=>m.groupKey(r,new Set(['imported']))),['sop','sop','sop']);
+assert.equal(m.revealedCount(3,1,398),28);assert.equal(m.revealedCount(3,2,398),53);assert.equal(m.revealedCount(3,20,398),398);
+const waiting={...owned,state:'待審核'};
+assert.equal(m.caseBadge(waiting,'2026-10-23'),'等待你處理');
+assert.equal(m.caseBadge({...waiting,project:{...waiting.project,due_date:'2026-10-01'}},'2026-10-23'),'逾期');
+assert.equal(m.caseBadge({...waiting,state:'暫停'},'2026-10-23'),'受阻');
+
+const population=Array.from({length:398},(_,i)=>i===0?row(make('115575',3,{sop_summary:{policy:'managed',imported_tasks:false}})):i===397?row(make('C115264')):row({...unstarted,id:`bulk-${i}`,name:'114年石門水庫蓄水範圍地形測繪及土地權屬調查',sop_summary:{policy:i<3?'managed':null,imported_tasks:false}}));
+assert.deepEqual(m.portfolioCounts(population),{all:398,active:2,sop:3,done:0});
+assert.deepEqual(m.groupRows(population,new Set(['115575'])).map(g=>[g.key,g.rows.length]),[['sop',1],['notStarted',396],['other',1],['done',0]]);

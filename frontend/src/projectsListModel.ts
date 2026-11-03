@@ -7,10 +7,10 @@ export type PortfolioProject = Project & {duplicate_count?:number;source_removed
 export type PortfolioPage = {items:PortfolioProject[];total:number;hidden_duplicates?:number;hidden_removed?:number;node_status_degraded?:boolean;source_synced_at?:string;as_of:string;basis:string;page?:number;next_page?:number|null;snapshot?:string};
 export type CaseState = '進行中'|'待審核'|'尚未開始'|'已完成'|'待核對'|'暫停';
 export type CaseRow = {project:PortfolioProject;nodes:FlowNode[];current:FlowNode|undefined;state:CaseState;mine:boolean;sop:boolean|null};
-export type GroupKey = 'pinned'|'mine'|'sop'|'notStarted'|'done'|'other';
+export type GroupKey = 'sop'|'notStarted'|'done'|'other';
 export const GROUPS = [
- {key:'pinned',label:'已釘選'}, {key:'mine',label:'我的案件'}, {key:'sop',label:'SOP 進行中'},
- {key:'notStarted',label:'尚未開始'}, {key:'done',label:'已完成'}, {key:'other',label:'其他案件'},
+ {key:'sop',label:'其他 SOP 納管案件'}, {key:'notStarted',label:'尚未開始'},
+ {key:'other',label:'其他案件'}, {key:'done',label:'已完成'},
 ] satisfies {key:GroupKey;label:string}[];
 export type CaseFilters = {q:string;client:string;owner:string;node:string;state:string;kind:string;attention:boolean;sort:string;direction:number};
 export const DEFAULT_FILTERS:CaseFilters = {q:'',client:'',owner:'',node:'',state:'',kind:'',attention:false,sort:'due',direction:1};
@@ -36,12 +36,10 @@ export function caseRow(project:PortfolioProject,users:User[],viewer:string,toda
  const sop=project.sop_summary ? project.sop_summary.policy==='managed' || project.sop_summary.imported_tasks===true : null;
  return {project,nodes,current,state,mine,sop};
 }
-export function groupKey(row:CaseRow,pins:ReadonlySet<string>):GroupKey {
+export function groupKey(row:CaseRow,_pins:ReadonlySet<string>):GroupKey {
  // Precedence is exclusive. Closed and unstarted cases retain their lifecycle group, even when owned or managed.
- if(pins.has(row.project.id))return 'pinned';
  if(row.state==='已完成')return 'done';
  if(row.state==='尚未開始')return 'notStarted';
- if(row.mine)return 'mine';
  if(row.sop)return 'sop';
  return 'other';
 }
@@ -86,3 +84,14 @@ export function writePins(storage:Pick<Storage,'setItem'>,key:string,pins:string
 export function verification(p:Project) {
  return p.source_lifecycle?.reasons?.includes('conflict')?'不一致':p.source_lifecycle?.state==='mapped'&&p.source_lifecycle.canonical&&!p.source_lifecycle.reasons?.length?'已驗證':'來源待確認';
 }
+
+/** One work badge; source health is separate exception text. */
+export function caseBadge(row:CaseRow,today:string):string {
+ if(row.state==='已完成')return '已完成';
+ const attention=caseAttention(row.project,today);
+ if(attention.late)return '逾期';
+ if(row.mine&&row.state==='待審核')return '等待你處理';
+ if(attention.blocked||row.state==='暫停')return '受阻';
+ return row.state==='待核對'?'待核對':row.state;
+}
+export const revealedCount=(initial:number,steps:number,total:number)=>Math.min(total,initial+25*steps);
