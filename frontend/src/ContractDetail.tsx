@@ -79,7 +79,7 @@ export function ContractDetail({
 
   if (view.kind === 'state') return <div className="p2-detail-root">
     <h1>合約明細</h1>
-    <DataState kind={view.page.states.some(s=>s==='forbidden'||s==='unlocated')?'Denied':'Partial'} title="目前無法開啟關聯內容" body="找不到可檢視的授權關聯，或來源尚未提供。這不代表沒有資料，系統不會推測關聯。"
+    <DataState kind={view.page.states.some(s=>s==='forbidden')?'Denied':'Partial'} title="目前無法開啟關聯內容" body="找不到可檢視的授權關聯，或來源尚未提供。這不代表沒有資料，系統不會推測關聯。"
       actions={onBack?<button className="button" onClick={onBack}>回確認單</button>:<a className="button" href="#view=confirmations">回確認單</a>}/>
     {['合約內容', '工項關聯', '來源與版本'].map(title=><section className="p2-card" key={title}><h2>{title}</h2><p>狀態未知 · 待核對</p></section>)}
   </div>;

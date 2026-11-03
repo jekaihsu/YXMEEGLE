@@ -190,3 +190,13 @@
 @media(max-width:767px) {
   .p2-page { padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
 }
+
+.approvals-disabled {
+  text-align:center;
+  justify-items:center;
+  padding:48px 24px;
+  background:var(--surface);
+  border:1px solid var(--sep);
+  border-radius:var(--radius-card);
+}
+.approvals-disabled p { max-width:65ch; color:var(--muted); }
