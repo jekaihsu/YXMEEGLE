@@ -119,7 +119,7 @@ class HomePanels:
         except Failure:
             return {}, True
 
-    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+    def lark_items(self, state, data, user, scope, team, hidden_confirmations, *, assigned_only=False):
         if reason := self.assignment_unavailable(state, data):
             return [], {}, None, reason
         sources, roster = self.assignment_sources(scope, include_roster=True)
@@ -130,6 +130,9 @@ class HomePanels:
         nodes_read, tasks_read = sources['node_assignments'], sources['tasks']
         raw_nodes = [] if isinstance(nodes_read, Failure) else nodes_read.value
         raw_tasks = [] if isinstance(tasks_read, Failure) else tasks_read.value
+        if assigned_only and not team:
+            from .home_assignment_candidates import assigned_rows
+            raw_nodes, raw_tasks = assigned_rows(raw_nodes, raw_tasks, user['id'])
         bulk = AssignmentChains(self.nodes, state, data, user, raw_nodes, raw_tasks)
         nodes, tasks = bulk.nodes, bulk.tasks
         raw_by_id, task_fields = bulk.node_fields, bulk.task_fields
@@ -273,7 +276,7 @@ class HomePanels:
         if panel in ('proxy', 'local') or params.get('kinds') == 'sop_task':
             items, sources, manager, reason = [], {}, None, None
         else:
-            items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations)
+            items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations, assigned_only=panel == 'assigned')
         if panel == 'confirmation' and manager is None and reason is None:
             reason = 'authorization_unavailable'
         if scope_name == 'team' and manager is not True:

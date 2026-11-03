@@ -1349,10 +1349,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def p2_generation(db,wid):
         version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
-        # The generation fence needs four scalars, not the large source snapshot.
-        keys=('status','last_attempt_at','last_sync','as_of')
-        cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
-        return (version,*(tuple(cache) if cache else (None,)*len(keys)))
+        # Extract once: four separate PostgreSQL JSON operators each parse
+        # the complete raw source document even though they return scalars.
+        from .source_metadata_reads import read_generation
+        return (version,*read_generation(db,CacheRow,wid))
+
 
     def p2_related_project_ids(state,project_id):
         """Other projects whose visibility a scoped case read still needs.

@@ -119,3 +119,85 @@ def test_lark_warm_case_keys_do_not_decode_workspace(tmp_path):
             assert response.status_code == 200
             assert len(wide) == 0, 'warm Lark admission/key validation must read person and scalars only'
         finally:event.remove(app.state.engine,'before_cursor_execute',observe)
+
+
+def test_progress_generation_source_document_parse_budget(tmp_path):
+    with scaled_client(tmp_path,2,WORKSPACE_SHELL_ENABLED='true',INDEX_TABLES_ENABLED='true') as (app,client):
+        assert client.get('/api/projects/p001/progress').status_code == 200
+        reads=[]
+        def observe(conn,cur,statement,*_):
+            if 'source_caches.data' in statement:
+                reads.append(statement)
+        event.listen(app.state.engine,'before_cursor_execute',observe)
+        try:
+            assert client.get('/api/projects/p001/progress').status_code == 200
+            for statement in reads:
+                extracts=statement.count('JSON_EXTRACT(source_caches.data')+statement.count('source_caches.data ->')
+                assert extracts <= 1, 'generation checks must not parse the same source document four times'
+        finally:event.remove(app.state.engine,'before_cursor_execute',observe)
+
+
+def test_unassigned_home_does_not_derive_other_peoples_cases(tmp_path):
+    from .benchmark_case_home import fixture,offline_assignments
+    from .node_assignment import bulk
+    with scaled_client(tmp_path,12,upgraded=True,mutate=fixture) as (app,client):
+        offline_assignments(app)
+        # The manager owns none of these 319 source groups.
+        with patch.object(bulk,'derive_chain',wraps=bulk.derive_chain) as derive:
+            response=client.get('/api/home-panels?panel=assigned&scope=mine&limit=100')
+        assert response.status_code == 200
+        assert response.json()['items'] == []
+        assert derive.call_count == 0, 'mine/assigned must not derive unassigned case chains'
+
+
+from .test_ux_home_panels import home, node, task  # noqa: E402,F401
+
+
+def test_assigned_candidate_filter_preserves_full_source_result(home):
+    from . import home_assignment_candidates as candidates
+    mine=node(home)
+    # A different relation/code holding the same key must still block mine as
+    # a global duplicate, even though that row belongs to someone else.
+    node(home,owner='ou_depth',**{'確認單編號':'C999999','工程確認單':['recOTHER']})
+    predecessor=node(home,label='業務',owner='ou_depth')
+    task(home,predecessor,owner='ou_depth')
+    task(home,mine,owner='ou_member')
+    task(home,mine,owner='ou_depth')
+    task(home,None,owner='ou_member')
+    task(home,'missing-parent',owner='ou_member')
+    unrelated=node(home,owner='ou_depth',**{'指派鍵':'C888888|外業','確認單編號':'C888888','工程確認單':['recUNRELATED']})
+    task(home,unrelated,owner='ou_depth')
+    with patch.object(candidates,'assigned_rows',lambda n,t,_:(n,t)):
+        full=home.read(panel='assigned')
+    narrowed=home.read(panel='assigned')
+    assert narrowed == full
+    assert any(i.get('assignment_state') == 'duplicate' for i in narrowed['items'])
+    assert home.fake.writes() == []
+
+
+def test_assigned_candidate_inputs_validate_all_envelopes():
+    from .home_assignment_candidates import assigned_rows
+    from .node_assignment.errors import Failure
+    with pytest.raises(Failure):
+        assigned_rows([{'record_id':'bad','fields':None}],[], 'ou_viewer')
+
+
+@pytest.mark.parametrize('dialect', ['sqlite','postgres'])
+def test_generation_projection_preserves_json_values(tmp_path,dialect):
+    from .source_metadata_reads import read_generation
+    url=os.getenv('PERF2_POSTGRES_URL') if dialect=='postgres' else f'sqlite:///{tmp_path}/fence.db'
+    if not url:pytest.skip('PERF2_POSTGRES_URL needs a disposable PostgreSQL database')
+    engine=create_engine(url);Base.metadata.create_all(engine)
+    wid='perf2-fence-'+tmp_path.name
+    values=(False,{'nested':[1,None,True]},'null',0)
+    try:
+        with Session(engine) as db:
+            db.add(CacheRow(id=wid,data=dict(zip(('status','last_attempt_at','last_sync','as_of'),values))))
+            db.commit()
+            assert read_generation(db,CacheRow,wid) == values
+            assert read_generation(db,CacheRow,wid+'-missing') == (None,None,None,None)
+    finally:
+        with Session(engine) as db:
+            row=db.get(CacheRow,wid)
+            if row:db.delete(row);db.commit()
+        engine.dispose()
