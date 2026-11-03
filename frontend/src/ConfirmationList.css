@@ -716,3 +716,11 @@
     justify-content: flex-end;
   }
 }
+
+/* Preserve compact text while giving each keyboard target a full hit area. */
+.confirmation-list-root :is(button,input:not([type=checkbox]),select,a){box-sizing:border-box;min-height:44px;min-width:44px}
+.confirmation-list-root .p2-filter-field-inline{height:auto;min-height:46px}
+.confirmation-list-root .p2-search-input{height:44px;padding-right:48px}
+.confirmation-list-root .p2-search-clear{width:44px;height:44px;right:0}
+.confirmation-list-root a{display:inline-flex;align-items:center}
+.confirmation-list-root .p2-filter-field-inline .p2-filter-input{height:44px;min-height:44px}

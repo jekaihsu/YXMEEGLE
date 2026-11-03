@@ -110,3 +110,9 @@
 @media(max-width:700px){.reports .reports-metrics{grid-template-columns:1fr}.reports-populations{grid-template-columns:1fr}.reports .reports-table-scroll{max-height:none;overflow:visible;border:0}.reports .reports-table-scroll table{min-width:0;display:block}.reports .reports-table-scroll :is(tbody,tr,td){display:block;width:auto;max-width:none;position:static!important;min-width:0!important}.reports .reports-table-scroll thead{display:none}.reports .reports-table-scroll tr{padding:16px 0;border-bottom:1px solid var(--sep)}.reports .reports-table-scroll td{padding:5px 0;border:0;text-align:left;white-space:normal;background:transparent!important}.reports .reports-table-scroll td:before{content:attr(data-label) '：';color:var(--label-2);font-size:12px}.reports .reports-progress-table{display:block}.reports .reports-progress-cards{display:none}.reports-scroll-hint{display:none}.reports .reports-pagination{flex-wrap:wrap}.reports-identity{min-width:0}.reports .reports-progress-table th:first-child{position:static}.reports .reports-table-scroll caption{display:block}}
 
 .reports td button{min-height:44px;min-width:44px;cursor:pointer}.reports td details summary{min-height:44px}.reports .reports-metrics .ds-stat strong{overflow-wrap:anywhere}.reports .reports-metrics>div{border-right:1px solid var(--sep)}
+
+/* Hit areas apply to the actual control on desktop as well as touch screens. */
+.reports :is(button,input:not([type=checkbox]),select){min-height:44px;min-width:44px}
+.reports-filters :is(input,.ds-select>.ds-picker>button),.reports-sort>button{height:44px;min-height:44px}
+.reports :is(.reports-week button,th button){min-width:44px}
+.reports-source-secondary a{display:inline-flex;align-items:center;min-width:44px;min-height:44px}

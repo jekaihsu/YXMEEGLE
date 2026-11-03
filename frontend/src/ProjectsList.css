@@ -490,3 +490,9 @@
 .pl-inline-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px}.pl-inline-filters .pl-select{min-width:120px}.pl-inline-filters .ds-select>select{max-width:240px}.pl-group h2:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(min-width:768px){.pl-filter-trigger{display:none}}
 @media(max-width:767px){.pl-inline-filters{display:none}}
+
+/* An opaque reading surface separates filter labels from the retained case list. */
+.ds-sheet:has(.pl-filters){background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+.ds-backdrop:has(.pl-filters){background:var(--scrim)}
+.pl-title{display:flex;align-items:center;min-height:44px;min-width:44px}
+@media(min-width:768px){.pl-title{padding-block:11.5px;margin-block:-11.5px}}
