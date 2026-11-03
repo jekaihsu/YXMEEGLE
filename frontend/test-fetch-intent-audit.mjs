@@ -11,7 +11,7 @@ import ts from 'typescript';
 const legacy={
  // C: migrated dispatch retry site has no exemption. These surviving sites
  // only restore scroll/pins or handle history keyboard/media UI; neither reads data.
- 'ProjectsList.tsx': 'ffad4ce5ab09ce55a986a4baa401e5adaab2fd249c7c1e3a2c1bc94802ae8b6b',
+ 'ProjectsList.tsx': 'd9735e31d189773325406771b6e34c517df4ed98322101a8352bea5c0f7964ed',
  'assistant/ConversationHistory.tsx': '2eea0214d33ef7dc6479b6a1fe8865eb9c5fe065ff3aaae5212d8ff978a8fcfb',
  // Newly inventoried: rAF focus/scroll (shell, flow, mentions, SOP),
  // explicit assignment notification and feedback patch microtasks,
@@ -31,7 +31,7 @@ const legacy={
  'assistant/useInputModality.ts': '822efb5b2e63069ef075c0a0bef50d0d5f3045dc34fb1a8422dc72fb85e11bf9',
  'design/PickerPopover.tsx': 'c9573b531f847dddeff291b4823f403f16688d4f75531339853f7d516c260ca8',
  // I1: DataState export; existing picker presentation listeners unchanged.
- 'design/index.tsx': '6782b99d515e684dfc8577ced7fa704d522712d9b065dd5dfcc4b40d155b85f1',
+ 'design/index.tsx': '6c92e3c17b2bfd8203e93dff156d6d512116ccd6fbf35713efe277d230a30115',
  'homeHelp.tsx': 'f887c49a97ee6485a61693d54e83b7af4ca585d9648c0372b3d6e06addd1bc55',
  'pageData.ts': '1bfb68b728abee62479f560fa761651fe1fd3ecb94453a52c65d6f0b3190e74d',
  'reports/ProgressTab.tsx': '52c0dd698d7e5308bd0ec41759435aa2545a9194d7f1587d7fb0ec4f790866b6',
