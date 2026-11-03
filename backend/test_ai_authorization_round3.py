@@ -179,3 +179,23 @@ def test_backfill_failure_rolls_back_marker_and_retries(tmp_path):
     ledger.ensure_schema(engine)
     with engine.connect() as db: assert db.scalar(select(ledger.AiSchemaMigration.name))==ledger.CONVERSATION_READ_BACKFILL
     engine.dispose()
+
+
+def test_postgres_index_disconnect_does_not_crash_startup_and_retries(app,client):
+    engine=app.state.sessions.kw['bind']
+    if engine.dialect.name!='postgresql': pytest.skip('PostgreSQL concurrent indexes')
+    with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as db:
+        db.exec_driver_sql('DROP INDEX CONCURRENTLY IF EXISTS ix_ai_usage_conversation')
+    attempted=[]
+    def disconnect(conn,cursor,sql,*args):
+        if sql.startswith('CREATE INDEX CONCURRENTLY'):
+            attempted.append(sql)
+            conn.invalidate()
+            raise OperationalError('synthetic disconnect',{},Exception('disconnect'),connection_invalidated=True)
+    event.listen(engine,'before_cursor_execute',disconnect)
+    try: ledger.ensure_schema(engine)
+    finally: event.remove(engine,'before_cursor_execute',disconnect)
+    assert len(attempted)==1
+    ledger.ensure_schema(engine)
+    with engine.connect() as db:
+        assert db.scalar(text("SELECT indisvalid FROM pg_index WHERE indexrelid=to_regclass('ix_ai_usage_conversation')")) is True

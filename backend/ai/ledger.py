@@ -9,7 +9,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect, true, union
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.schema import CreateColumn
 from ..models import Base
 
@@ -555,9 +555,9 @@ def ensure_usage_conversation_index(engine):
                 try:
                     connection.exec_driver_sql('RESET lock_timeout')
                     connection.exec_driver_sql('RESET statement_timeout')
-                except DBAPIError:
+                except SQLAlchemyError:
                     connection.invalidate()
-    except DBAPIError:
+    except SQLAlchemyError:
         logger.warning('ai_usage_conversation_index_retry_on_next_startup')
 
 
