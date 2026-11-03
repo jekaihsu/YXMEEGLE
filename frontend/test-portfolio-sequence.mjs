@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-const bundle=await build({stdin:{contents:`export {readPortfolioSequence} from './src/portfolioSequence';export {ApiError} from './src/api';`,resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
+const bundle=await build({stdin:{contents:`export {readPortfolioSequence,readPortfolioWindow} from './src/portfolioSequence';export {ApiError} from './src/api';`,resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
 const m=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const page=(snapshot,ids,next_page=2)=>({snapshot,items:ids.map(id=>({id})),total:3,next_page});
 for(const conflicts of [1,2,3]){
@@ -31,3 +31,22 @@ for(const status of [401,403,500]){
  assert.equal(count,1);assert.equal(output.denied,status!==500);
 }
 console.log('portfolio sequence passed: two bounded restarts, no mixed rows, atomic replacement, abort and denied');
+
+for(const scenario of ['normal','replacement','409','mismatch','exhausted','denied','abort']){
+ let calls=[];const abort=new AbortController();
+ const run=()=>m.readPortfolioWindow(page('old',['old']),'other',2,async(section,n,token)=>{
+  calls.push({section,n,token});
+  if(scenario==='denied')throw new m.ApiError(403,'denied');
+  if(scenario==='abort'){abort.abort();return page('old',['late'],null)}
+  if(scenario==='exhausted'||scenario==='409'&&section)throw new m.ApiError(409,'changed');
+  if(scenario==='replacement')return {...page('new',['replacement'],null),snapshot_replaced:true};
+  return page(scenario==='mismatch'||!section?'new':'old',[section?'next':'first'],null);
+ },abort.signal);
+ if(scenario==='exhausted'||scenario==='denied'||scenario==='abort')await assert.rejects(run);
+ else{
+  const result=await run();assert.deepEqual(result.items.map(i=>i.id),[scenario==='replacement'?'replacement':scenario==='409'||scenario==='mismatch'?'first':'next']);
+  assert.equal(!!result.snapshot_replaced,scenario!=='normal');
+ }
+ assert.equal(calls.length,scenario==='exhausted'?3:scenario==='409'||scenario==='mismatch'?2:1);
+}
+console.log('portfolio windows passed: one user-selected window, bounded conflict/mismatch recovery, atomic replacement, denied and abort');
