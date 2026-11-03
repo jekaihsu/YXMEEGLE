@@ -66,6 +66,13 @@ test('3. stage and due date never render a value even if the body supplies one (
  eq([r.currentStage.text,r.effectiveDueDate.text,r.currentStage.known,r.effectiveDueDate.known],['—','—',false,false]);
  ok(!JSON.stringify(v(b)).includes('2026-12-31'),'supplied date never output');
 });
+test('owners distinguish unknown/withheld labels from a verified empty value',()=>{
+ for(const reason of ['Current PM has no authorized person label.','Not loaded','Withheld']){
+  const b=body();b.snapshot.cases[0].responsible={value:null,state:st(['unknown']),reason};const cell=v(b).snapshot.cases[0].responsible;eq(cell.known,false);eq(cell.reason,reason);
+ }
+ for(const value of ['', '   ']){const b=body();b.snapshot.cases[0].responsible={value,state:null,reason:'Authorized source field is empty.'};const cell=v(b).snapshot.cases[0].responsible;eq(cell.known,true);eq(cell.text,'未填')}
+});
+
 test('4. cards carry unit labels; drilldown descriptors pass through unchanged',()=>{
  const view=v();const a=cardOf(view,'confirmation_versions'),b=cardOf(view,'stable_cases');
  eq([a.unitLabel,b.unitLabel],['確認單版本','案件（穩定身分）']);
