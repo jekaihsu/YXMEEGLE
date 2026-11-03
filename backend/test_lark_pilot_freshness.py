@@ -110,11 +110,11 @@ def test_R_H_exemption_unchanged():
     assert PATH+'/x' not in NO_ROSTER_REFRESH_PATHS
 
 
-def test_R_H_registered_adjacent_route_refreshes(integrated, clock):
+def test_R_H_registered_adjacent_route_uses_stored_roster(integrated, clock):
     app, client, calls, refreshes, _ = integrated
     profile(app, directory_last_seen_at=(clock-timedelta(seconds=90)).isoformat())
     assert client.get('/api/session').status_code == 200
-    assert refreshes == ['lark-company'] and calls == []
+    assert refreshes == [] and calls == []
 
 
 def test_R_I_flag_off_precedes_identity(integrated):

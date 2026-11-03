@@ -52,7 +52,14 @@ def attendance_route(tmp_path, monkeypatch, request):
     reader.refreshers['attendance'] = lambda key: dict(fingerprint='fixture', snapshot=fetch_week(
         Adapter(), users, 'app', 'company', week_window('2026-10-12'), True))
     monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
+    refresh_attendance_fixture(app, client)
     yield app, client
+
+
+
+def refresh_attendance_fixture(app, client):
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    app.state.people_attendance.ensure(wid + '|2026-10-12', 'attendance', wait=True, force=True)
 
 
 
@@ -182,6 +189,8 @@ def test_refresh_changes_count_only_when_evidence_changes(attendance_route):
         records=[dict(check_in_result='Normal')]))
     reader = app.state.people_attendance
     reader.clock = lambda: datetime(2026, 10, 12, 1, tzinfo=timezone.utc)
+    assert call(attendance_route, args)['counts']['unaccounted'] == 52
+    refresh_attendance_fixture(*attendance_route)
     refreshed = call(attendance_route, args)
     assert refreshed['counts']['unaccounted'] == 51
     assert refreshed['counts']['arrived'] == 1

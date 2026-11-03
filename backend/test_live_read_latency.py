@@ -43,7 +43,7 @@ def test_pages_return_immediately_while_refresh_is_slow_or_failing(tmp_path, fai
             response = client.get(path)
             assert monotonic() - begun < 3, path
             assert response.status_code == 200, path
-        assert started  # the refresh really is in flight while pages were served
+        assert not started  # Page reads never start upstream work.
         assert response.json()  # last-good data is served, freshness attached below
         assert 'freshness' in client.get('/api/workspace').json()
     finally:

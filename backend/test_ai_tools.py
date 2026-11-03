@@ -98,6 +98,8 @@ def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monk
     reader.refreshers['attendance'] = lambda key: dict(fingerprint='test', snapshot=fetch_week(
         Adapter(), users, 'app', 'company', week_window('2026-10-12'), True))
     monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
+    from .test_ai_attendance import refresh_attendance_fixture
+    refresh_attendance_fixture(app, client)
     source = client.get('/api/people/attendance?week=2026-10-12').json()
     assert source['people'] and source['as_of']
     result = tool(app, client, 'attendance_today', {'range': 'today', 'date': ''})

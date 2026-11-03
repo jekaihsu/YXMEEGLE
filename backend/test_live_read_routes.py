@@ -144,19 +144,23 @@ def production_client(tmp_path, *, enabled=True):
     return app,client
 
 
-def test_app_workspace_demand_read_and_header(tmp_path):
+def test_app_workspace_serves_retained_timestamp_without_demand_refresh(tmp_path):
     app,client=production_client(tmp_path);calls=[]
     def read(wid):calls.append(wid);return {'fingerprint':'new'}
     app.state.live_read.refreshers={d:read for d in ('sources','roster','attendance')}
+    with app.state.sessions.begin() as db:
+        db.add(CacheRow(id=app.state.live_read._key('lark-company','sources'),
+                        data={'as_of':'2020-01-01T00:00:00+08:00'}))
     response=client.get('/api/workspace');assert response.status_code==200,response.text
+    assert response.json()['freshness']['datasets']['sources']['status']=='stale'
     assert response.headers['x-data-as-of']==response.json()['freshness']['datasets']['sources']['as_of']
-    assert len(calls)==2  # The person's roster proof is still below its soft TTL.
+    assert calls==[]
     calls.clear()
     assert client.get('/api/live/status').status_code==200
     assert calls==[]
 
 
-def test_admission_reloads_refreshed_person_before_access_check(tmp_path):
+def test_page_admission_keeps_stored_proof_without_demand_refresh(tmp_path):
     app,client=production_client(tmp_path)
     with app.state.sessions.begin() as db:
         person=db.get(PersonRow,('lark-company','u-manager'))
@@ -170,7 +174,7 @@ def test_admission_reloads_refreshed_person_before_access_check(tmp_path):
         return {'fingerprint':'verified'}
     app.state.live_read.refreshers={'roster':roster,'sources':lambda wid:{'fingerprint':'s'},'attendance':lambda wid:{'fingerprint':'a'}}
     response=client.get('/api/workspace');assert response.status_code==200,response.text
-    assert calls==['lark-company']
+    assert calls==[]
 
 
 def test_status_never_triggers_stale_admission_read(tmp_path):
@@ -365,11 +369,11 @@ def test_forced_refresh_records_actor_and_datasets(tmp_path):
 
 
 @pytest.mark.parametrize('path', ['/api/workspace', '/api/sources'])
-def test_display_cache_read_failure_returns_cached_content(tmp_path, path):
+def test_display_cache_read_failure_returns_cached_content(tmp_path, path, monkeypatch):
     app, client = production_client(tmp_path)
-    def failed(key):
+    def failed(*args):
         raise OSError('private database details')
-    app.state.live_read._read = failed
+    monkeypatch.setattr('backend.live_read.status_reads.read_status_rows', failed)
     response = client.get(path)
     assert response.status_code == 200, response.text
     assert response.json()['freshness']['datasets']['sources']['status'] == 'error'

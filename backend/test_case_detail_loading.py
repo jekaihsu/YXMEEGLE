@@ -42,6 +42,8 @@ def test_case_reads_finish_before_slow_external_refresh(tmp_path, monkeypatch, e
     try:
         coordinator.ensure(WID, 'sources', wait=False)
         assert source_started.wait(2)
+        coordinator.ensure(WID, 'roster', wait=False)
+        assert roster_started.wait(2)
         with ThreadPoolExecutor(max_workers=1) as executor:
             request = executor.submit(client.get, '/api/' + endpoint.format(pid=pid))
             try:

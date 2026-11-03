@@ -71,11 +71,11 @@ def test_E19_pilot_does_not_refresh_and_stale_access_fails_closed(pilot_identity
     assert mutations == [], 'settled identity pilot GET caused persistence'
 
 
-def test_E19_adjacent_formal_route_still_refreshes(pilot_identity):
+def test_E19_adjacent_formal_route_uses_stored_roster(pilot_identity):
     app, client, refreshes, _ = pilot_identity
     age_person(app, 90)
     assert client.get('/api/session').status_code == 200
-    assert refreshes == ['lark-company']
+    assert refreshes == []
 
 
 @pytest.mark.parametrize('path', [PATH + '/x', '/api/lark-pilot', '/api/Lark-Pilot/shadow'])

@@ -58,7 +58,7 @@ def slow_lark(tmp_path):
     app.state.live_read.close()
 
 
-def test_project_pages_return_at_database_speed_while_a_stale_roster_refreshes(slow_lark):
+def test_project_pages_return_at_database_speed_without_starting_roster_refresh(slow_lark):
     app, client, seen = slow_lark
     listing = client.get('/api/projects?view=overview&limit=5')
     assert listing.status_code == 200, listing.text
@@ -69,8 +69,7 @@ def test_project_pages_return_at_database_speed_while_a_stale_roster_refreshes(s
         assert response.status_code == 200, (path, response.text)
         assert time.monotonic() - started < LARK_SECONDS, path
     app.state.live_read.close()
-    assert seen, 'the stale roster really was refreshed beside the requests'
-    assert all(name.startswith('ThreadPoolExecutor') for name in seen), seen
+    assert seen == [], 'ordinary page reads must not start Lark requests'
 
 
 def test_project_pages_expose_their_server_phases(slow_lark):
