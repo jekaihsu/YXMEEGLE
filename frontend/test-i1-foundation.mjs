@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {JSDOM} from 'jsdom';
+const bundle=await build({stdin:{contents:"export * from './src/design/recentCases';export * from './src/design/DataState';export * from './src/homeViews/deadline';export {AppShell} from './src/AppShell';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
+const file=new URL('./.i1-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);let m;try{m=await import(file.href)}finally{await fs.unlink(file)}
+let ids=[];for(const id of ['a','b','c','d','e','f','c'])ids=m.openRecentCase(ids,id);assert.deepEqual(ids,['c','f','e','d','b']);
+const memory=new Map(),storage={getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};
+const key=m.recentCasesKey('u','w',1);m.saveRecentCases(storage,key,ids);assert.deepEqual(m.readRecentCases(storage,key),ids);
+for(const other of [m.recentCasesKey('v','w',1),m.recentCasesKey('u','v',1),m.recentCasesKey('u','w',2)])assert.deepEqual(m.readRecentCases(storage,other),[]);
+m.clearRecentCases(storage,key);assert.deepEqual(m.readRecentCases(storage,key),[]);
+const blocked={getItem(){throw Error()},setItem(){throw Error()},removeItem(){throw Error()}};assert.deepEqual(m.readRecentCases(blocked,key),[]);m.saveRecentCases(blocked,key,ids);m.clearRecentCases(blocked,key);
+for(const kind of ['Loading','Empty','Stale','Partial','Error','Denied','Conflict','UnknownOutcome']){
+ const html=renderToStaticMarkup(React.createElement(m.DataState,{kind,title:'狀態',body:'內容'}));
+ assert.match(html,/aria-hidden="true"/);assert.doesNotMatch(html,/ds-data-state-actions/);
+ assert.match(html,new RegExp(`role="${['Error','Denied','Conflict','UnknownOutcome'].includes(kind)?'alert':'status'}"`));
+}
+assert.match(renderToStaticMarkup(React.createElement(m.DataState,{kind:'Error',title:'失敗',body:'內容',actions:React.createElement('button',null,'重試')})),/ds-data-state-actions/);
+assert.equal(m.overdueDays('2026-08-05','2026-11-02'),89);assert.equal(m.overdueDays('2026-11-01T17:00:00Z','2026-11-02'),null);assert.equal(m.overdueDays(null,'2026-11-02'),null);assert.equal(m.overdueDays('invalid','2026-11-02'),null);assert.equal(m.overdueDays('2026-08-05','2026-11-02',true),null);assert.equal(m.dataTime(null),'尚未取得');
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','Event','HTMLElement','MutationObserver','sessionStorage'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+window.scrollTo=()=>{};globalThis.requestAnimationFrame=cb=>cb();globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const root=createRoot(document.getElementById('root'));
+const props={s:{user:{id:'u',name:'User',role:'manager'},workspace_id:'w',features:{change_extension:true,routines:true}},w:{projects:[{id:'a',code:'A',name:'案件A'}]},route:{view:'dashboard'},error:'',setError(){},mobile:false,setMobile(){},sessionOpen:false,setSessionOpen(){},ready:true,go(){},refresh:async()=>{},children:React.createElement('h1',null,'今日工作台')};
+await act(async()=>root.render(React.createElement(m.AppShell,props)));
+assert.deepEqual([...document.querySelectorAll('.mobile-tabs button span')].map(n=>n.textContent),['今日工作台','案件總覽','更多']);assert.equal(document.querySelectorAll('.recent-project').length,0);assert.equal(document.querySelector('.recent-empty').textContent,'尚無最近開啟的案件');
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'false');
+await act(async()=>document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true})));
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'true');
+await act(async()=>document.dispatchEvent(new window.Event('pointerdown',{bubbles:true})));
+assert.equal(document.querySelector('.app-shell').dataset.keyboardFocus,'false');
+await act(async()=>root.render(React.createElement(m.AppShell,{...props,route:{view:'project',project:'a'},children:React.createElement('h1',null,'案件A')})));
+assert.equal(document.querySelector('.recent-project').textContent,'A案件A');assert.equal(document.querySelector('.recent-empty'),null);assert.equal(document.title,'案件詳情｜詠翔工作台');
+await act(async()=>m.invalidateSessionEpoch());assert.equal(document.querySelectorAll('.recent-project').length,1,'the currently open authorized case becomes first in the new epoch');
+await act(async()=>root.render(React.createElement(m.AppShell,{...props,s:{...props.s,user:{id:'v',name:'Other'}}})));
+assert.equal(document.querySelectorAll('.recent-project').length,0,'user switch removes previous recents');
+await act(async()=>root.unmount());console.log('I1 MRU, DataState, overdue, bottom-nav and identity tests passed');

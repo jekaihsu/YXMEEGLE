@@ -8,7 +8,7 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate as ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.stage-workspace.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 const tick=(ms=15)=>new Promise(r=>setTimeout(r,ms));
@@ -74,10 +74,11 @@ await check('flow has one stage selector and selecting a stage never changes cur
  assert.match(document.querySelector('.pf-stage-nav .pf-node[aria-label^="控制"] .pf-stage-marker').textContent,/目前階段/);
  assert.equal(writes().length,0);
 });
-await check('overview keeps tasks after summary and removes stepper, node panel, folds and stale banner',async()=>{
+await check('overview keeps nine-node stepper and tasks after summary',async()=>{
  await mount();
  assert.ok(document.querySelector('.cs-summary').compareDocumentPosition(document.querySelector('#flow-tasks'))&Node.DOCUMENT_POSITION_FOLLOWING);
- for(const selector of ['.pf-diagram','.pf-stage-detail','#flow-evidence','.po-fold','.cs-stale','.cs-levels','.st-others'])assert.equal(document.querySelector(selector),null,selector);
+ assert.equal(document.querySelectorAll('.i3-stepper .pf-node').length,9);
+ for(const selector of ['.pf-stage-detail','#flow-evidence','.po-fold','.cs-stale','.cs-levels','.st-others'])assert.equal(document.querySelector(selector),null,selector);
  assert.doesNotMatch(document.body.textContent,/資料為上次成功讀取|上次成功資料|讀取時間/);
 });
 await check('flow retains evidence and delivery access while overview omits evidence',async()=>{
@@ -101,8 +102,8 @@ await check('T04/T05 task heading has one count and rows have value-only metadat
  assert.match(rowOf('c4').textContent,/待處理/);assert.match(rowOf('c4').textContent,/尚未指派/);assert.doesNotMatch(rowOf('c4').textContent,/受阻/);
  assert.equal([...rowOf('c5').querySelectorAll('button')].some(b=>b.textContent.trim()==='改派'),false);
 });
-await check('T07 denied assignment is hidden and sends no request',async()=>{
- await mount({node:'control',assign:false});assert.equal([...rowOf('c4').querySelectorAll('button')].some(b=>b.textContent.trim()==='指派'),false);assert.equal(writes().length,0);
+await check('T07 denied assignment shows its reason and sends no request',async()=>{
+ await mount({node:'control',assign:false});assert.ok([...rowOf('c4').querySelectorAll('button')].find(b=>b.textContent.trim()==='指派').disabled);assert.match(rowOf('c4').textContent,/無指派權限/);assert.equal(writes().length,0);
 });
 await check('filter controls appear above four tasks, and never for empty stages',async()=>{
  for(const count of [0,4,5]){await mount({node:'control',tasks:{control:Array.from({length:count},(_,i)=>mk('n'+i))}});assert.equal(!!document.querySelector('.pf-filters'),count>4);if(count===0){assert.match(document.querySelector('#flow-tasks').textContent,/此階段尚無任務/);assert.equal(document.querySelector('.st-count'),null)}}
@@ -148,7 +149,8 @@ await check('T12 a capability revoked during save stops writing and reloads capa
  await mount({node:'control'});await openDrawer('c4');await pickPerson('林安娜');mode.patch='forbidden';
  await click([...dialog().querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));await act(async()=>{await tick(40)});
  assert.match(dialog().textContent,/權限已變更/);assert.ok([...dialog().querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存').disabled);assert.equal(writes().length,1);
- assert.ok(calls.filter(r=>r.method==='GET'&&r.url.endsWith('/node-assignments')).length>=2,'capabilities re-read');
+ await click(button('取消'));await act(async()=>{await tick(40)});
+ assert.ok(calls.filter(r=>r.method==='GET'&&r.url.endsWith('/node-assignments')).length>=2,'capabilities re-read after draft guard closes');
 });
 await check('T13 an unknown outcome verifies the result before a same-request retry',async()=>{
  await mount({node:'control'});await openDrawer('c4');await pickPerson('林安娜');mode.patch='unknown';
@@ -201,23 +203,23 @@ await check('T22 the drawer takes focus, keeps Tab inside and closes with Escape
 });
 await check('source lifecycle pause shows progress and one source review reason',async()=>{
  await mount({node:'control',project:{status:'paused',execution_status:'paused',progress_status:'pending',source_kind:'lark',source_lifecycle:{state:'needs_verification',canonical:null,reasons:['blank']}}});
- assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態尚未開始來源狀態待核對/);
- assert.match(document.querySelector('.cs-next').textContent,/來源案件狀態待核對/);
- assert.doesNotMatch(document.querySelector('.cs-next').textContent,/案件暫停中/);
+ assert.match(document.querySelector('.pds-status-chip').textContent,/控制 · 進行中/);assert.match(document.querySelector('.po-source-note').textContent,/查看狀態差異/);
+ assert.match(document.querySelector('.po-next-action').textContent,/查看流程與任務/);
+ assert.doesNotMatch(document.querySelector('.po-next-action').textContent,/案件暫停中/);
  assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/案件暫停中/);
 });
 await check('declared stop still displays paused with no source review chip',async()=>{
  await mount({node:'control',project:{status:'paused',execution_status:'paused',progress_status:'paused',source_kind:'lark',source_lifecycle:{state:'mapped',canonical:'中止',reasons:[]}}});
- assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態暫停中/);
+ assert.match(document.querySelector('.pds-status-chip').textContent,/暫停中/);
  assert.equal(document.querySelector('.case-source-status'),null);
- assert.match(document.querySelector('.cs-next').textContent,/案件暫停中/);
+ assert.match(document.querySelector('.po-next-action').textContent,/查看流程與任務/);
 });
 await check('other stages use only the flow selector and case status is only in the header',async()=>{
  await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
  assert.equal(document.querySelector('.st-others'),null);assert.equal(document.querySelector('.cs-levels'),null);
- assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態暫停中/);
+ assert.match(document.querySelector('.pds-status-chip').textContent,/暫停中/);
  assert.doesNotMatch(document.querySelector('.po-sidebar').textContent,/來源紀錄狀態|外業組別|指派主管/);
- assert.match(document.querySelector('.cs-next').textContent,/案件暫停中/);
+ assert.match(document.querySelector('.po-next-action').textContent,/查看流程與任務/);
 });
 
 await act(async()=>root.unmount());

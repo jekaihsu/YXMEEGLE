@@ -9,7 +9,7 @@ import {LocalNodeActions} from './LocalNodeActions';
 import {safeUrl,isProjectLead} from './appCommon';
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
-import {Button,Skeleton} from './design';
+import {DataState,Button,Skeleton} from './design';
 import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
 import {useStartSop} from './useStartSop';
@@ -74,7 +74,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   if(keyboardMove.current){keyboardMove.current=false;return;}
   const id=c.route.section==='evidence' ? 'flow-evidence' : route.focus==='tasks' ? 'flow-tasks' : c.route.node ? 'flow-selected' : '';
   if(id==='flow-evidence'){const target=document.getElementById(id);if(target instanceof HTMLDetailsElement)target.open=true}
-  if(stageNavigation||!id)return;const frame=requestAnimationFrame(()=>{const target=document.getElementById(id);if(id==='flow-evidence' && target instanceof HTMLDetailsElement)target.open=true;target?.scrollIntoView({block:'start',behavior:'auto'})});return()=>cancelAnimationFrame(frame);
+  if(stageNavigation||!id)return;{const target=document.getElementById(id);if(id==='flow-evidence' && target instanceof HTMLDetailsElement)target.open=true;target?.scrollIntoView({block:'start',behavior:'auto'})}
  },[c.route.tab,c.route.node,c.route.section,loading,stageNavigation]);
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};
  const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:inline ? 'overview' : keyboard ? c.route.tab : 'flow',node,task:undefined,task_source:undefined,focus:undefined},keyboard)};
@@ -83,7 +83,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const plan=seed?.task ? productionPlanFacts(seed.task,selected.key,selected.production) : null;
  const taskLoading=loading || !isLegacy && !!list && !!selected.assignment && !detail && !details.errors[selected.key];
  const gapCount=category && selected.production ? productionPlanGaps(selected).length : selected.gaps.length;
- const evidence=<details id="flow-evidence" className="pf-evidence" key={selected.key}><summary>工程證據與節點待補<span className="pf-evidence-state">{read.state.kind==='error' ? '讀取失敗，可重試' : read.state.kind==='loading' ? '讀取中' : gapCount ? `${gapCount} 項待核對` : '查看來源'}</span></summary><div>
+ const evidence=<details id="flow-evidence" className="pf-evidence" key={selected.key}><summary>工程證據與節點待補<span className="pf-evidence-state">{read.state.kind==='error' ? '讀取失敗，可重試' : read.state.kind==='loading' ? '讀取中' : gapCount ? `${gapCount} 項待核對` : '阻礙數：待確認'}</span></summary><div>
     {read.state.kind!=='ready' && plan && <ProductionPlanFacts plan={plan}/>}
     {read.state.kind==='error' ? <div role="alert" className="pg-callout">工程證據讀取失敗。{read.state.message}{(read.canRefresh || read.canRetryRead) && <Button onClick={read.retry}>重試工程證據</Button>}</div>
      : read.state.kind==='loading' ? <div aria-label="工程證據載入中" aria-busy="true"><Skeleton height="12rem"/></div>
@@ -111,7 +111,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    {creating&&detail&&<TaskCreator detail={detail} busy={busy} error={assignments.error} onCancel={()=>setCreating(false)} onSubmit={async task=>{const ok=await assignments.mutate({action:'create_task',nodeKey:selected.key,task});if(ok)setCreating(false)}}/>}
    {showSetup&&<p role="status">預設清單尚未套用<Button onClick={()=>{if(isSopNode(selected.key))setSopImport(selected.key)}}>匯入預設任務</Button></p>}
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {<FlowTasks c={c} p={p} ctx={stage} details={details.details} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} evidence={inline?null:evidence} reopened={reopened} caseReasonShown={!inline&&isLegacy&&!workbench.local&&(isProjectLead(c.s,p)||selected.legacy?.owner_id===c.s.user?.id)} emptyActions={inline ? detail?.can.create_task ? <div className="nw-actions"><Button variant="primary" disabled={busy} disabledReason={reason} onClick={()=>setCreating(true)}>新增任務</Button></div> : !selected.assignment&&!workbench.local ? emptyActions : null : isLegacy&&!workbench.local ? legacyActions : nodeActions}>{inline?<SopTasks overview emptyOverview={!selected.taskRows.length} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>:canSetup&&selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}</FlowTasks>}
+   {<FlowTasks c={c} p={p} ctx={stage} details={details.details} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} evidence={inline?null:evidence} reopened={reopened} caseReasonShown={!inline&&isLegacy&&!workbench.local&&(isProjectLead(c.s,p)||selected.legacy?.owner_id===c.s.user?.id)} emptyActions={inline ? detail?.can.create_task ? <div className="nw-actions"><FlowAction allowed={!busy} reason={reason} onClick={()=>setCreating(true)}>新增任務</FlowAction></div> : !selected.assignment&&!workbench.local ? emptyActions : null : isLegacy&&!workbench.local ? legacyActions : nodeActions}>{inline?<SopTasks overview emptyOverview={!selected.taskRows.length} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>:canSetup&&selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}</FlowTasks>}
    {!inline&&canSetup&&!selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}
    </div>;
  return <div id="flow-top" className="project-flow">
@@ -120,11 +120,11 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   {!enabled&&!localCase(p)&&c.route.task&&c.route.task_source!=='sop_local'&&!p.nodes.some(n=>n.tasks.some(t=>t.id===c.route.task))&&<p role="alert">節點指派尚未開放，無法定位此 Lark 節點或任務。</p>}
   {assignments.notice && <p role="status">{assignments.notice}</p>}
   {assignments.pending && <p role="status">儲存中…</p>}
-  {assignments.error && <div role="alert" className="pg-callout">{assignments.error.message}{['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code || '') && <Button onClick={()=>void assignments.retryMutation()}>重試同一操作</Button>}</div>}
+  {assignments.error && <DataState kind={['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code||'')?'UnknownOutcome':assignments.error.code==='revision_conflict'?'Conflict':assignments.error.code==='forbidden'?'Denied':'Error'} title="節點操作尚未完成" body={assignments.error.message} actions={<>{['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code || '') && <Button onClick={()=>void assignments.retryMutation()}>重試同一操作</Button>}</>}/> }
   <div className={stageNavigation?'pf-stage-workspace':'pf-action-workspace'}>
   {!inline && <FlowDiagram compact selectionFollowsFocus stageNavigation={stageNavigation} currentIds={stage.currentIds} nodes={model.nodes} overall={model.overall} selected={selected.key} loading={loading} onSelect={select}/>}
   <section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} aria-busy={loading} tabIndex={-1}>
-   {inline?tasks:<>{nodeDetail}{tasks}</>}
+   {inline?tasks:<><h2>{selected.label}{stage.currentIds.includes(selected.key)?' · 目前階段':' · 已選取'}</h2><p className="i3-reassurance">切換檢視不會啟動節點或變更目前階段。</p>{tasks}{nodeDetail}</>}
   </section>
   {!inline&&<div className="pf-stage-secondary">{secondary}</div>}
   </div>

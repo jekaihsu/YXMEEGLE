@@ -9,7 +9,7 @@ export function CaseStatus({status}:{status:string}){const s=caseStatus(status);
 export default function ProgressDetail({caseKey,dept,week,onClose,refreshVersion=0}:{refreshVersion?:number;caseKey:string;dept:string;week:string;onClose:()=>void}){
  const result=useReport<Detail>('progress/case',{key:caseKey,dept,week});const d=result.data;
  useEffect(()=>{if(refreshVersion)result.retry()},[refreshVersion]);
- return <div className="reports-case-drawer"><Sheet title={d?`案件詳情 · ${d.case.code} ${d.case.name}`:'案件詳情'} onClose={onClose}>{!d?<>{result.error==='case_not_found'?<div role="alert"><h3>找不到這個案件</h3><p>案件可能已移除，請關閉面板並重新整理資料。</p><button onClick={result.retry}>重試</button></div>:<ReportState loading={result.loading} error={result.error} warming={result.warming} retry={result.retry}/>}</>:<>
+ return <div className="reports-case-drawer"><Sheet title={d?`案件詳情 · ${d.case.code} ${d.case.name}`:'案件詳情'} onClose={onClose}>{!d?<>{result.error==='case_not_found'?<div role="alert"><h3>找不到這個案件</h3><p>案件可能已移除，請關閉面板並重新整理資料。</p><button onClick={result.retry}>重試</button></div>:<ReportState denied={result.denied} loading={result.loading} error={result.error} warming={result.warming} retry={result.retry}/>}</>:<>
   <div className="reports-case-head"><CaseStatus status={d.case.status}/>{!d.case.name&&<span className="reports-caption">案件名稱未填</span>}</div>
   {[
    ['案件',[['業主',d.case.client||'未填'],['PM',d.case.pm||'未填']]],

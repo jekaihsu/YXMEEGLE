@@ -1,3 +1,6 @@
+import {DataState} from './design/DataState';
+import {plainReason} from './workPresentation';
+import './confirmation-calm.css';
 import {compareTableValues} from './companyDashboardCache';
 import { useRef, useEffect } from 'react';
 import type {
@@ -19,14 +22,14 @@ export interface ContractDetailProps {
 function renderCell(cell: Cell) {
   if (cell.kind === 'unknown') {
     return (
-      <span className="p2-cell-unknown" title={cell.reason}>
+      <span className="p2-cell-unknown" title={plainReason(cell.reason)}>
         {cell.text}
       </span>
     );
   }
   if (cell.kind === 'withheld') {
     return (
-      <span className="p2-cell-withheld" title={cell.reason}>
+      <span className="p2-cell-withheld" title={plainReason(cell.reason)}>
         {cell.text}
       </span>
     );
@@ -74,35 +77,12 @@ export function ContractDetail({
     }
   }, [view.drawer]);
 
-  // Page-level non-ready / state view
-  if (view.kind === 'state') {
-    return (
-      <div className="p2-detail-root">
-        <section
-          className={`p2-banner ${view.page.states.map(s => `state-${s}`).join(' ')}`}
-          role="status"
-          aria-live="polite"
-          aria-label="合約明細資料狀態"
-        >
-          <div className="p2-banner-header">
-            <span className="p2-banner-title">合約明細資料狀態</span>
-            <span className="p2-badge" data-state={view.page.states[0]}>
-              {view.page.label}
-            </span>
-          </div>
-          {view.page.note && <p className="p2-banner-note">{view.page.note}</p>}
-          {view.page.reason && <p className="p2-banner-reason">{view.page.reason}</p>}
-        </section>
-        {onBack && (
-          <div>
-            <button type="button" className="p2-btn p2-btn-plain" onClick={onBack}>
-              返回
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
+  if (view.kind === 'state') return <div className="p2-detail-root">
+    <h1>合約明細</h1>
+    <DataState kind={view.page.states.some(s=>s==='forbidden')?'Denied':'Partial'} title="目前無法開啟關聯內容" body="找不到可檢視的授權關聯，或來源尚未提供。這不代表沒有資料，系統不會推測關聯。"
+      actions={onBack?<button className="button" onClick={onBack}>回確認單</button>:<a className="button" href="#view=confirmations">回確認單</a>}/>
+    {['合約內容', '工項關聯', '來源與版本'].map(title=><section className="p2-card" key={title}><h2>{title}</h2><p>狀態未知 · 待核對</p></section>)}
+  </div>;
 
   const currentEntry = view.directory?.entries.find(e => e.selected);
   const mainKey = currentEntry?.navKey ?? null;

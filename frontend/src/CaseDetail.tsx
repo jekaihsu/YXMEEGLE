@@ -1,3 +1,6 @@
+import {DataState} from './design/DataState';
+import {plainReason} from './workPresentation';
+import './confirmation-calm.css';
 import {compareTableValues} from './companyDashboardCache';
 import {taipeiTime} from './taipeiTime';
 import { useRef, useEffect, useId } from 'react';
@@ -28,6 +31,7 @@ export interface CaseDetailProps {
   onSort?: (sort: SortSpec | string) => void;
   onNavigate?: (target: CaseDetailNavTarget | string) => void;
   onBack?: () => void;
+  onRetry?: () => void;
   onPage?: (page: number) => void;
   currentSort?: SortSpec;
 }
@@ -40,7 +44,7 @@ export function PlanQuantityPanel({summary}: {summary: PlanSummary | null | 'una
     {summary === 'unavailable' ? <p className="p2-plan-note">計畫數量無法顯示</p> : summary && hasRows ? <>
       {hasPlanDerivation(summary) &&
         <p className="p2-plan-note">含依工編推導或待確認的關聯，非 Lark 原生關聯</p>}
-      <table className="p2-plan-table">
+      <p className="p2-plan-note">以下為已讀取摘要的已知關聯數量；實際數量與完成率尚未取得。</p><table className="p2-plan-table">
         <caption className="p2-sr-only">各類別計畫數量與工項關聯狀態</caption>
         <thead><tr><th scope="col">類別</th><th scope="col">合約項數</th><th scope="col">計畫數量</th><th scope="col">工項數</th><th scope="col">關聯狀態</th></tr></thead>
         <tbody>{PLAN_CATEGORIES.map(category => {
@@ -62,26 +66,15 @@ export function PlanQuantityPanel({summary}: {summary: PlanSummary | null | 'una
       {summary.needsReview &&
         <p className="p2-plan-note">需人工確認：重複的合約項未計入總量</p>}
       {summary.truncated && <p className="p2-plan-note">清單僅顯示部分資料</p>}
-    </> : <p className="p2-plan-note">尚無計畫數量資料</p>}
+    </> : summary ? <p className="p2-plan-note">已讀取摘要中沒有計畫項目（0 項）；實際數量與完成率尚未取得</p> : <p className="p2-plan-note">計畫數量待核對，實際數量與完成率尚未取得</p>}
   </section>;
 }
 
 function renderDisplayField(f: DisplayField) {
-  if (f.text === '未核准顯示') {
-    return (
-      <span className="p2-cell-withheld" title={f.reason ?? undefined}>
-        {['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}
-      </span>
-    );
-  }
-  if (f.text === '—') {
-    return (
-      <span className="p2-cell-unknown" title={f.reason ?? undefined}>
-        {['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}
-      </span>
-    );
-  }
-  return <span className="p2-cell-text">{['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}</span>;
+ const status:Record<string,string>={pending:'未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中'};
+ const time=['事件時間','取代時間','來源同步完成時間'].includes(f.label);
+ const label=time?taipeiTime(f.text,'待核對'):f.text==='—'?'待核對':status[f.text]??f.text;
+ return <span className={f.text==='未核准顯示'?'p2-cell-withheld':f.text==='—'?'p2-cell-unknown':'p2-cell-text'} title={f.reason?plainReason(f.reason):undefined}>{label}</span>;
 }
 
 function getKindLabel(kind: string): string {
@@ -128,12 +121,21 @@ function getIdentifierLabel(idKey: string): string {
   }
 }
 
+function confirmationNotice(states: readonly string[]) {
+ if(states.includes('forbidden'))return {kind:'Denied',title:'你目前無法查看此確認單',body:'目前沒有檢視權限。請返回確認單清單，或聯絡管理者確認權限。'} as const;
+ if(states.includes('read_failed'))return {kind:'Error',title:'無法載入確認單',body:'讀取未完成，請重新讀取；這不代表沒有確認單資料。'} as const;
+ if(states.includes('loading'))return {kind:'Loading',title:'正在載入確認單',body:'正在讀取確認單資料，筆數與關聯狀態待核對。'} as const;
+ if(states.includes('stale'))return {kind:'Stale',title:'資料待更新，目前顯示保留資料',body:'目前內容為先前成功讀取的資料，請依各章節來源同步時間核對。'} as const;
+ return {kind:'Partial',title:'部分資料未驗證',body:'確認單與合約的對應需要授權來源。標示「待核對」的內容不是 0，也不是沒有資料。'} as const;
+}
+
 export function CaseDetail({
   view,
   onSelect,
   onSort,
   onNavigate,
   onBack,
+  onRetry,
   currentSort,
 }: CaseDetailProps) {
   const instanceId = useId();
@@ -216,22 +218,8 @@ export function CaseDetail({
   if (view.header.length === 0) {
     return (
       <div className="p2-detail-root p2-case-root" ref={rootRef}>
-        <section
-          className={`p2-banner ${view.page.states.map(s => `state-${s}`).join(' ')}`}
-          role="status"
-          aria-live="polite"
-          aria-label="案件與確認單明細資料狀態"
-        >
-          <div className="p2-banner-header">
-            <span className="p2-banner-title">案件與確認單明細資料狀態</span>
-            <span className="p2-badge" data-state={view.page.states[0]}>
-              {view.page.label}
-            </span>
-          </div>
-          {view.page.reason && (
-            <p className="p2-banner-reason">{view.page.reason}</p>
-          )}
-        </section>
+        <h1>工程確認單</h1>
+        <DataState {...confirmationNotice(view.page.states)} actions={onRetry&&view.page.states.includes('read_failed')?<button className="button" onClick={onRetry}>重新讀取</button>:undefined}/>
         {onBack && (
           <div>
             <button
@@ -262,7 +250,7 @@ export function CaseDetail({
         <th scope="row">
           {renderDisplayField(row.title)}
           {isUnresolved && row.reason && (
-            <span className="p2-reason-text"> ({row.reason})</span>
+            <span className="p2-reason-text"> ({plainReason(row.reason)})</span>
           )}
         </th>
         <td>
@@ -308,7 +296,7 @@ export function CaseDetail({
           ) : (
             <span
               className="p2-cell-unknown"
-              title={row.sourceLink.reason ?? undefined}
+              title={plainReason(row.sourceLink.reason)}
             >
               {row.sourceLink.label}：—
             </span>
@@ -367,18 +355,11 @@ export function CaseDetail({
         <div className="p2-card-header">
           <div className="p2-card-header-left">
             <h2 className="p2-section-title">{section.title}</h2>
-            <span className="p2-badge" data-state={section.states[0]}>
-              {section.label}
-            </span>
-            {section.freshness && (
-              <span className="p2-badge p2-badge-verification">
-                {section.freshness}
-              </span>
-            )}
+            {(section.freshness || section.label!=='已讀取') && <span className="p2-badge" data-state={section.states[0]}>{section.freshness || section.label}</span>}
           </div>
           <div className="p2-section-meta">
             <span className="p2-meta-item">
-              {section.sourceTime.label}：{renderDisplayField(section.sourceTime)}
+              來源同步：{renderDisplayField(section.sourceTime)}
             </span>
           </div>
         </div>
@@ -387,10 +368,10 @@ export function CaseDetail({
         {section.reason && (
           <div className="p2-section-reason-block" role="status">
             <span className="p2-warning-icon" aria-hidden="true">
-              ⚠️
+
             </span>
             <span className="p2-section-reason-text">
-              狀態原因：{section.reason}
+              狀態原因：{plainReason(section.reason)}
             </span>
           </div>
         )}
@@ -480,7 +461,7 @@ export function CaseDetail({
                           {isChildUnresolved && child.reason && (
                             <span className="p2-reason-text">
                               {' '}
-                              ({child.reason})
+                              ({plainReason(child.reason)})
                             </span>
                           )}
                         </th>
@@ -535,7 +516,7 @@ export function CaseDetail({
                           ) : (
                             <span
                               className="p2-cell-unknown"
-                              title={child.sourceLink.reason ?? undefined}
+                              title={plainReason(child.sourceLink.reason)}
                             >
                               {child.sourceLink.label}：—
                             </span>
@@ -575,25 +556,6 @@ export function CaseDetail({
 
   return (
     <div className="p2-detail-root p2-case-root" ref={rootRef}>
-      {/* 頁面資料狀態橫幅 (Page State Banner) */}
-      {view.page.states.length > 0 && (
-        <section
-          className={`p2-banner ${view.page.states.map(s => `state-${s}`).join(' ')}`}
-          role="status"
-          aria-live="polite"
-          aria-label="頁面資料狀態"
-        >
-          <div className="p2-banner-header">
-            <span className="p2-banner-title">資料狀態</span>
-            <span className="p2-badge" data-state={view.page.states[0]}>
-              {view.page.label}
-            </span>
-          </div>
-          {view.page.reason && (
-            <p className="p2-banner-reason">{view.page.reason}</p>
-          )}
-        </section>
-      )}
 
       {/* 路徑導覽 (Breadcrumb) */}
       <nav className="p2-breadcrumb" aria-label="路徑導覽">
@@ -629,8 +591,8 @@ export function CaseDetail({
       {/* 標頭資訊 (Header Fields) */}
       <header className="p2-header" aria-label="案件與確認單標頭資訊">
         <div className="p2-header-title-row">
-          <h1 className="p2-header-title">案件與確認單明細</h1>
-          <span className="p2-badge p2-badge-source">{view.page.label}</span>
+          <h1 className="p2-header-title">{view.header.find(f=>f.label==='專案')?.text || '工程確認單明細'}</h1>
+
         </div>
 
         <div className="p2-header-meta">
@@ -648,7 +610,7 @@ export function CaseDetail({
             ) : (
               <span
                 className="p2-cell-unknown"
-                title={view.sourceLink.reason ?? undefined}
+                title={plainReason(view.sourceLink.reason)}
               >
                 {view.sourceLink.label}：—
               </span>
@@ -658,7 +620,7 @@ export function CaseDetail({
 
         {/* Distinct labelled header fields: dates are never merged */}
         <dl className="p2-header-grid">
-          {view.header.filter(f=>['專案','案件編號','確認單版本','PM','目前階段'].includes(f.label)).map((fieldItem, idx) => (
+          {view.header.filter(f=>['案件編號','確認單版本','PM','目前階段'].includes(f.label)).map((fieldItem, idx) => (
             <div
               key={`${instanceId}-hdr-${idx}-${fieldItem.label}`}
               className="p2-header-field-item"
@@ -677,6 +639,8 @@ export function CaseDetail({
           </dl>
         </details>
       </header>
+
+      {(view.page.states.length > 0 || view.sections.some(s=>s.states.length>0)) && <DataState {...confirmationNotice(view.page.states)} actions={onRetry&&view.page.states.includes('read_failed')?<button className="button" onClick={onRetry}>重新讀取</button>:undefined}/>}
 
       {/* 頁內導覽 (In-page Navigation) */}
       <nav className="p2-inpage-nav" aria-label="章節快速導覽">
@@ -719,7 +683,7 @@ export function CaseDetail({
                 <div className="p2-card-header">
                   <div className="p2-card-header-left">
                     <h2 className="p2-section-title">
-                      案件關聯結構 (Related Tree)
+                      案件關聯結構
                     </h2>
                     <span className="p2-badge">單層展開</span>
                   </div>
@@ -808,7 +772,7 @@ export function CaseDetail({
                               {child.unresolved && (
                                 <span className="p2-unresolved-label">
                                   {child.relationship}{' '}
-                                  {child.reason ? `(${child.reason})` : ''}
+                                  {child.reason ? `(${plainReason(child.reason)})` : ''}
                                 </span>
                               )}
                             </button>
@@ -846,7 +810,7 @@ export function CaseDetail({
                                           <span className="p2-unresolved-label">
                                             {sub.relationship}{' '}
                                             {sub.reason
-                                              ? `(${sub.reason})`
+                                              ? `(${plainReason(sub.reason)})`
                                               : ''}
                                           </span>
                                         )}
@@ -959,7 +923,7 @@ export function CaseDetail({
                         >
                           <span className="p2-parent-label">{parent.label}</span>
                           <span className="p2-badge p2-badge-verification">
-                            {parent.verification}
+                            {plainReason(parent.verification)}
                           </span>
                         </li>
                       ))}
@@ -973,7 +937,7 @@ export function CaseDetail({
                     <h4 className="p2-drawer-section-title">關聯數量統計</h4>
                     {view.drawer.countBasis && (
                       <p className="p2-count-basis">
-                        {view.drawer.countBasis}
+                        僅限目前可檢視的已讀取關聯，並非全部資料總數
                       </p>
                     )}
                     <dl className="p2-drawer-def">
@@ -1031,7 +995,7 @@ export function CaseDetail({
                     className="p2-btn p2-btn-plain"
                     onClick={() => onNavigate?.(view.drawer!.sourceHealth)}
                   >
-                    查看來源健康 (Source Health)
+                    查看資料來源
                   </button>
                 </div>
               </div>
@@ -1051,7 +1015,7 @@ export function CaseDetail({
             </div>
             {view.side.relationshipCompleteness.reason && (
               <p className="p2-completeness-reason">
-                原因：{view.side.relationshipCompleteness.reason}
+                原因：{plainReason(view.side.relationshipCompleteness.reason)}
               </p>
             )}
           </section>
@@ -1063,16 +1027,16 @@ export function CaseDetail({
             </div>
             {view.side.warnings.length > 0 && (
               <ul className="p2-warnings-list">
-                {view.side.warnings.map(w => (
+                {view.side.warnings.slice(0,3).map(w => (
                   <li key={w.key} className="p2-warning-item">
                     <span className="p2-warning-icon" aria-hidden="true">
-                      ⚠️
+
                     </span>
                     <div className="p2-warning-details">
                       <span className="p2-warning-text">{w.relationship}</span>
                       {w.reason && (
                         <span className="p2-warning-reason">
-                          （{w.reason}）
+                          （{plainReason(w.reason)}）
                         </span>
                       )}
                     </div>
@@ -1080,6 +1044,7 @@ export function CaseDetail({
                 ))}
               </ul>
             )}
+            {view.side.warnings.length>3 && <details><summary>查看其餘已讀取警示（{view.side.warnings.length-3} 筆）</summary><ul>{view.side.warnings.slice(3).map(w=><li key={w.key}>{w.relationship} · {plainReason(w.reason)}</li>)}</ul></details>}
           </section>
 
           {/* 章節同步時間與狀態 */}
@@ -1116,7 +1081,7 @@ export function CaseDetail({
                 onClick={() => onNavigate?.({ view: 'sources' })}
                 aria-label="查看來源健康狀態"
               >
-                查看來源健康 (Source Health)
+                查看資料來源
               </button>
             </div>
           </section>

@@ -9,7 +9,7 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {AppShell} from './src/AppShell'; export {LocalNodeActions} from './src/LocalNodeActions'; export {invalidateSessionEpoch} from './src/api'; export {prefetchNodeAssignmentDetail} from './src/useNodeAssignments';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"import React from 'react';import {ProjectDetail as Detail} from './src/ProjectDetail';import {DetailRefreshProvider,useCaseData} from './src/detailRefresh';function Owned(props){globalThis.round2Owner=useCaseData();return React.createElement(Detail,props)}export function ProjectDetail({c}){return React.createElement(DetailRefreshProvider,{scope:c.s.workspace_id,identityFingerprint:'fixture'},React.createElement(Owned,{c}))} export {AppShell} from './src/AppShell'; export {LocalNodeActions} from './src/LocalNodeActions'; export {invalidateSessionEpoch} from './src/api'; export {prefetchNodeAssignmentDetail} from './src/useNodeAssignments';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.project-flow-round2-bundle.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const sopExamples=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
@@ -89,18 +89,18 @@ await check('legacy task drawer shows facts, tabs and one footer reason',async()
 });
 await check('round2 local flow list translates both pending and in-progress task statuses',async()=>{
  await mount({enabled:false,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'l1',title:'待開始工作',status:'pending',owner_id:'ou_anna'},{id:'l2',title:'進行工作',status:'in_progress',owner_id:'ou_anna'}]}});
- assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['待處理林安娜未排期限','進行中林安娜未排期限']);
+ assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['本地流程待處理林安娜未排期限','本地流程進行中林安娜未排期限']);
 });
 await check('round2 completed and skipped steps show state without progress bars',async()=>{
  await mount({node:'control',configure(base,f){Object.assign(f.list.nodes.find(n=>n.key==='control'),{derived_status:'已完成'});f.list.nodes.find(n=>n.key==='mapping').derived_status='略過';}});
  const completed=document.querySelector('.pf-node[aria-label^="控制節點"]'),skipped=document.querySelector('.pf-node[aria-label^="圖資節點"]');
- assert.equal(completed.querySelector('progress'),null);assert.equal(completed.querySelector('.pf-state').textContent,'已完成');assert.match(completed.getAttribute('aria-label'),/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-state').textContent,'略過');assert.equal(completed.querySelector('.pf-needs'),null);assert.equal(skipped.querySelector('.pf-needs'),null);
+ assert.equal(completed.querySelector('progress'),null);assert.equal(completed.querySelector('.pf-state').textContent,'已完成');assert.match(completed.getAttribute('aria-label'),/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-state').textContent,'核准跳過');assert.equal(completed.querySelector('.pf-needs'),null);assert.equal(skipped.querySelector('.pf-needs'),null);
 });
 await check('round2 keyboard replaces history and never scrolls the selected panel',async()=>{
  let shellScroll=0;window.scrollTo=()=>shellScroll++;await mount({node:'control',shell:true});await act(tick);const before=history.length,scrollBefore=shellScroll;globalThis.lastScroll='untouched';
  const selected=document.querySelector('.pf-node[aria-current]');selected.focus();
  await act(async()=>{selected.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await tick()});
- assert.equal(c.route.node,'mapping');assert.equal(history.length,before);assert.equal(shellScroll,scrollBefore);assert.equal(globalThis.lastScroll,'untouched');assert.equal(document.activeElement.getAttribute('aria-current'),'step');
+ assert.equal(c.route.node,'mapping');assert.equal(history.length,before);assert.equal(shellScroll,scrollBefore);assert.equal(globalThis.lastScroll,'untouched');assert.equal(document.activeElement.getAttribute('aria-pressed'),'true');
 });
 await check('round2 one selected node for panel and local operations',async()=>{
  await mount({configure(base,f){f.list.summary.current_node='field';base.project.nodes[3].description='外業背景';base.project.nodes[3].collaborator_ids=['ou_anna'];}});
@@ -117,8 +117,8 @@ await check('flow omits the source timestamp and duplicate node facts',async()=>
  assert.equal(document.querySelector('.pf-source'),null);
  assert.equal(document.querySelector('.pf-facts'),null);
 });
-await check('overview has one summary and task list without a stepper or duplicate previews',async()=>{
- await mount({tab:'overview'});assert.ok(document.querySelector('.cs-summary'));assert.equal(document.querySelectorAll('.project-overview .pf-diagram').length,0);assert.equal(document.querySelectorAll('#flow-tasks').length,1);assert.equal(document.querySelector('.po-items-table'),null);assert.equal(document.querySelector('.po-documents'),null);assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,'總覽');
+await check('overview has one stepper, summary and task list without duplicate previews',async()=>{
+ await mount({tab:'overview'});assert.ok(document.querySelector('.cs-summary'));assert.equal(document.querySelectorAll('.project-overview .pf-diagram').length,1);assert.equal(document.querySelectorAll('#flow-tasks').length,1);assert.equal(document.querySelector('.po-items-table'),null);assert.equal(document.querySelector('.po-documents'),null);assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,'總覽');
  assert.ok([...document.querySelectorAll('.po-team dt')].filter(n=>n.textContent==='執行人').length<=1);
 });
 await check('overview task list remains visible while evidence loads or fails',async()=>{
@@ -142,7 +142,7 @@ await check('removed node background and selected panel do not repeat stepper fa
 });
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
  await mount({node:'control',detailHold:true});await click(button('指派'));const drawer=document.querySelector('.task-drawer[role=dialog]');await click(drawer.querySelector('.assignee-picker button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent.includes('林安娜')).click();await tick()});
- const pending=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true);
+ const pending=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true,globalThis.round2Owner);
  const cancelled=pending.catch(error=>{assert.equal(error.name,'AbortError')});
  await click([...drawer.querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));globalThis.releaseDetail();await act(async()=>{await cancelled;await tick()});
  const row=document.querySelector('[data-assignment-task="recUnassigned"]');assert.match(row.textContent,/林安娜/);assert.doesNotMatch(row.textContent,/尚未指派/);

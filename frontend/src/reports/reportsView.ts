@@ -13,3 +13,13 @@ export function sample(reviewed:number){return `${number(reviewed)} 筆已檢核
 export function compactMoney(v:number|null|undefined){if(v==null||!Number.isFinite(v))return '來源無資料';return `NT$ ${number(v>=100000000?v/100000000:v>=10000?v/10000:v)}${v>=100000000?' 億':v>=10000?' 萬':''}`}
 
 export function nextSortOrder(current:string,order:string,next:string,defaults:Record<string,string>){if(current===next)return order==='asc'?'desc':'asc';return defaults[next]??'asc'}
+
+/** Calendar dates only: do not let the browser timezone shift the report week. */
+export function reportWeekRange(week:string):string {
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return '尚未載入';
+ const start=new Date(`${week}T00:00:00Z`);
+ if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==week)return '尚未載入';
+ const end=new Date(start);end.setUTCDate(end.getUTCDate()+6);
+ const last=end.toISOString().slice(0,10).replaceAll('-','/');
+ return `${week.replaceAll('-','/')}–${end.getUTCFullYear()===start.getUTCFullYear()?last.slice(5):last}`;
+}

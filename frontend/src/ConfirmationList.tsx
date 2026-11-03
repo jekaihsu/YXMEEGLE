@@ -1,3 +1,6 @@
+import {taipeiTime} from './taipeiTime';
+import {DataState} from './design/DataState';
+import './confirmation-calm.css';
 import { useRef, useEffect, useState, useId } from 'react';
 import type {
   ConfirmationListView,
@@ -18,6 +21,7 @@ export interface ConfirmationListCallbacks {
   onFilterChange?: (filters: FilterSet) => void;
   onColumnToggle?: (columnKey: string) => void;
   onResetFilters?: () => void;
+  onRefresh?: () => void;
 }
 
 export type ConfirmationListProps = (
@@ -78,7 +82,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
 
   if (!view) return null;
 
-  const visibleColumns = view.columns.filter((c) => c.visible);
+  const visibleColumns = view.columns.filter(c=>c.visible && (advancedOpen || c.key!=='case_number' || !view.columns.some(col=>col.key==='project_name'&&col.visible)));
   const stickyCol1 = view.table.stickyColumns[0] ?? 'case_number';
   const stickyCol2 = view.table.stickyColumns[1] ?? 'project_name';
 
@@ -128,18 +132,17 @@ export function ConfirmationList(props: ConfirmationListProps) {
       {/* Header */}
       <header className="p2-header">
         <div className="p2-header-title-row">
-          <h2 className="p2-title">{view.header.title}</h2>
+          <h1 className="p2-title">工程確認單</h1>{props.onRefresh&&<button className="button" type="button" onClick={props.onRefresh} disabled={view.pageState?.states.some(state=>state==='loading')}>重新讀取</button>}
           <div className="p2-header-meta">
-            {!view.header.asOf.reason && <span className="p2-meta-item">資料日期：{view.header.asOf.label}</span>}
-            {!view.header.snapshot.reason && <span className="p2-meta-item">保留資料：{view.header.snapshot.label}</span>}
+            {!view.header.asOf.reason && <span className="p2-meta-item">資料時間：{taipeiTime(view.header.asOf.label,'待核對')}</span>}
+            {!view.header.snapshot.reason && <span className="p2-meta-item">保留資料：{taipeiTime(view.header.snapshot.label,'待核對')}</span>}
           </div>
         </div>
       </header>
 
-      {view.pageState && <p className="overview-table-note" role="status">
-        {view.pageState.states.some(state => state === 'forbidden') ? '沒有權限檢視工程確認單。' : view.pageState.states.some(state => state === 'loading') ? '確認單讀取中…' : view.pageState.states.some(state => state === 'complete_empty') ? '目前沒有工程確認單。' : view.pageState.states.some(state => state === 'filtered_empty') ? '沒有符合條件的確認單。' : view.pageState.states.some(state => state === 'stale') ? '資料待更新，目前顯示保留資料。' : view.pageState.states.some(state => state === 'read_failed') ? '更新失敗，目前顯示保留資料。' : '確認單資料尚未完整，僅顯示已載入內容。'}
-      </p>}
-
+      {view.pageState && <DataState kind={view.pageState.states.some(state=>state==='forbidden')?'Denied':view.pageState.states.some(state=>state==='loading')?'Loading':view.pageState.states.some(s=>s==='complete_empty'||s==='filtered_empty')?'Empty':view.pageState.states.some(state=>state==='stale')?'Stale':view.pageState.states.some(state=>state==='read_failed')?'Error':'Partial'}
+        title={view.pageState.states.some(state=>state==='forbidden')?'沒有權限檢視工程確認單':view.pageState.states.some(state=>state==='loading')?'確認單讀取中…':view.pageState.states.some(state=>state==='stale')?'資料待更新，目前顯示保留資料':view.pageState.states.some(state=>state==='read_failed')?'確認單讀取失敗':view.pageState.states.some(s=>s==='complete_empty'||s==='filtered_empty')?'目前沒有符合條件的確認單':'確認單資料尚未完整'}
+        body={view.pageState.states.some(state=>state==='forbidden')?'目前無法檢視此清單，已移除先前資料。':view.pageState.states.some(state=>state==='loading')?'筆數待核對，保留目前篩選條件。':'僅顯示已讀取內容。版本尚未取得時顯示「待核對」，不代表沒有版本。'}/>}
       {/* Controls & Toolbar with Progressive Disclosure */}
       <div className="p2-toolbar" role="region" aria-label="清單篩選與欄位控制">
         {/* Primary Filter & Action Bar */}
@@ -220,7 +223,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
             </button>
           </div>
 
-          <div className="p2-toolbar-primary-right">
+          <div className="p2-toolbar-primary-right" hidden={!advancedOpen}>
             {/* Reset Filters button */}
             <button
               type="button"
@@ -349,7 +352,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
       </div>
 
       {/* Main Table and Drawer Layout */}
-      <div className="confirmation-list-layout">
+      <div className="confirmation-list-layout" hidden={view.pageState?.states.some(state=>state==='forbidden')}>
         <div className="p2-main-content">
           <div className="p2-table-container">
             <div
@@ -429,7 +432,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         </th>
                       );
                     })}
-                    <th scope="col">操作</th>
+                    {advancedOpen && <th scope="col">來源資訊</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -451,7 +454,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         <tr
                           key={row.key}
                           className={`p2-row ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => onSelect?.(isSelected ? null : row.key)}
+                          onClick={() => onNavigate?.(row.key)}
                           tabIndex={0}
                           onKeyDown={(e) => {
                             if (e.repeat) return;
@@ -460,7 +463,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                               (e.key === 'Enter' || e.key === ' ')
                             ) {
                               e.preventDefault();
-                              onSelect?.(isSelected ? null : row.key);
+                              onNavigate?.(row.key);
                             }
                           }}
                         >
@@ -479,6 +482,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                             if (col.key === 'project_name') {
                               return (
                                 <td key={col.key} className={stickyClass}>
+                                  {!advancedOpen && <small className="confirmation-case-code">{row.cells.case_number?.label==='—'?'案號待核對':row.cells.case_number?.label}</small>}
                                   <button
                                     type="button"
                                     className="p2-row-title-btn"
@@ -492,7 +496,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                         : '查看案件詳情'
                                     }
                                   >
-                                    <strong>{cell?.label ?? '—'}</strong>
+                                    <strong>{!cell || cell.label==='—' ? '待核對' : cell.label}</strong>
                                   </button>
 
                                 </td>
@@ -503,7 +507,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                               return (
                                 <td key={col.key} className={stickyClass}>
                                   <strong className="p2-cell-text">
-                                    {cell?.label ?? '—'}
+                                    {!cell || cell.label==='—' ? '待核對' : cell.label}
                                   </strong>
                                 </td>
                               );
@@ -529,14 +533,14 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   }
 
                                 >
-                                  {cell?.label ?? '—'}
+                                  {!cell || cell.label==='—' ? '待核對' : cell.label}
                                 </span>
                               </td>
                             );
                           })}
 
-                          {/* Action / Selection column */}
-                          <td>
+                          {/* Secondary source details are available through advanced controls. */}
+                          {advancedOpen && <td>
                             <button
                               type="button"
                               ref={(el) => {
@@ -559,9 +563,9 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   : '選取來源資訊'
                               }
                             >
-                              {isSelected ? '收合' : '選取'}
+                              {isSelected ? '收合' : '來源資訊'}
                             </button>
-                          </td>
+                          </td>}
                         </tr>
                       );
                     })
@@ -577,7 +581,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
               aria-label="清單資料統計"
             >
               <div className="p2-footer-totals">
-                {!view.footer.matching.reason && <span>符合條件 {view.footer.matching.label} 筆</span>}
+                {view.footer.matching.reason && <span>全部筆數尚未取得</span>}{!view.footer.matching.reason && <span>符合條件 {view.footer.matching.label} 筆</span>}
                 {!view.footer.loaded.reason && <span>已載入筆數：{view.footer.loaded.label}</span>}
                 {!view.footer.authorizedSource.reason && <span>已授權來源 {view.footer.authorizedSource.label} 筆</span>}
               </div>

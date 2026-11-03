@@ -177,10 +177,26 @@
 .unified-home .home-personal:not([open]){align-self:start}
 }
 
-.sop-home-filter {display:flex;align-items:center;gap:.75rem;margin-block:1rem;color:var(--text-secondary,#55605a)}
-.sop-home-filter select {min-height:44px;border:1px solid var(--border-color,#d9dedb);border-radius:6px;background:var(--surface,#fff);padding:.5rem}
+.sop-home-filter {display:flex;align-items:center;gap:.75rem;margin-block:1rem;color:var(--label-2)}
+.sop-home-filter select {min-height:44px;border:1px solid var(--sep);border-radius:6px;background:var(--surface);padding:.5rem}
 
 @layer pages {
 .unified-home .home-card{min-height:280px;box-sizing:border-box}
 .unified-home [data-home-card=kpi],.unified-home .home-kpi-strip{min-height:160px;box-sizing:border-box}
 }
+
+@layer polish{
+.unified-home .ds-page{max-width:none;padding:0}
+.unified-home .home-card{background:var(--surface);border:1px solid var(--sep);box-shadow:none;backdrop-filter:none}
+.unified-home .ds-data-state{margin-bottom:var(--space-6)}
+.unified-home .home-data-time{font-size:var(--fs-caption);color:var(--label-2);margin:0 0 var(--space-2)}
+.unified-home .home-card-content .ds-row{min-height:44px;align-items:flex-start;flex-direction:column;gap:var(--space-2);padding:var(--space-3) 0}
+.unified-home .home-card-content .ds-row-main>span{color:var(--accent);font-weight:500}
+.unified-home .home-case-code{display:block;color:var(--label-2);font-size:var(--fs-caption);font-weight:400;margin-bottom:var(--space-2)}
+.unified-home .home-case-client{display:block;margin-bottom:var(--space-2)}
+.unified-home .home-card-more.ds-button[data-variant=primary]{color:var(--on-accent)}
+.unified-home .home-card-grid{gap:var(--space-6)}
+.unified-home .ds-page-head .ds-eyebrow{color:var(--label-2);text-transform:none;letter-spacing:0;font-weight:400;margin-top:var(--space-3)}
+@media(max-width:760px){.unified-home .home-card{min-height:0}.unified-home .home-card-grid{grid-template-columns:1fr}.unified-home .ds-page-head{align-items:flex-start;flex-direction:column}}
+}
+@layer polish{.unified-home .home-section>header[hidden]{display:none}}

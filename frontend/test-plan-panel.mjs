@@ -23,6 +23,12 @@ assert.equal(doc.querySelector('section').getAttribute('aria-labelledby'),doc.qu
 summary.categories.控制.lines=0;summary.categories.控制.items=0;
 assert.deepEqual([...render(summary).querySelectorAll('tbody th')].map(x=>x.textContent),['外業','圖資','報告']);
 for(const c of Object.values(summary.categories)){c.lines=0;c.items=0;}
-for(const value of [null,summary]) {const d=render(value);assert.equal(d.querySelectorAll('table').length,0);assert.ok(d.body.textContent.includes('尚無計畫數量資料'));}
+const absent=render(null);assert.equal(absent.querySelectorAll('table').length,0);assert.match(absent.body.textContent,/計畫數量待核對/);
+const zero=structuredClone(summary);
+for(const c of Object.values(zero.categories))for(const key of Object.keys(c))c[key]=key==='planned_qty'?'0':0;
+zero.needsReview=false;zero.truncated=false;zero.lines_basis.derived=0;
+const known=render(zero);assert.equal(known.querySelectorAll('table').length,0);
+assert.match(known.body.textContent,/已讀取摘要中沒有計畫項目（0 項）/);
+assert.doesNotMatch(known.body.textContent,/待核對/);
 assert.ok(render('unavailable').body.textContent.includes('計畫數量無法顯示'));
 console.log('plan panel: 8 behavior groups passed');

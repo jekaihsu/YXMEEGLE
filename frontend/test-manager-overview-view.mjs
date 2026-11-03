@@ -47,8 +47,8 @@ const v=(b=body(),extra={})=>build({body:b,...extra});
 const cardOf=(view,id)=>view.snapshot.cards.find(c=>c.id===id);
 
 test('1. header: snapshot timestamp and readable scope; missing timestamp is a dash',()=>{
- const a=v();eq(a.header.asOfLabel,`${L.asOf} ${ASOF}`);ok(a.header.scopeLabel.includes('PM：pm-1'),'scope from snapshot filters');
- eq(v(body({as_of:undefined})).header.asOfLabel,`${L.asOf} —`,'no invented timestamp');
+ const a=v();eq(a.header.asOfLabel,`${L.asOf} 2026/10/14 01:02:03 (台北時間)`);ok(a.header.scopeLabel.includes('PM：pm-1'),'scope from snapshot filters');
+ eq(v(body({as_of:undefined})).header.asOfLabel,`${L.asOf} 尚未載入`,'no invented timestamp');
  eq(v(withSnap({filters:{}})).header.scopeLabel,L.filterNone);
 });
 test('2. cases first, owner/stage/due/blocker/pending shown honestly: unknown is a dash plus reason',()=>{
@@ -66,6 +66,13 @@ test('3. stage and due date never render a value even if the body supplies one (
  eq([r.currentStage.text,r.effectiveDueDate.text,r.currentStage.known,r.effectiveDueDate.known],['—','—',false,false]);
  ok(!JSON.stringify(v(b)).includes('2026-12-31'),'supplied date never output');
 });
+test('owners distinguish unknown/withheld labels from a verified empty value',()=>{
+ for(const reason of ['Current PM has no authorized person label.','Not loaded','Withheld']){
+  const b=body();b.snapshot.cases[0].responsible={value:null,state:st(['unknown']),reason};const cell=v(b).snapshot.cases[0].responsible;eq(cell.known,false);eq(cell.reason,reason);
+ }
+ for(const value of ['', '   ']){const b=body();b.snapshot.cases[0].responsible={value,state:null,reason:'Authorized source field is empty.'};const cell=v(b).snapshot.cases[0].responsible;eq(cell.known,true);eq(cell.text,'未填')}
+});
+
 test('4. cards carry unit labels; drilldown descriptors pass through unchanged',()=>{
  const view=v();const a=cardOf(view,'confirmation_versions'),b=cardOf(view,'stable_cases');
  eq([a.unitLabel,b.unitLabel],['確認單版本','案件（穩定身分）']);
@@ -250,7 +257,7 @@ test('21. 128b-4030811 X1: population unavailable keeps cases listed with row ke
 
 // ---- mutation checks: break each guard in a temp copy and require the behavior it protects to break ----
 const src=readFileSync(new URL('./src/managerOverviewView.ts',import.meta.url),'utf8');
-const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
+const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/taipeiTime.ts',import.meta.url),join(dir,'taipeiTime.ts'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
 let n=0;
 async function mutated(find,replace){
  ok(src.includes(find),'mutation anchor exists: '+find.slice(0,40));

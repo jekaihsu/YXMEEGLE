@@ -1,4 +1,5 @@
-import {createContext,useContext,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {subscribeConnectivity,isOffline} from '../api';
+import {createContext,useSyncExternalStore,useContext,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import type {ButtonHTMLAttributes,CSSProperties,KeyboardEvent,ReactNode} from 'react';
 import {Check,ChevronDown} from 'lucide-react';
 import {useDialogFocus} from '../useDialogFocus';
@@ -44,7 +45,10 @@ export function DisabledAction({disabled,reason,children}:{disabled?:boolean;rea
  return <span className="disabled-action">{children(id)}<span id={id} className="disabled-action-reason" title={reason||'目前無法操作'}>{reason||'目前無法操作'}</span></span>;
 }
 export function Button({variant='secondary',disabledReason,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'primary'|'secondary'|'plain'|'destructive';disabledReason?:string}){
- return <DisabledAction disabled={variant==='primary'&&props.disabled} reason={disabledReason}>{id=><button type="button" {...props} aria-describedby={[props['aria-describedby'],id].filter(Boolean).join(' ')||undefined} className={`ds-button ${props.className||''}`} data-variant={variant}/>}</DisabledAction>;
+ const offline=useSyncExternalStore(subscribeConnectivity,isOffline,()=>false);
+ const blocked=offline&&props.type==='submit';
+ if(blocked){props={...props,disabled:true};disabledReason='目前離線，無法儲存或送出。'}
+ return <DisabledAction disabled={blocked||variant==='primary'&&props.disabled} reason={disabledReason}>{id=><button type="button" {...props} aria-describedby={[props['aria-describedby'],id].filter(Boolean).join(' ')||undefined} className={`ds-button ${props.className||''}`} data-variant={variant}/>}</DisabledAction>;
 }
 
 export function Segmented<T extends string>({label,options,value,onChange}:{label:string;options:[T,ReactNode][];value:T;onChange:(v:T)=>void}){
@@ -107,3 +111,5 @@ export function Picker<T extends string>({label,options,value,onChange,className
   </ul>{!visible.length&&<p className="ds-picker-empty" role="status">沒有符合的選項</p>}</PickerPopover>}
  </div>;
 }
+
+export {DataState,type DataStateProps,type DataStateKind} from './DataState';
