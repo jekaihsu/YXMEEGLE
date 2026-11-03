@@ -139,9 +139,16 @@ assert.match(document.body.textContent,/對話已重設/);assert.doesNotMatch(do
 await flush(()=>button('重新開啟助理').click());assert.ok(document.querySelector('textarea'));
 await mount();
 await flush(()=>document.querySelector('.assistant-history-open').click());
-globalThis.fetch=async(url,init)=>url.includes('/chat%2Fa')?json({code:'ai_forbidden'},403):server(url,init);
+globalThis.fetch=async(url,init)=>url.includes('/chat%2Fa')?json({code:'ai_forbidden',denial_scope:'conversation'},403):server(url,init);
 await flush(()=>document.querySelector('.assistant-history-open').click());
 assert.equal(document.querySelectorAll('.assistant-message').length,0,'denied conversation clears its own content');assert.equal(document.querySelectorAll('.assistant-history-open').length,0,'denied row is removed');
 assert.match(document.body.textContent,/沒有權限/);assert.ok(document.querySelector('textarea'),'other global conversations remain available');
+const projectServer=async(url,init)=>url==='/api/ai/models'?server(url,init):url.includes('/chat%2Fa')?json({...detail,scope:'project',project_id:'p1'}):json({history_available:true,items:[{...summary,scope:'project',project_id:'p1'}],next_cursor:null});
+globalThis.fetch=projectServer;
+await flush(()=>root.render(React.createElement(ui.AssistantChat,{key:'case-denial',projectId:'p1'})));await flush();
+await flush(()=>document.querySelector('.assistant-history-open').click());assert.match(document.body.textContent,/控制測量進行中/);
+globalThis.fetch=async(url,init)=>url.includes('/chat%2Fa')?json({code:'ai_forbidden'},403):projectServer(url,init);
+await flush(()=>document.querySelector('.assistant-history-open').click());
+assert.equal(document.querySelector('textarea')===null,true,'case open denial clears the whole case assistant');assert.equal(document.querySelectorAll('.assistant-message').length,0);assert.match(document.body.textContent,/沒有權限/);
 await flush(()=>root.unmount());dom.window.close();
 console.log('History passed. List, project/cursor encoding, open, text seeding, reused UUID, continuation payload, completion refresh, 204 delete, inline cancel, empty, unavailable, error, retry, loading, pagination and stale-open cancellation.');

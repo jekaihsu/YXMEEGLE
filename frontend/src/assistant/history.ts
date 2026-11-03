@@ -10,10 +10,10 @@ export function subscribeAssistantScope(listener:()=>void){
 }
 export function denyAssistantScope(projectId?:string){
  const key=JSON.stringify(projectId??null);scopeVersions.set(key,(scopeVersions.get(key)||0)+1);
- for(const listener of scopeListeners)listener();
+ for(const listener of [...scopeListeners])listener();
 }
 const stale=()=>new DOMException('Assistant scope changed','AbortError');
-async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal,denyScope=true):Promise<T>{
+async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal,denyScope:boolean|'response'=true):Promise<T>{
  const version=assistantScopeVersion(projectId);
  try{
   const result=await api<T>(url,{signal,cache:'no-store'});
@@ -21,7 +21,10 @@ async function scopedRead<T>(url:string,projectId?:string,signal?:AbortSignal,de
   return result;
  }catch(error){
   if(version!==assistantScopeVersion(projectId)||signal?.aborted)throw stale();
-  if(denyScope&&error instanceof ApiError&&error.status===403)denyAssistantScope(projectId);
+  if(error instanceof ApiError&&error.status===403){
+   const conversationOnly=(error.payload as {denial_scope?:unknown}|undefined)?.denial_scope==='conversation';
+   if(denyScope===true||(denyScope==='response'&&!conversationOnly))denyAssistantScope(projectId);
+  }
   throw error;
  }
 }
@@ -36,7 +39,7 @@ export function listConversations(scope:HistoryScope,before?:string,signal?:Abor
   return page;
  });
 }
-export function openConversation(id:string,signal?:AbortSignal,projectId?:string){return scopedRead<ConversationDetail>(`/api/ai/conversations/${encodeURIComponent(id)}`,projectId,signal,false)}
+export function openConversation(id:string,signal?:AbortSignal,projectId?:string){return scopedRead<ConversationDetail>(`/api/ai/conversations/${encodeURIComponent(id)}`,projectId,signal,'response')}
 export async function deleteConversation(id:string,signal?:AbortSignal,projectId?:string){
  const epoch=getSessionEpoch(),version=assistantScopeVersion(projectId);
  const response=await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`,{method:'DELETE',credentials:'same-origin',signal});
