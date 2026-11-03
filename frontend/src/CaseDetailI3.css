@@ -57,3 +57,14 @@
 .project-detail .project-case-header{position:relative}
 .project-detail .project-case-header>.pds-tools{z-index:13}
 .project-detail .project-case-header .pds-back{margin-right:160px}
+
+/* Keep legacy calm selectors from repainting I3's token surfaces and labels. */
+.project-detail.project-detail-calm .i3-stepper{background:var(--surface);color:var(--label);border-color:var(--sep)}
+.project-detail.project-detail-calm .i3-stepper .pf-node[aria-current=step] .pf-node-title{color:var(--accent)}
+.project-detail.project-detail-calm .i3-stepper .pf-node[aria-pressed=true]{border:1px solid var(--accent);background:var(--accent-fill)}
+.project-detail.project-detail-calm .i3-stepper .pf-state{color:var(--label-2)}
+.project-detail.project-detail-calm .pf-stage-workspace :is(.st-count,.pf-evidence-state,.pf-plan-facts dt,.pf-plan-note,.pf-basis-chip,.pf-gap-list,.pf-gap-list li,.pf-production>.pg-details>summary,.pf-departments p,.pf-departments summary span){color:var(--label-2)}
+.project-detail.project-detail-calm .pf-stage-workspace .pf-items-heading a{color:var(--accent)}
+.project-detail.project-detail-calm .pf-stage-workspace .pf-gap-list strong{color:var(--warning)}
+.project-detail .project-overview .pf-panel{background:var(--surface);color:var(--label);border-color:var(--sep)}
+.app-shell .workspace:has(.project-detail :is(.project-overview,.pf-stage-workspace)){background:var(--bg);background-image:none}
