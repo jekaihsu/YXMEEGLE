@@ -18,7 +18,7 @@ const legacy={
  // presentation-only pointer/key listeners (menus, modality, picker, help),
  // user history query changes (ProgressTab), and owner cleanup microtask.
  // I1: MRU, DOM focus observer and keyboard/pointer modality listeners are presentation-only; no data reads.
- 'AppShell.tsx': 'eb3da194b7f142a75f5bfb243198f32539fed5a7bfebe60048329b9cf8b1566e',
+ 'AppShell.tsx': 'e908f3ac5abd3b567a92f77cd2053cd4656f8f4e86e3a263574c87b42c8192d4',
  'FlowActions.tsx': 'e378074c175118a65937a2206244be7754ecdc8b43c96698e0d42f5796f2687e',
  'LocalNodeActions.tsx': '84a571293507aa087f92ab7f56562ff1bce7c31201cec73c99dae041e64e4369',
  'MentionComposer.tsx': 'be14d7eb8360e3059b8838009b94c78bfaaed9f6ac4243a7e6d2080e6b6a791c',
@@ -40,7 +40,7 @@ const legacy={
  "inputRecovery.ts": "ea9bc500bbebb5a28a1755e834a9c3e352dbe7694eecc8f2e6766dbcb9810287",
  "LarkPilotPanel.tsx": "3173adde587f4ff70711675906c92f21db2701d87fd76be7ce6de8a7467f0326",
  "StageFixture.tsx": "9dfb8e14c631b01a1acd9a1adc88c5d094164b94945dadc2553c998504f52df8",
- "P2Pages.tsx": "32fd9844c05de8dbc0e95490d47167006888e51b66c6b6d75e950236e8653cd1",
+ "P2Pages.tsx": "fdb8dea1c8a5150331d91d5b435e4836df88dbe7e7eff261c308a880bdb075dc",
  "api.ts": "1398b98d1e2d25fd1f66153b4f646452f31df9374ebe16e697a168a4e3fa846d",
  "DispatchWork.tsx": "79ef8fd4ede9917b3f5fc6d2797a31953812242d397b25e67de3d65b7121fe7f",
  "DispatchBoard.tsx": "e68312a0f6c6fdaa91cdf232ee5e2cae5c1dbdb1b5726263f3991cee9257c880",
