@@ -17,7 +17,7 @@ import {lifecycleGate} from './sourceLifecycle';
 import {type Node, type Project, type Route, type Session, type Task, type Workspace, type Freshness, type LiveDataset} from './types';
 
 export type ActionScope={project_id?:string;node_id?:string;task_id?:string};
-export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;canRefreshDetail?:()=>boolean;route:Route;go:(r:Route,replace?:boolean)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
+export type Ctx={w:Workspace;s:Session;busy:boolean;offline?:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;canRefreshDetail?:()=>boolean;route:Route;go:(r:Route,replace?:boolean)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
 export type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
 export type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
 export type TaskRow={p:Project;n:Node;t:Task};
@@ -94,4 +94,4 @@ export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNod
  return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在載入完整資料…</p><Skeleton lines={4}/></div>;
 }
 
-export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines'|'dispatch_board';onHome:()=>void}){if(feature==='change_extension')return <DisabledApprovals onHome={onHome}/>;return <section className="system-state-card" aria-label="功能尚未開放"><h1>{feature==='dispatch_board'?'派工看板':'追蹤與檢討'}尚未開放</h1><p>{feature==='dispatch_board'?'派工看板尚未啟用。':'目前保留歷史紀錄，暫停此功能操作。'}</p><button className="button primary" onClick={onHome}>回首頁</button></section>}
+export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines'|'dispatch_board';onHome:()=>void}){if(feature==='change_extension')return <DisabledApprovals onHome={onHome}/>;return <section className="system-state-card" aria-label="功能尚未開放"><h1>{feature==='dispatch_board'?'派工看板':'追蹤與檢討'}尚未開放</h1><p>{feature==='dispatch_board'?'派工看板尚未啟用。':'目前保留歷史紀錄，暫停此功能操作。'}</p><button className="button primary" onClick={onHome}>回今日工作台</button></section>}

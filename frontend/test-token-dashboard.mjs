@@ -131,7 +131,7 @@ await flush(()=>refreshButton().click());await flush(()=>requests.at(-1).resolve
 
 const countBeforeRange=requests.length;
 await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});
-assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(document.activeElement.getAttribute('aria-label'),'用量資料');assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
+assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(document.querySelector('.td-more').open,true);assert.ok([...document.querySelectorAll('input[type=date]')].every(e=>e.getAttribute('aria-describedby')==='td-range-error'));assert.equal(document.activeElement.getAttribute('aria-label'),'用量資料');assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
 // A late export may not download protected content after an identity epoch changes.
 await flush(()=>{history.pushState(null,'','?from=2026-10-01&to=2026-10-31&actor=export-epoch');window.dispatchEvent(new Event('popstate'))});await flush(()=>requests.at(-1).resolve(json(feedbackFixture)));
 downloaded=undefined;window.HTMLAnchorElement.prototype.click=function(){downloaded=this.download};
@@ -140,6 +140,10 @@ await flush(()=>ui.invalidateSessionEpoch());await flush(()=>oldExport.resolve(n
 await flush(()=>requests.at(-1).resolve(json(feedbackFixture)));
 await flush(()=>exportButton().click());await flush(()=>requests.at(-1).resolve(json({detail:'revoked'},403)));assert.equal(document.querySelector('.td-kpis'),null,'export denial clears protected summary');
 window.HTMLAnchorElement.prototype.click=originalClick;
+await flush(()=>{history.pushState(null,'','?from=2026-10-01&to=2026-10-30');window.dispatchEvent(new Event('popstate'))});
+await flush(()=>requests.at(-1).resolve(json({...feedbackFixture,range:{from:'2026-10-01',to:'2026-10-30'},by_day:[1,4,10,18,30].map(day=>({day:`2026-10-${String(day).padStart(2,'0')}`,questions:2,input_tokens:10,output_tokens:2,cost_usd:.01,up:0,down:0})),recent:[]})));
+const bars=[...document.querySelectorAll('.td-chart rect')];assert.equal(bars.length,30);assert.equal(bars.filter(e=>e.getAttribute('aria-label').includes('，0 次提問')).length,25);assert.equal(bars[1].getAttribute('height'),'0');assert.ok(Math.abs((Number(bars[9].getAttribute('x'))-Number(bars[0].getAttribute('x')))-234)<.001,'x spacing follows calendar days');
+assert.match(document.body.textContent,/無提問的日期以 0 顯示/);
 await flush(()=>root.unmount());dom.window.close();
 assert.doesNotMatch(await fs.readFile(new URL('./src/AppShell.tsx',import.meta.url),'utf8'),/token_dashboard|TokenDashboard/);
 const manifest=JSON.parse(await fs.readFile(new URL('./dist/.vite/manifest.json',import.meta.url),'utf8'));

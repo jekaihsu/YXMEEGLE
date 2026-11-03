@@ -645,3 +645,14 @@ for(const allowed of [{import:true,manage:true,work:true},{import:false,manage:f
  assert.equal(!!button('匯入預設任務'),allowed.import);
  assert.equal(calls.filter(c=>c.method!=='GET').length,0);
 });
+
+test('offline inspector failure keeps edits, never reads back, and remains closable',async()=>{
+ await mount({route:{task:'t1',task_source:'sop_local'}});const before=calls.length;
+ Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+ try{
+  await click(startButton());assert.equal(calls.length,before,'blocked write triggers neither fetch nor readback');
+  assert.match(dialog().querySelector('.task-drawer-footer').textContent,/目前離線，無法儲存或送出/);
+  assert.doesNotMatch(dialog().textContent,/正在確認剛才|無法確認剛才/);assert.equal(startButton().disabled,false);
+  await click(dialog().querySelector('[aria-label=關閉]'));assert.equal(dialog(),null);
+ }finally{Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'))}
+});
