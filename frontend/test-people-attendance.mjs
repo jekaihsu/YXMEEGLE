@@ -46,13 +46,13 @@ const body={status:'incomplete',as_of:'2026-10-14T01:00:00Z',week_start:'2026-10
  {id:'two',name:'合成乙',group:'圖資組',in_service:false,attendance:['出差']},
  {id:'three',name:'合成丙',group:null,in_service:null,attendance:[null]}],
  trips:[{person_id:'two',name:'合成乙',group:'圖資組',kind:'trip',start:'2026-10-12',end:'2026-10-13'}],summary:{on_leave:null,on_trip:null}};
-const requests=[];let httpStatus=200;
-globalThis.fetch=async(url,options)=>{requests.push(url);return new Response(JSON.stringify(body),{status:httpStatus,headers:{'Content-Type':'application/json'}})};
+const requests=[],intents=[];let httpStatus=200;
+globalThis.fetch=async(url,options)=>{requests.push(url);intents.push(new Headers(options?.headers).get('X-YX-Fetch-Intent'));return new Response(JSON.stringify(body),{status:httpStatus,headers:{'Content-Type':'application/json'}})};
 const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,20))});
 const root=createRoot(document.getElementById('root'));
 const render=async(key,reloadVersion=1)=>{await act(async()=>root.render(React.createElement(model.PeopleAttendancePanel,{key,c:{reloadVersion,w:{version:1},s:{user:{id:'same-user'}}}})));await settle()};
 await render('first');
-assert.equal(requests.length,1);
+assert.equal(requests.length,1);assert.equal(intents[0],'initial_open');
 assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,3);
 assert.ok(document.querySelector('.attendance-attention'));
 assert.ok(document.querySelector('[role=region][tabindex="0"]'));
@@ -84,6 +84,7 @@ await render('return',2);
 assert.equal(requests.length,before+3,'the global manual reload signal reads once');
 await render('return',2);
 assert.equal(requests.length,before+3,'ordinary rerenders do not reread');
+await change(document.querySelector('[aria-label="出勤週日期"]'),'2026-10-19');assert.equal(intents.at(-1),'user_query_change');
 httpStatus=403;
 await act(async()=>document.querySelector('.people-heading button').click());await settle();
 assert.doesNotMatch(document.body.textContent,/合成甲|合成乙|合成丙/,'permission revocation clears retained personal records');
@@ -95,6 +96,13 @@ assert.equal((document.body.textContent.match(/尚未連接/g)??[]).length,1,'co
 assert.equal(document.querySelector('[aria-labelledby=people-trips-title]'),null,'hide empty trip group');
 assert.equal(document.querySelectorAll('input[type=search]').length,1);
 assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,0);
+Object.assign(body,{status:'ok',incomplete:false,people:Array.from({length:67},(_,i)=>({id:`bulk-${i}`,name:`合成人員 ${i}`,group:null,in_service:true,attendance:[null]}))});
+await render('bulk',0);const beforeReveal=requests.length;
+const more=()=>document.querySelector('.people-group button');
+await act(async()=>{more().focus();more().click()});await settle();assert.equal(document.querySelector('.people-reveal-status').textContent,'已顯示 50 / 67 筆');assert.equal(document.activeElement,more());
+assert.equal(more().textContent,'顯示更多（再 17 筆）');
+await act(async()=>{more().focus();more().click()});await settle();assert.equal(more(),null);assert.equal(document.activeElement.tagName,'H3');assert.equal(document.activeElement.textContent,'組別待核對顯示 67 / 67 筆');assert.equal(document.querySelector('.people-reveal-status').textContent,'已顯示 67 / 67 筆');assert.equal(document.querySelectorAll('.people-reveal-status[role=status]').length,1);assert.equal(document.querySelectorAll('.people-day-list li').length,67);
+const overview=document.querySelector('.people-day-controls > button');await act(async()=>overview.click());await settle();assert.equal(overview.textContent,'返回當日名單');assert.equal(document.querySelector('.people-day-list'),null);await act(async()=>overview.click());await settle();assert.equal(document.querySelectorAll('.people-day-list li').length,67);assert.equal(requests.length,beforeReveal,'reveal and mobile view switch remain local');
 await act(async()=>root.unmount());
 console.log('People page: search, filters, empty/reset, keyboard table, explicit refresh, re-entry, idle and permission safety passed');
 
