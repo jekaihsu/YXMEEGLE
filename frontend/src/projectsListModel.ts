@@ -29,7 +29,7 @@ export function caseRow(project:PortfolioProject,users:User[],viewer:string,toda
  const nodes=buildFlowModel({project:local,users,today}).nodes.map(n=>n.legacy?.status==='paused'?{...n,state:'暫停'}:n);
  const result=currentNode(nodes);
  const current=project.lifecycle_state==='待核對'?undefined:result.current;
- const state:CaseState=project.lifecycle_state??result.state;
+ const state:CaseState=project.lifecycle_state==='待核對'?'待核對':result.state;
  const mine=!!viewer && (project.pm_id===viewer || project.owner_id===viewer ||
   Array.isArray(project.collaborator_ids)&&project.collaborator_ids.includes(viewer) ||
   current?.legacy?.collaborator_ids?.includes(viewer)===true || current?.owners.some(p=>p.open_id===viewer)===true);
