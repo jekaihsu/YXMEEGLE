@@ -9,7 +9,7 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate as ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.project-flow-ui.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
@@ -62,7 +62,7 @@ assert.match(document.querySelector('#flow-evidence').textContent,/實際完成�
 assert.equal(calls.filter(r=>r.url.endsWith('/progress')).length,1);assert.equal(calls.filter(r=>r.url.endsWith('/node-assignments')).length,1);assert.equal(calls.filter(r=>r.url.includes('/nodes/')).length,0);
 assert.ok([...document.querySelectorAll('.pf-secondary')].every(d=>!d.open));
 await act(async()=>document.querySelector('.pf-node[aria-current]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));
-assert.equal(c.route.node,'mapping');assert.equal(document.activeElement.getAttribute('aria-current'),'step');
+assert.equal(c.route.node,'mapping');assert.equal(document.activeElement.getAttribute('aria-pressed'),'true');
 await mount({tab:'tasks',node:'control',extraRows:3});assert.equal(button('全部').getAttribute('aria-pressed'),'true');
 await act(async()=>{const menu=document.querySelector('.st-filter-menu');menu.open=true;menu.dispatchEvent(new Event('toggle'));await tick()});await click(button('未指派'));assert.equal(document.querySelectorAll('.pf-task-open').length,1);assert.match(document.querySelector('.pf-task-open').textContent,/尚待指派/);
 await act(async()=>{const menu=document.querySelector('.st-filter-menu');menu.open=true;menu.dispatchEvent(new Event('toggle'));await tick()});await click(button('逾期'));assert.equal(document.querySelectorAll('.pf-task-open').length,1);
@@ -74,16 +74,16 @@ const field=label=>[...document.querySelectorAll('.dp-field')].find(l=>l.firstEl
 assert.equal(field('專案編號').value,'p1');assert.equal(field('工程確認單').value,'recCase');assert.equal(field('部門').value,'控制');assert.equal(field('父義務').value,'recObligation');
 await value(field('負責人'),'ou_anna');await value(field('預定開始'),'2026-10-19T08:00');await value(field('預定結束'),'2026-10-19T12:00');
 await click(button('檢核並預覽'));await click(button('查看核准席位'));await click(button('發布排班'));
-assert.equal(calls.filter(r=>r.url.endsWith('/node-assignments')).length,2);assert.equal(calls.filter(r=>r.url.endsWith('/progress')).length,1);
+assert.equal(calls.filter(r=>r.url.endsWith('/node-assignments')).length,2);assert.equal(calls.filter(r=>r.url.endsWith('/progress')).length,2);
 await click(button('關閉'));await act(async()=>{c.go({...c.route,tab:'flow'});await tick()});assert.match(document.querySelector('#flow-tasks').textContent,/已發布的新排班/);
-await mount({node:'control',assign:false});assert.equal(button('指派'),undefined);assert.equal(document.querySelector('.pf-task-picker'),null);
+await mount({node:'control',assign:false});assert.ok(button('指派').disabled);assert.equal(document.querySelector('.pf-task-picker'),null);
 await mount({node:'control',dispatch:true,parentProject:'YX-2026-042'});await schedule();assert.match(document.querySelector('[role=dialog]').textContent,/尚無可核實的父義務/);assert.equal(document.querySelector('.dp-dialog'),null);
 for(const role of ['member','viewer']){await mount({node:'control',dispatch:true,role});assert.equal(button('排班'),undefined);assert.equal(calls.some(r=>r.url.includes('/dispatch/')),false)}
 for(const [tab,label] of [['overview','總覽'],['progress','工項與進度'],['flow','流程與任務'],['tasks','流程與任務']]){await mount({tab,node:'control',task:tab==='flow'?'recTask1':undefined});assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,label);if(tab==='flow')assert.match(document.querySelector('[role=dialog]').textContent,/控制點成果核對/)}
 evidenceStatus=500;await mount({node:'control'});assert.equal(document.querySelectorAll('.pf-node').length,9);assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.match(document.querySelector('#flow-evidence').textContent,/讀取失敗/);evidenceStatus=200;await click(button('重試工程證據'));assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);
 await mount({node:'control',evidenceHold:true});assert.equal(document.querySelector('.pf-diagram').getAttribute('aria-busy'),'false');assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.equal(document.querySelector('#flow-evidence [aria-busy]').getAttribute('aria-busy'),'true');await act(async()=>{globalThis.releaseEvidence();await tick()});assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);
 nodeStatus=500;await mount({node:'control'});assert.equal(document.querySelector('.pf-diagram').getAttribute('aria-busy'),'false');assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/尚無可見任務/);nodeStatus=200;
-await mount({node:'control',embedded:false});await click(button('更新節點與任務'));await click(document.querySelector('.pf-node[aria-label^="外業節點"]'));await click(document.querySelector('.pf-node[aria-label^="控制節點"]'));assert.equal(calls.filter(r=>r.url.endsWith('/nodes/control')).length,2);
+await mount({node:'control',embedded:false});await click(button('更新節點與任務'));await click(document.querySelector('.pf-node[aria-label^="外業節點"]'));await click(document.querySelector('.pf-node[aria-label^="控制節點"]'));assert.equal(calls.filter(r=>r.url.endsWith('/nodes/control')).length,3);
 detailStatus=500;await mount({node:'control',embedded:false});assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);fixture.list.node_details=globalThis.detailPayloads;await click(button('更新節點與任務'));assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);detailStatus=200;
 await mount({enabled:false,node:'node_control'});assert.equal(calls.some(r=>r.url.includes('/node-assignments')),false);assert.equal(document.querySelectorAll('.pf-node').length,9);assert.ok(document.querySelector('#flow-tasks'));assert.equal(document.querySelector('.pf-legacy'),null);
 globalThis.sopOverview=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
@@ -94,11 +94,11 @@ await mount({node:'control',embedded:false});assert.equal(document.querySelector
  const fetchNow=globalThis.fetch;let releaseDetail;const detailHold=new Promise(r=>releaseDetail=r);
  globalThis.fetch=async(url,init)=>{if(url.includes('/node-assignments/nodes/'))await detailHold;return fetchNow(url,init)};
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
- assert.equal(document.querySelectorAll('.pf-task-open').length,2,'revisit keeps pinned task rows without revalidation');assert.equal(document.querySelector('[aria-label="任務載入中"]'),null);
+ assert.equal(document.querySelectorAll('.pf-task-open').length,0,'a new page owner waits for its initial detail read');assert.ok(document.querySelector('[aria-label="任務載入中"]'));
  await act(async()=>{releaseDetail();await tick()});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
  detailStatus=403;Date.now=()=>realNow()+122000;
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
- assert.equal(document.querySelectorAll('.pf-task-open').length,2,'age alone does not revalidate task rows');
+ assert.equal(document.querySelectorAll('.pf-task-open').length,0,'a new page open with forbidden detail does not reuse a prior owner cache');
  await click(button('更新節點與任務'));
  assert.equal(document.querySelectorAll('.pf-task-open').length,0,'explicit forbidden revalidation removes cached task rows');
  assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);

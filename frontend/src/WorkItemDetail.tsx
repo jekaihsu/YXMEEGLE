@@ -1,3 +1,6 @@
+import {DataState} from './design/DataState';
+import {plainReason} from './workPresentation';
+import './confirmation-calm.css';
 import {compareTableValues} from './companyDashboardCache';
 import {taipeiDate} from './taipeiTime';
 import { useRef, useEffect, useId } from 'react';
@@ -23,14 +26,14 @@ export interface WorkItemDetailProps {
 function renderCell(cell: Cell) {
   if (cell.state === 'unknown') {
     return (
-      <span className="p2-cell-unknown" title={cell.reason}>
+      <span className="p2-cell-unknown" title={plainReason(cell.reason)}>
         {cell.text}
       </span>
     );
   }
   if (cell.state === 'withheld') {
     return (
-      <span className="p2-cell-withheld" title={cell.reason}>
+      <span className="p2-cell-withheld" title={plainReason(cell.reason)}>
         {cell.text}
       </span>
     );
@@ -111,36 +114,12 @@ export function WorkItemDetail({
     }
   };
 
-  // Page-level non-ready / state view
-  if (!view.hasContent) {
-    return (
-      <div className="p2-detail-root">
-        <section
-          className={`p2-banner ${view.pageState.states.map(s => `state-${s}`).join(' ')}`}
-          role="status"
-          aria-live="polite"
-          aria-label="工作項資料狀態"
-        >
-          <div className="p2-banner-header">
-            <span className="p2-banner-title">工作項資料狀態</span>
-            <span className="p2-badge" data-state={view.pageState.states[0]}>
-              {view.pageStateLabel}
-            </span>
-          </div>
-          {view.unknownReason && (
-            <p className="p2-banner-reason">{view.unknownReason}</p>
-          )}
-        </section>
-        {onBack && (
-          <div>
-            <button type="button" className="p2-btn p2-btn-plain" onClick={onBack}>
-              返回
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
+  if (!view.hasContent) return <div className="p2-detail-root">
+    <h1>工項</h1>
+    <DataState kind={view.pageState.states.some(s=>s==='forbidden'||s==='unlocated')?'Denied':'Partial'} title="目前無法開啟關聯內容" body="找不到可檢視的授權關聯，或來源尚未提供。這不代表沒有資料，系統不會推測關聯。"
+      actions={onBack?<button className="button" onClick={onBack}>回確認單</button>:<a className="button" href="#view=confirmations">回確認單</a>}/>
+    {['工作內容', '計畫與實際數量', '來源與歷程'].map(title=><section className="p2-card" key={title}><h2>{title}</h2><p>狀態未知 · 待核對</p></section>)}
+  </div>;
 
   return (
     <div className="p2-detail-root" ref={rootRef}>
@@ -181,9 +160,9 @@ export function WorkItemDetail({
               <span className="p2-breadcrumb-separator" aria-hidden="true">/</span>
               {/* Contract Line */}
               {b.contractLineUnresolved ? (
-                <span className="p2-breadcrumb-unresolved" title={b.reason ?? undefined}>
+                <span className="p2-breadcrumb-unresolved" title={plainReason(b.reason)}>
                   {WORK_ITEM_LABELS.contractLineUnresolved}
-                  {b.reason && <small className="p2-crumb-reason">（{b.reason}）</small>}
+                  {b.reason && <small className="p2-crumb-reason">（{plainReason(b.reason)}）</small>}
                 </span>
               ) : (
                 <span className="p2-breadcrumb-text">{b.contractLine}</span>
@@ -299,7 +278,7 @@ export function WorkItemDetail({
               <p className="p2-banner-note">
                 狀態：<span className="p2-cell-unknown">{view.planActual.label}</span>
               </p>
-              <p className="p2-banner-reason">{view.planActual.reason}</p>
+              <p className="p2-banner-reason">{plainReason(view.planActual.reason)}</p>
             </section>
 
             {/* 上層合約項目 (Parents) */}
@@ -373,7 +352,7 @@ export function WorkItemDetail({
                         <tr key={`parent-unresolved-${ui}`} className="p2-tr">
                           <td colSpan={5}>
                             <span className="p2-unresolved-label">{u.label}</span>
-                            <span className="p2-crumb-reason">（{u.reason}）</span>
+                            <span className="p2-crumb-reason">（{plainReason(u.reason)}）</span>
                           </td>
                         </tr>
                       ))}
@@ -402,7 +381,7 @@ export function WorkItemDetail({
                 </div>
               </div>
               <p className="p2-banner-note">{view.workOrders.emptyRow}</p>
-              <p className="p2-banner-reason">{view.workOrders.reason}</p>
+              <p className="p2-banner-reason">{plainReason(view.workOrders.reason)}</p>
               {view.workOrders.sourceHealthLink && (
                 <div className="p2-link-container">
                   <button

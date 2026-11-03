@@ -12,6 +12,8 @@ import type {useNodeAssignments} from './useNodeAssignments';
 import {useFlowDetails} from './useFlowDetails';
 import {Avatar} from './AppShell';
 import {CaseSummary} from './CaseSummary';
+import {FlowDiagram} from './FlowDiagram';
+import {Button} from './design';
 import {assignRequests} from './assignRequests';
 import {resolveStages,stageNextStep,sharedBlockerReasons,taskView,type NextStep} from './stageModel';
 import {isProjectLead,nameOf,type Ctx} from './appCommon';
@@ -44,9 +46,16 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const openStep=(next:NextStep)=>{if(next.kind==='action'&&(!next.taskId||next.needs==='approve')){c.go({view:'project',project:p.id,tab:'flow',node:next.nodeKey});return}const sop=(next.kind==='action'||next.kind==='view')&&model.nodes.flatMap(n=>n.taskRows).find(r=>r.id===next.taskId&&r.source==='SOP 任務');if(sop){go({...flowTaskTarget(sop),tab:'overview'});return}if(next.kind==='action'&&next.needs==='assign'&&next.taskId){assignRequests.request(next.nodeKey,next.taskId);go({tab:'overview',node:next.nodeKey});return}if(next.kind==='action'||next.kind==='view')go({tab:'overview',node:next.nodeKey,task:next.taskId})};
  const localField=p.nodes.find(node=>node.key==='field');
  const pm=c.w.users.find(user=>user.id===p.pm_id),supervisor=c.w.users.find(user=>user.id===localField?.supervisor_id);
+ const localNode=('data' in sopTasks.state?sopTasks.state.data?.localNodes:undefined)?.find(n=>n.key===current?.key);
+ const canRecommend=!!current&&stage.currentKnown&&!stage.finished&&caseProgressStatus(p)!=='completed'&&caseProgressStatus(p)!=='paused'&&!sourceStatusPending(p)&&execution.allowed&&fresh;
+ const canOwner=canRecommend&&!current.owners.length&&(localNode?.can.assign||list?.can[current.key]?.assign||list?.can[current.key]?.claim||assignments.state.kind==='disabled'&&isProjectLead(c.s,p));
+ const canCreate=canRecommend&&!!current.owners.length&&current.tasks.total===0&&!current.taskRows.length&&!!(current.assignment?merged?.node_details?.[current.key]:current.legacy||localNode)&&(localNode?.can.create_task||list?.can[current.key]?.create_task||assignments.state.kind==='disabled'&&isProjectLead(c.s,p));
+ const recommendation=canOwner?'指派負責人':canCreate?'新增任務':'';
  return <div className="project-overview">
   <div className="po-main">
-   <CaseSummary onRetry={()=>void assignments.reload()} ctx={stage} step={summaryStep} loading={assignments.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:''} onStep={openStep} onCurrent={()=>go({tab:'overview',node:stage.currentIds[0]})}/>
+   <section className="po-card po-next-action" aria-label="下一步"><h2>下一步</h2>{recommendation?<><h3>{recommendation}</h3><p>{current?.label} · {canOwner?'尚未指派負責人':'此階段尚無任務'}</p><Button variant="primary" onClick={()=>c.go({view:'project',project:p.id,tab:'flow',node:current?.key})}>前往{recommendation}</Button></>:summaryStep.kind==='action'||summaryStep.kind==='view'?<><h3>{summaryStep.title}</h3><p>{summaryStep.reason}</p><Button variant="primary" onClick={()=>openStep(summaryStep)}>{summaryStep.button}</Button></>:<><h3>目前沒有可執行的下一步</h3>{summaryStep.kind==='none'&&caseProgressStatus(p)==='paused'&&summaryStep.reasons[0]&&<p>{summaryStep.reasons[0]}</p>}<p>先查看目前階段、負責人與待辦任務。</p><Button variant="primary" onClick={()=>c.go({view:'project',project:p.id,tab:'flow',node:stage.currentIds[0]})}>查看流程與任務</Button></>}{sourceStatusPending(p)&&<p className="po-source-note">來源與工作台狀態不同。<Button variant="plain" onClick={()=>c.go({view:'project',project:p.id,tab:'data',section:'basic'})}>查看狀態差異</Button></p>}</section>
+   <FlowDiagram compact stageNavigation currentIds={stage.currentIds} nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>c.go({view:'project',project:p.id,tab:'overview',node})}/>
+   <div className="po-current-summary"><CaseSummary showNext={false} onRetry={()=>void assignments.reload()} ctx={stage} step={summaryStep} loading={assignments.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:''} onStep={openStep} onCurrent={()=>go({tab:'overview',node:stage.currentIds[0]})}/></div>
    {workbench()}
   </div>
   <aside className="po-sidebar" aria-label="案件摘要資料">

@@ -91,7 +91,7 @@ try{
   await act(async()=>{[...timers.values()][0]()});
   assert.equal(requests.length,1,'timeout does not silently duplicate an upstream request');
   assert.match(document.querySelector('[role=alert]').textContent,/案件讀取失敗/);
-  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click());
+  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重新讀取').click());
   assert.equal(requests.length,2);
   globalThis.setTimeout=originalTimeout;globalThis.clearTimeout=originalClear;
   await act(async()=>requests[1].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));

@@ -111,17 +111,21 @@ export function P2Page({c}: {c: Ctx}) {
  const body = fetched.status === 'ok' ? fetched.body : undefined;
  let page: React.ReactNode;
  if (!parsed.ok) page = <InvalidContext label={ROUTE_LABEL[context.route]} onReset={() => open(context, true)}/>;
+ else if ((!pageRequest?.ok && pageRequest?.reason==='unlocated' || failure && ['forbidden','unlocated'].includes(failure.state)) && (context.route==='contract'||context.route==='workitem')) {
+  const states=[failure?.state??'unlocated'];
+  page=context.route==='contract'?<ContractBody context={context} body={{page_state:{states}}} open={open} setNotice={setNotice} goBack={goBack}/>:<WorkItemBody context={context} body={{read_state:{states}}} open={open} openExisting={openExisting} setNotice={setNotice} goBack={goBack}/>;
+ }
  else if (!pageRequest?.ok) page = <UnsupportedFilters unsupported={pageRequest?.ok === false ? pageRequest.unsupported : []} invalid={pageRequest?.ok === false ? pageRequest.invalid : []} unlocated={pageRequest?.ok === false && pageRequest.reason === 'unlocated'}
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
  else if (fetched.status === 'loading' && context.route !== 'confirmations') page = context.route === 'confirmation' ? <CaseDetailSkeleton/> : <div className="p2-card"><DataState kind="Loading" title="正在載入資料" body="摘要與案件筆數尚未載入，不代表 0 筆。"/><div aria-hidden="true"><Skeleton lines={6}/></div></div>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
  else if (context.route === 'overview') page = <OverviewBody onRefresh={onRetry} users={c.w.users} context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
- else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} open={open} setNotice={setNotice}/>;
+ else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} onRefresh={onRetry} open={open} setNotice={setNotice}/>;
  else if (context.route === 'confirmation') page = <CaseBody context={context} body={body} open={open} openExisting={openExisting} goBack={goBack} setNotice={setNotice}/>;
  else if (context.route === 'contract') page = <ContractBody context={context} body={body} open={open} setNotice={setNotice} goBack={goBack}/>;
  else page = <WorkItemBody context={context} body={body} open={open} openExisting={openExisting} setNotice={setNotice} goBack={goBack}/>;
  return <main className="page p2-page" aria-label={ROUTE_LABEL[context.route]}>
-  {crumbs.length > 1 && <nav className="p2-breadcrumb" aria-label="返回路徑">
+  {crumbs.length > 1 && context.route!=='confirmation' && <nav className="p2-breadcrumb" aria-label="返回路徑">
    {goBack && (context.route === 'overview' || context.route === 'confirmations') && <button type="button" className="p2-btn p2-btn-plain" onClick={goBack}>返回上一層</button>}
    <ol className="p2-breadcrumb-list">
     {crumbs.map((crumb, depth) => <li key={depth} className="p2-breadcrumb-item">
@@ -199,7 +203,7 @@ const overviewFilters = (context: P2Context) => ({
 });
 
 const COMMIT_DELAY_MS = 400;
-function ConfirmationsBody({context, body, loading, open, setNotice}: {context: P2Context; body: unknown; loading: boolean; open: Open; setNotice: (m: string) => void}) {
+function ConfirmationsBody({context, body, loading, onRefresh, open, setNotice}: {context: P2Context; body: unknown; loading: boolean; onRefresh:()=>void; open: Open; setNotice: (m: string) => void}) {
  // F1: the controls stay mounted through reads. Edits live in `draft`; the hash/query is committed after a pause (or on blur/Enter-free change of a select)
  // and the table shows loading, never the previous rows, while draft and committed query differ.
  const [draft, setDraft] = useState<Record<string, string>>(context.filters);
@@ -230,19 +234,7 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
  // Any change to the query (sort) restarts at page one and drops the selection.
  const requery = (next: Partial<P2Context>) => open({...context, cursor: null, selected: null, ...next}, true);
  const rows = body && typeof body === 'object' && Array.isArray((body as {rows?: unknown}).rows) ? (body as {rows: {row_key?: unknown; case_link?: {project_id?: unknown}}[]}).rows : [];
- const proximity=useRef<HTMLDivElement>(null);
- useEffect(()=>{
-  const cursor=view.pagination.next.cursor;
-  const connection='connection' in navigator?navigator.connection:null;
-  if(!cursor||pending||loading||typeof IntersectionObserver==='undefined'||connection&&typeof connection==='object'&&('saveData' in connection&&connection.saveData||'effectiveType' in connection&&['slow-2g','2g'].includes(String(connection.effectiveType))))return;
-  const request=p2Request({...context,cursor});
-  if(!request.ok||!proximity.current)return;
-  const controller=new AbortController();
-  const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();void readPanel(request.url,controller.signal,memoryOwner.split('|').slice(1).join('|'),{timeoutMs:60000}).catch(()=>{})}},{rootMargin:'600px'});
-  observer.observe(proximity.current);
-  return()=>{observer.disconnect();controller.abort()};
- },[view.pagination.next.cursor,pending,loading,context]);
- return <><ConfirmationList view={view}
+ return <><ConfirmationList view={view} onRefresh={onRefresh}
   onSelect={key => open({...context, selected: key}, true)}
   onSort={(sort: SortSpec) => requery({sort})}
   onSearch={search => edit({...draft, search})}
@@ -261,7 +253,7 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
    if (typeof projectId !== 'string' || !projectId) {setNotice('這筆確認單尚未對應到案件（對應未驗證），無法開啟案件詳情。'); return;}
    const result = drill({...context, selected: rowKey}, 'confirmation', {selected: caseSelection(projectId, confirmation)});
    if (result.ok) open(result.value); else setNotice('無法開啟案件詳情。');
-  }}/><div ref={proximity} aria-hidden="true"/></>;
+  }}/></>;
 }
 const withoutEmpty = (filters: Readonly<Record<string, string>>): Record<string, string> =>
  Object.fromEntries(Object.entries(filters).filter(([, value]) => typeof value === 'string' && value.trim() !== ''));

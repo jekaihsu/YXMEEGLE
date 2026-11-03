@@ -8,7 +8,7 @@ for(const key of ['window','document','location','history','sessionStorage','loc
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {parseRoute,normalizeRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate as ProjectDetail} from './src/ProjectDetail'; export {parseRoute,normalizeRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.stage-sop-merge.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const example=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
 const tick=()=>new Promise(r=>setTimeout(r,20));
@@ -37,9 +37,9 @@ const count=()=>document.querySelector('.st-count').textContent;
 
 await mount('view=project&project=p1&node=node_sales&tab=overview');
 assert.match(count(),/已完成 2 \/ 12 項/,'before the fix this list showed only the 2 local-flow tasks');
-assert.equal(ids().length,12);assert.match(document.querySelector('#flow-selected').textContent,/已完成 2 \/ 12 項/);
+assert.equal(ids().length,8);await click([...document.querySelectorAll('#flow-tasks button')].find(b=>b.textContent==='查看全部（12 項）'));assert.equal(ids().length,12);assert.match(document.querySelector('#flow-selected').textContent,/已完成 2 \/ 12 項/);
 assert.equal(document.querySelector('.st-note[role=status]')?.textContent.includes('不一致')??false,false,'rows and node total agree');
-const statuses=[...document.querySelectorAll('#flow-tasks > .pf-task-list .st-meta > span:first-child')].map(s=>s.textContent);
+const statuses=[...document.querySelectorAll('#flow-tasks > .pf-task-list .st-meta > .ds-badge')].map(s=>s.textContent);
 assert.ok(statuses.every(s=>/^(待處理|進行中|已完成|受阻)$/.test(s)),'one status dictionary: '+[...new Set(statuses)].join(','));
 assert.equal(statuses.filter(s=>s==='待處理').length,8,'local 尚未開始 and SOP 待處理 read the same');
 await click(button('我的任務'));assert.deepEqual(ids().sort(),['l1','sop-2'],'my tasks come from both sources');assert.match(count(),/已完成 2 \/ 12 項/);
