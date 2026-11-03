@@ -18,16 +18,18 @@ def stream_error(exc):
         if code == 'ai_forbidden' and getattr(exc, 'conversation_only', False) else {}))
 
 
-def visible_cases(sessions, workspace_id, cfg):
-    # Only headers and policy metadata are needed. Load once for the entire page,
-    # before the ledger's bounded, single-statement history query.
+def referenced_visibility(sessions, workspace_id, cfg, actor_id=None, extra=()):
+    from .ledger import required_case_ids
+    wanted = required_case_ids(sessions, workspace_id, actor_id) | set(extra)
+    if not wanted:
+        return set()
     with sessions() as db:
-        row = db.get(WorkspaceRow, workspace_id)
-        if row is None:
+        root = db.get(WorkspaceRow, workspace_id)
+        if root is None:
             raise HistoryDenied()
-        state = storage.load_partial(db, BusinessRow, row, collections=('projects',), project_details=False)
+        state = storage.load_partial(db, BusinessRow, root, collections=('projects',), project_ids=wanted, project_details=False)
         normalize_environment(state, workspace_id, cfg)
-        return {p['id'] for p in state.get('projects', []) if visible_project(state, p)}
+        return {p['id'] for p in state['projects'] if visible_project(state,p)}
 
 
 def require_cases(sessions, workspace_id, project_ids, cfg):
@@ -45,6 +47,13 @@ def require_cases(sessions, workspace_id, project_ids, cfg):
             WorkspaceRow, WorkspaceRow.id == BusinessRow.workspace_id).where(
             BusinessRow.workspace_id == workspace_id, BusinessRow.kind == 'projects',
             BusinessRow.entity_id.in_(wanted))).all()
+        if not rows:
+            root = db.get(WorkspaceRow, workspace_id)
+            if root is not None and root.data.get('storage_schema') != 2:
+                state = storage.load_partial(db, BusinessRow, root, collections=('projects',), project_ids=wanted, project_details=False)
+                normalize_environment(state, workspace_id, cfg)
+                if wanted.issubset({p['id'] for p in state['projects'] if visible_project(state,p)}):
+                    return
         visible = set()
         for project, environment in rows:
             state = normalize_environment({'environment': environment}, workspace_id, cfg)
@@ -61,38 +70,6 @@ def require_case(sessions, workspace_id, project_id, cfg):
 def permission_key(user):
     import hashlib
     import json
-    values = [user.get('authz_version', 0), user.get('role'), sorted(user.get('capabilities', [])),
+    values = [user.get('permission_version', user.get('authz_version', 0)), user.get('role'), sorted(user.get('capabilities', [])),
               user.get('active', True), user.get('company_admin_authorization')]
     return hashlib.sha256(json.dumps(values, sort_keys=True, default=str).encode()).hexdigest()
-
-
-def permission_keys(sessions, workspace_id):
-    from ..models import PersonRow
-    from sqlalchemy import select
-    with sessions() as db:
-        root = db.get(WorkspaceRow, workspace_id)
-        state = storage.load_partial(db, BusinessRow, root, collections=('users',), project_details=False)
-        users = {u['id']:u for u in state['users']}
-        if workspace_id.startswith(('lark-', 'test-lark-')):
-            org = workspace_id.removeprefix('test-')
-            users.update({p.person_id:p.data for p in db.scalars(select(PersonRow).where(PersonRow.organization_id == org))})
-        return {ident:permission_key(u) for ident, u in users.items() if u.get('active', True)}
-
-
-def resolve_case_codes(sessions, workspace_id, codes):
-    """Resolve trusted report-row codes against server records; ambiguity is conservative."""
-    from ..sources import normalized_case
-    from sqlalchemy import select
-    wanted = {normalized_case(code) for code in codes}
-    found = set()
-    projects = set()
-    with sessions() as db:
-        headers = db.scalars(select(BusinessRow.data).where(BusinessRow.workspace_id == workspace_id,
-            BusinessRow.kind == 'projects'))
-        for project in headers:
-            matches = wanted & {normalized_case(code) for code in
-                [project.get('code'), *project.get('code_history', [])] if code}
-            if matches:
-                found.update(matches)
-                projects.add(project['id'])
-    return projects, found == wanted

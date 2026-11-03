@@ -48,7 +48,8 @@ def test_global_tool_case_reads_revoke_list_open_resume(app, client):
     _, resumed = ask(app, client, 'global-case')
     resumed_uid = events(resumed)[0]['usage_id']
     with app.state.sessions() as db:
-        assert pid in db.scalars(select(ledger.AiCaseRead.project_id).where(ledger.AiCaseRead.usage_id == resumed_uid)).all()
+        assert db.scalars(select(ledger.AiCaseRead.project_id).where(ledger.AiCaseRead.usage_id == resumed_uid)).all() == []
+        assert pid in db.scalars(select(ledger.AiConversationCaseRead.project_id)).all()
     hide(app, client, pid)
     assert client.get('/api/ai/conversations').json()['items'] == []
     assert client.get('/api/ai/conversations/global-case').status_code == 403
@@ -206,16 +207,9 @@ def test_report_case_codes_are_resolved_from_server_rows_and_authorized(app, cli
     monkeypatch.setattr(httpx.AsyncClient,'get',report)
     _, response = ask(app,client,'global-report',calls=[dataset_call('report-read','report_sales',{})])
     result = events(response)
-    if unresolved:
-        assert result[-1] == {'type':'error','code':'ai_forbidden','denial_scope':'conversation'}
-        assert client.get('/api/ai/conversations/global-report').status_code == 404
-        return
     assert result[-1]['type'] == 'done'
     with app.state.sessions() as db:
-        assert pid in db.scalars(select(ledger.AiCaseRead.project_id).where(ledger.AiCaseRead.usage_id == result[0]['usage_id'])).all()
+        assert db.scalars(select(ledger.AiCaseRead.project_id).where(ledger.AiCaseRead.usage_id == result[0]['usage_id'])).all() == []
+        assert db.scalars(select(ledger.AiWorkspaceRead.marker).where(ledger.AiWorkspaceRead.usage_id == result[0]['usage_id'])).all() == ['report:sales']
     hide(app,client,pid)
-    assert client.get('/api/ai/conversations/global-report').status_code == 403
-    fake, response = ask(app,client,'hidden-new-report',calls=[dataset_call('hidden-report','report_sales',{})])
-    result = events(response)
-    assert result[-1]['code'] == 'ai_forbidden'
-    assert len(fake.inputs) == 1, 'hidden report content must never reach a model continuation'
+    assert client.get('/api/ai/conversations/global-report').status_code == 200

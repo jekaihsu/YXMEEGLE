@@ -14,12 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from starlette.concurrency import run_in_threadpool
 
 from . import ledger
-from .history_authorization import HistoryDenied, require_case, require_cases, visible_cases, permission_key, permission_keys, stream_error
+from .history_authorization import HistoryDenied, require_case, require_cases, permission_key, referenced_visibility, stream_error
 from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun, sse
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
 from .project_context import ProjectContextCache, ContextUnavailable
 from .tools import ReadDenied, valid_case_id
+from ..production_access import hr_view_allowed
 
 
 class Message(BaseModel):
@@ -107,6 +108,8 @@ class ChatResponse(StreamingResponse):
             await self.body_iterator.aclose()
             await self.run.finish()
 
+STREAM_REVOCATION_BOUND_SECONDS = 2.0
+
 RUN_REGISTRATION_SECONDS = QUESTION_TIMEOUT_SECONDS + 60
 
 
@@ -145,6 +148,8 @@ def register(app, *, identity, sessions, cfg):
 
     def authorize_history(workspace_id, user, authority):
         try:
+            if 'attendance' in authority['workspace_reads'] and not hr_view_allowed(user,cfg):
+                raise HistoryDenied()
             if authority['permission_keys'] - {permission_key(user)}:
                 raise HistoryDenied()
             require_cases(sessions, workspace_id, authority['case_ids'], cfg)
@@ -165,11 +170,11 @@ def register(app, *, identity, sessions, cfg):
                            auth=Depends(authenticated)):
         data, user = auth
         try:
-            allowed = visible_cases(sessions, data['wid'], cfg)
+            allowed = referenced_visibility(sessions, data['wid'], cfg, user['id'], extra=[project_id] if project_id else [])
             if allowed is not None and project_id is not None and project_id not in allowed:
                 raise HistoryDenied()
             result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before,
-                                          allowed_project_ids=allowed, permission_key=permission_key(user), **history_options())
+                                          allowed_project_ids=allowed, permission_key=permission_key(user), viewer_can_hr=hr_view_allowed(user,cfg), **history_options())
         except ValueError:
             raise HTTPException(422, '分頁游標錯誤') from None
         return JSONResponse(result, headers={'Cache-Control': 'no-store'})
@@ -251,7 +256,6 @@ def register(app, *, identity, sessions, cfg):
         run.case_ids = set(authority['case_ids'])
         if body.project_id is not None:
             run.case_ids.add(body.project_id)
-        run.case_reads = {('conversation', project) for project in run.case_ids}
         run.provenance_version = 0 if authority['legacy'] else 1
         run.started = started
         run.project_context = context
@@ -269,12 +273,14 @@ def register(app, *, identity, sessions, cfg):
 
         async def authorize(force=False):
             nonlocal last_authorized
-            if not force and monotonic() - last_authorized < 2:
+            if not force and monotonic() - last_authorized < STREAM_REVOCATION_BOUND_SECONDS:
                 return
             def check():
                 # The request cookie identifies this run. AuthRow expiry/revocation
                 # and current admission detect logout or permission loss.
                 _, current_user = identity(request)
+                if 'attendance' in run.workspace_reads | authority['workspace_reads'] and not hr_view_allowed(current_user,cfg):
+                    raise HistoryDenied(conversation_only=body.project_id is None)
                 if permission_key(current_user) != initial_permission:
                     raise HistoryDenied()
                 if body.project_id is not None and run.case_ids == {body.project_id}:
@@ -340,8 +346,8 @@ def register(app, *, identity, sessions, cfg):
             ledger.logger.error('ai_content_cleanup_failed')
         exporting = request.url.path.endswith('/export')
         result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
-            content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting, allowed_project_ids=visible_cases(sessions, data['wid'], cfg),
-            permission_keys=permission_keys(sessions, data['wid']))
+            content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting, allowed_project_ids=referenced_visibility(sessions, data['wid'], cfg),
+            viewer_can_hr=hr_view_allowed(user,cfg))
         if exporting:
             rows = result['rows']
             truncated = result['truncated']
@@ -360,8 +366,8 @@ def register(app, *, identity, sessions, cfg):
             raise HTTPException(403, '僅主管可查看 AI 用量')
         result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=app.state.ai_store_content,
                                  retention_days=app.state.ai_content_retention_days,
-                                 allowed_project_ids=visible_cases(sessions, data['wid'], cfg),
-                                 permission_keys=permission_keys(sessions, data['wid']))
+                                 allowed_project_ids=referenced_visibility(sessions, data['wid'], cfg),
+                                 viewer_can_hr=hr_view_allowed(user,cfg))
         if result is None:
             raise HTTPException(404, '找不到提問')
         return result

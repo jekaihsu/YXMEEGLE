@@ -12,7 +12,7 @@ from .workflow import require
 from .business_policy import refresh_business_authority
 
 TEST_AUTH_FIELDS = ('role', 'capabilities', 'active', 'department', 'default_workspace',
-                    'authz_version', 'manager_revoked', 'capability_config_applied')
+                    'authz_version', 'permission_version', 'manager_revoked', 'capability_config_applied')
 
 
 def admitted(person, app_id):

@@ -124,14 +124,14 @@ def test_generation_failure_releases_slot_and_runs_in_worker(app, client, monkey
     original = ledger.conversation_generation
     event_threads = []
     async def stream(run):
-        event_threads.append(threading.get_ident())
+        event_threads.append(threading.current_thread())
         async for item in original_stream(run):
             yield item
     original_stream = ChatRun.stream
     monkeypatch.setattr(ChatRun, 'stream', stream)
     workers = []
     def failing(*args):
-        workers.append(threading.get_ident())
+        workers.append(threading.current_thread())
         if len(workers) <= 2:
             raise RuntimeError('database locked')
         return original(*args)
@@ -329,7 +329,7 @@ def test_inflight_case_revocation_blocks_later_events_and_keeps_usage(app, clien
     with app.state.sessions() as db:
         row = db.get(AiUsageRow, result[0]['usage_id'])
         assert row is not None and row.output_tokens > 0
-    assert client.get('/api/ai/conversations/' + BODY['conversation_id']).status_code == 403
+    assert client.get('/api/ai/conversations/' + BODY['conversation_id']).status_code == 404
 
 
 def test_mixed_scope_conversation_cannot_bypass_case_denial(app, client):

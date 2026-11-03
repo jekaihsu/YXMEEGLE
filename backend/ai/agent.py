@@ -14,9 +14,9 @@ from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
 from .tools import TOOLS, execute, result_display
-from .read_provenance import case_reads, case_code_reads
+from .read_provenance import case_reads, workspace_reads
 from fastapi import HTTPException
-from .history_authorization import permission_key, stream_error, resolve_case_codes, require_cases, HistoryDenied
+from .history_authorization import permission_key, stream_error
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -53,6 +53,7 @@ class ChatRun:
         self.answer = ''
         self.tool_names = []
         self.case_reads = set()
+        self.workspace_reads = set()
         self.case_ids = set()
         self.provenance_version = 1
         self.authorize = self.unrestricted
@@ -92,8 +93,8 @@ class ChatRun:
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
                       scope=self.scope, project_id=self.body.project_id,
-                      authz_version=self.user.get('authz_version', 0), permission_key=permission_key(self.user),
-                      provenance_version=self.provenance_version, case_reads=self.case_reads,
+                      authz_version=self.user.get('permission_version', self.user.get('authz_version', 0)), permission_key=permission_key(self.user),
+                      provenance_version=self.provenance_version, case_reads=self.case_reads, workspace_reads=self.workspace_reads,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
                       cache_write_tokens=usage.cache_write, output_tokens=usage.output,
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
@@ -195,28 +196,15 @@ class ChatRun:
                     def observed(project):
                         self.case_ids.add(project)
                         self.case_reads.add((call.id, project))
-                    codes = set()
                     token = case_reads.set(observed)
-                    code_token = case_code_reads.set(codes.add)
+                    workspace_token = workspace_reads.set(self.workspace_reads.add)
                     try:
-                        result = await asyncio.wait_for(execute(self.app, self.cookie, call.name, call.args), timeout=15)
-                        if codes:
-                            projects, resolved = await run_in_threadpool(resolve_case_codes, self.app.state.sessions,
-                                self.data['wid'], codes)
-                            for project in projects:
-                                observed(project)
-                            if not resolved:
-                                raise HistoryDenied(conversation_only=True)
-                            try:
-                                await run_in_threadpool(require_cases, self.app.state.sessions, self.data['wid'], projects, self.app.state.cfg)
-                            except HistoryDenied:
-                                raise HistoryDenied(conversation_only=True) from None
-                        return result
+                        return await asyncio.wait_for(execute(self.app, self.cookie, call.name, call.args), timeout=15)
                     except TimeoutError:
                         return json.dumps({'error': '查詢逾時，請稍後重試', 'retryable': True}, ensure_ascii=False), True
                     finally:
                         case_reads.reset(token)
-                        case_code_reads.reset(code_token)
+                        workspace_reads.reset(workspace_token)
 
                 self.tool_calls += len(pending)
                 async def run_any(call):
