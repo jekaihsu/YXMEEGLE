@@ -78,12 +78,14 @@ class RefreshCoordinator:
         return self._status(wid, DATASETS)
 
     def _status(self, wid, datasets):
-        rows = {}
-        for dataset in datasets:
-            try:
-                rows[dataset] = self._read(self._key(wid, dataset))
-            except Exception:
-                rows[dataset] = {'last_error': 'Lark refresh failed'}
+        from .status_reads import read_status_rows
+        keys = {self._key(wid, dataset): dataset for dataset in datasets}
+        try:
+            with self.Session() as db:
+                stored = read_status_rows(db, self.CacheRow, list(keys))
+            rows = {dataset: stored.get(key, {}) for key, dataset in keys.items()}
+        except Exception:
+            rows = {dataset: {'last_error': 'Lark refresh failed'} for dataset in datasets}
         workspace_as_of = None
         if not self._enabled(wid):
             from ..models import WorkspaceRow
@@ -290,6 +292,12 @@ class RefreshCoordinator:
     def ensure(self, wid, dataset, *, wait=False, force=False, timeout=None):
         if dataset not in DATASETS:
             raise ValueError('Unknown live-read dataset')
+        # Ordinary page reads consume retained data. Existing workers and
+        # explicit refreshes still own refresh admission and database leases.
+        from ..request_timing import _current
+        request = _current.get()
+        if request is not None and getattr(request, 'method', None) in ('GET', 'HEAD') and not wait and not force:
+            return self._status(wid, (dataset,))['datasets'][dataset]
         deadline = monotonic() + (self.config.blocking_timeout_seconds if timeout is None else timeout)
         parent = refresh_context.get()
         if parent:

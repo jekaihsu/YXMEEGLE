@@ -246,3 +246,16 @@ def _case_scalar(node, key, plan):
 
 # Lifecycle status/raw values remain intact; only diagnostic identities change.
 HANDLERS.update(source_id=_case_scalar, record_id=_case_scalar, blank_sources=_refs)
+
+
+def _retained_identities(node, key, plan):
+    # These holders also contain work-item identities. Retain every identity
+    # except a proven hidden case; the admitted-case set is not their universe.
+    if isinstance(node[key], list):
+        node[key] = [value for value in node[key]
+                     if not (isinstance(value, str) and
+                             (value in plan.hidden or value in plan.hidden_codes))]
+
+
+HANDLERS.update(source_visible_record_ids=_retained_identities,
+                record_ids=_retained_identities, link_record_ids=_retained_identities)

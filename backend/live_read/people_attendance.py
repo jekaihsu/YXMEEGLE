@@ -35,7 +35,11 @@ class PeopleAttendance(RefreshCoordinator):
         result = empty_view(days)
         if not self._enabled(wid):
             return dict(result, status='not-connected')
-        attempt = self.ensure(key, 'attendance')
+        from ..request_timing import _current
+        request = _current.get()
+        attempt = (self._status(key, ('attendance',))['datasets']['attendance']
+                   if request is not None and getattr(request, 'method', None) in ('GET', 'HEAD')
+                   else self.ensure(key, 'attendance'))
         row = self._read(self._key(key, 'attendance'))
         snapshot = deepcopy(row.get('snapshot'))
         if snapshot:

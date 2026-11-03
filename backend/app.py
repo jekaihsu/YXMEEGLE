@@ -774,8 +774,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def workspace(request:Request,scope:str=''):
         data,user=identity(request)
         coordinator=app.state.live_read
-        coordinator.ensure(data['wid'],'sources')
-        coordinator.ensure(data['wid'],'attendance')
         if scope=='shell' and shell_enabled:
             shell_result=shell_response(request,data,user,coordinator)
             if shell_result is not None: return shell_result
@@ -1229,7 +1227,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.get('/api/sources')
     def sources(request:Request):
         data,user=identity(request)
-        app.state.live_read.ensure(data['wid'],'sources')
         freshness=app.state.live_read.status(data['wid'])
         if data['mode']!='lark' or data['wid'].startswith('test-'):
             result={'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
@@ -1287,7 +1284,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def source_health_page(data,user):
         """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
-        app.state.live_read.ensure(data['wid'],'sources')
         freshness=app.state.live_read.status(data['wid'])
         cache_data=state=None
         if data['mode']=='lark' and not data['wid'].startswith('test-'):
@@ -1348,11 +1344,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return state
 
     def p2_generation(db,wid):
-        version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
-        # Extract once: four separate PostgreSQL JSON operators each parse
-        # the complete raw source document even though they return scalars.
-        from .source_metadata_reads import read_generation
-        return (version,*read_generation(db,CacheRow,wid))
+        from .source_metadata_reads import read_workspace_generation
+        return read_workspace_generation(db,CacheRow,WorkspaceRow,wid)
 
 
     def p2_related_project_ids(state,project_id):
@@ -1378,7 +1371,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
         empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
         Single-project progress retains shared policy/redaction facts but loads only that project's tree."""
         wid=data['wid']
-        app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
             with sessions() as db: generation=p2_generation(db,wid)
             freshness=app.state.live_read.status(wid)
@@ -1481,7 +1473,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
-        app.state.live_read.ensure(data['wid'],'sources')
         source_freshness=app.state.live_read.status(data['wid'])['datasets']['sources']
         source_fence=json.dumps({k:v for k,v in source_freshness.items() if k!='age_seconds'},sort_keys=True)
         with sessions() as db:
@@ -1554,7 +1545,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .my_work import build_my_work_input, READ_OMIT_KINDS
         data,user=identity(request)
         if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
-        app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
             with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),omit_kinds=READ_OMIT_KINDS)
