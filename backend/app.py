@@ -221,6 +221,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     from .read_snapshots import ReadSnapshots, EncodedSnapshot
     read_snapshots = ReadSnapshots()
+    from .projects_portfolio import PortfolioCaptures
+    portfolio_captures = app.state.portfolio_captures = PortfolioCaptures()
     from .build_identity import read_build_identity
     shell_wire_revision=json.dumps(read_build_identity(),sort_keys=True)
     app.state.read_snapshots = read_snapshots
@@ -808,29 +810,38 @@ def create_app(overrides=None,*,dispatch_transport=None):
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
                             result = portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
                                 assignments=app.state.home_panels, data=data, user=user)
-                            # A cold or failed Lark overlay must not be pinned for the snapshot window.
-                            return EncodedSnapshot.encode(JSONResponse(result).body, volatile=bool(result.get('node_status_degraded')))
+                            # Cold overlays may continue a sequence, but never become current cached reads.
+                            result['capture_revision'] = root.version
+                            with sessions() as verify_db:
+                                latest = verify_db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id == data['wid']))
+                            return EncodedSnapshot.encode(JSONResponse(result).body,
+                                volatile=bool(result.get('node_status_degraded')) or latest != root.version)
                     with phase(request, 'snapshot'):
-                        generation = read_snapshots.fence(data['wid'])
-                        if snapshot:
-                            body = read_snapshots.peek(('portfolio-version', key, snapshot))
-                            require(body is not None, '案件清單已更新，請重新讀取。', 409)
-                            snapshot_status = 'hit'
+                        replaced = False
+                        retained = portfolio_captures.get(key, snapshot) if snapshot else None
+                        if retained:
+                            body, captured_revision = retained
+                            snapshot_status = 'stale' if captured_revision != row.version or body.volatile else 'hit'
                         else:
-                            body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
+                            body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version,
+                                force=bool(snapshot))
+                            replaced = bool(snapshot)
+                            if replaced or body.volatile:
+                                snapshot_status = 'stale'
                     if page:
                         version_body = body
-                        read_snapshots.retain(('portfolio-version', key, body.etag), body, generation, workspace=data['wid'])
-                        # Pages share the same authority-checked portfolio capture.
-                        # Cache their wire bytes as well; no re-projection per page.
-                        def build_page():
-                            result = json.loads(version_body.body)
-                            start = (page-1)*30
-                            result['items'] = result['items'][start:start+30]
-                            result.update(page=page, next_page=page+1 if start+30<result['total'] else None,
-                                          snapshot=version_body.etag)
-                            return EncodedSnapshot.encode(JSONResponse(result).body)
-                        body, _ = read_snapshots.get(('portfolio-page', key, body.etag, page), build_page)
+                        result = json.loads(version_body.body)
+                        portfolio_captures.put(key, body, result['capture_revision'])
+                        # Missing history (another process, expiry, eviction) cannot
+                        # reconstruct an old DB revision. Return one complete new
+                        # capture for atomic replacement, never mixed-revision rows.
+                        start = 0 if replaced else (page-1)*30
+                        result['items'] = result['items'] if replaced else result['items'][start:start+30]
+                        result.update(page=1 if replaced else page,
+                            next_page=None if replaced else page+1 if start+30<result['total'] else None,
+                            snapshot=version_body.etag, snapshot_replaced=replaced,
+                            stale=snapshot_status == 'stale' or version_body.volatile)
+                        body = EncodedSnapshot.encode(JSONResponse(result).body, volatile=version_body.volatile)
                     return body.response(request, snapshot_status)
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:

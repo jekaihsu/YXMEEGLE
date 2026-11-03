@@ -1,4 +1,5 @@
-import {api,ApiError} from './api';
+import {readPortfolioSequence,type PortfolioSequence} from './portfolioSequence';
+import {api} from './api';
 import {CaseStatus} from './CaseStatus';
 import {PickerPopover} from './design/PickerPopover';
 import {Select as FormSelect} from './design/Select';
@@ -77,30 +78,23 @@ export function Projects({c}:{c:Ctx}) {
  const resource={endpoint:PROJECT_URL};
  const result=usePageResource<PortfolioPage|undefined>(owner,resource,refreshId||c.reloadVersion?{reason:refreshCause,id:`${c.reloadVersion??0}:${refreshId}`}:{reason:'initial_open'},async(signal,current,intent)=>{
   const data=shell?await api<PortfolioPage>(PROJECT_URL,{signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':intent.reason}},current):undefined;
-  return {data,snapshotId:data?.snapshot??null,fetchedAt:data?.as_of??null,verifiedAt:null,changedAt:null,completeness:data?.next_page?'partial':'complete',localRevision:null,empty:data?.total===0,stale:false};
+  return {data,snapshotId:data?.snapshot??null,fetchedAt:data?.as_of??null,verifiedAt:null,changedAt:null,completeness:data?.next_page?'partial':'complete',localRevision:null,empty:data?.total===0,stale:data?.stale===true};
  });
  const firstDenied=result.kind==='Denied';
  const value='value' in result?result.value:!firstDenied&&'previous' in result?result.previous:undefined;
- const data=value?.data;
- const read={data,loading:result.kind==='Loading',error:'error' in result?String(result.error instanceof Error?result.error.message:result.error):'',reload:()=>{setRefreshCause('explicit_refresh');setRefreshId(v=>v+1)},afterWrite:()=>{setRefreshCause('own_write_committed');setRefreshId(v=>v+1)}};
- const [remaining,setRemaining]=useState<{first:PortfolioPage;items:PortfolioPage['items'];complete:boolean;error:string;denied?:boolean}>();
+ const initialData=value?.data;
+ const [remaining,setRemaining]=useState<{origin:PortfolioPage;value:PortfolioSequence}>();
  useEffect(()=>{
-  if(!shell||!data?.next_page)return;
-  const first=data,controller=new AbortController();
-  setRemaining({first,items:[],complete:false,error:''});
-  void (async()=>{
-   let page=first.next_page;const items:PortfolioPage['items']=[];
-   while(page&&!controller.signal.aborted){
-    const next=await api<PortfolioPage>(`/api/projects?view=portfolio&page=${page}&snapshot=${encodeURIComponent(first.snapshot||'')}`,{signal:controller.signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':refreshId||c.reloadVersion?refreshCause:'initial_open'}});
-    if(next.snapshot!==first.snapshot)throw new Error('案件清單已更新，請重新讀取。');
-    items.push(...next.items);page=next.next_page;
-    if(!controller.signal.aborted)setRemaining({first,items:[...items],complete:!page,error:''});
-   }
-   if(!controller.signal.aborted)setRemaining({first,items,complete:true,error:''});
-  })().catch(error=>{if(!controller.signal.aborted)setRemaining(previous=>({first,items:previous?.first===first?previous.items:[],complete:false,denied:error instanceof ApiError&&(error.status===401||error.status===403),error:error instanceof Error?error.message:'案件清單讀取失敗'}))});
+  if(!shell||!initialData?.next_page)return;
+  const first=initialData,controller=new AbortController();
+  const publish=(value:PortfolioSequence)=>{if(!controller.signal.aborted)setRemaining({origin:first,value})};
+  publish({first,items:[],complete:false,error:''});
+  void readPortfolioSequence(first,(page,snapshot)=>api<PortfolioPage>(`/api/projects?view=portfolio&page=${page}${snapshot?`&snapshot=${encodeURIComponent(snapshot)}`:''}`,{signal:controller.signal,etag:true,cacheScope:scope,cache:'reload',headers:{'X-YX-Fetch-Intent':refreshId||c.reloadVersion?refreshCause:'initial_open'}}),controller.signal,publish);
   return()=>controller.abort();
- },[shell,data,scope]);
- const tail=remaining?.first===data?remaining:undefined;
+ },[shell,initialData,scope]);
+ const tail=remaining?.origin===initialData?remaining?.value:undefined;
+ const data=tail?.first??initialData;
+ const read={data,loading:result.kind==='Loading',error:'error' in result?String(result.error instanceof Error?result.error.message:result.error):'',reload:()=>{setRefreshCause('explicit_refresh');setRefreshId(v=>v+1)},afterWrite:()=>{setRefreshCause('own_write_committed');setRefreshId(v=>v+1)}};
  const denied=firstDenied||tail?.denied===true;
  const complete=!shell||!data?.next_page||tail?.complete===true;
  const projects=useMemo(()=>denied?undefined:shell?data?[...data.items,...(tail?.items||[])]:undefined:c.w.projects,[denied,shell,data,tail,c.w.projects]);
@@ -140,6 +134,7 @@ export function Projects({c}:{c:Ctx}) {
  return <div className="pl-page">
   <header className="pl-header"><div><h1>案件總覽</h1><p className="pl-scope">{ready?(data?.total??modeled.length):'未知'} 件 · 資料時間 {taipeiTime(asOf,'來源未提供')}</p></div><div className="pl-header-actions"><label className="pl-search"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案件、客戶或案號…" maxLength={240} value={filters.q} onChange={e=>update('q',e.target.value)}/>{filters.q&&<button aria-label="清除搜尋" onClick={()=>update('q','')}><X size={15}/></button>}</label><div className="pl-header-secondary" data-open={headerOpen} onKeyDown={e=>{if(e.key==='Escape'){setHeaderOpen(false);e.currentTarget.querySelector<HTMLButtonElement>('.pl-actions-trigger')?.focus()}}}><button className="pl-actions-trigger" aria-expanded={headerOpen} aria-controls="pl-secondary-actions" onClick={()=>setHeaderOpen(v=>!v)}>操作</button><div id="pl-secondary-actions" className="pl-secondary-content"><a className="button" href="#view=confirmations">工程確認單</a><div className="pl-view" role="group" aria-label="案件顯示方式"><button aria-label="清單檢視" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="卡片檢視" aria-pressed={view==='grid'} onClick={()=>setView('grid')}><LayoutGrid size={17}/></button></div><button className="pl-sync" disabled={read.loading} onClick={read.reload}>重新讀取</button>{canSync&&<button className="pl-sync" aria-label="重新同步 Lark" disabled={syncing} onClick={()=>void sync()}>{syncing?'同步中…':'重新同步 Lark'}</button>}</div></div>{canCreate&&<button className="pl-create" onClick={()=>setCreating(true)}><Plus size={17}/>新增案件</button>}</div></header>
   <p className="pl-sync-status sr-only" role="status" aria-live="polite">{syncStatus}</p>
+  {!denied&&data?.stale&&<DataState kind="Stale" title="案件快照較舊" body={`顯示本次讀取的快照；來源同步時間：${data.source_synced_at?`${taipeiDate(data.source_synced_at)} ${taipeiTime(data.source_synced_at)}`:'未知'}。`} actions={<button onClick={read.reload}>重新讀取</button>}/>}
   {!denied&&!complete&&<DataState kind={tail?.error?'Error':'Partial'} title={tail?.error?'部分案件無法載入':'案件尚未完整載入'} body={`已載入 ${projects?.length??0} / ${data?.total??'未知'} 件；搜尋僅涵蓋已載入快照，來源表筆數：${data?.total??'未知（讀取中）'}。${tail?.error||''}`} actions={tail?.error?<button onClick={read.reload}>重新讀取</button>:undefined}/>}
   <section className="pl-kpis" aria-label="生命週期篩選">{[{key:'all',label:'全部',count:rows.length},...groups.map(g=>({key:g.key,label:g.key==='sop'?'SOP 納管':g.label,count:g.rows.length}))].map(k=><button key={k.key} aria-pressed={lifecycle===k.key} onClick={()=>setLifecycle(k.key)}>{k.label} <strong>{!ready?'未知':!complete?`${k.count} 已載入`:k.count}</strong></button>)}</section>
   <p className="pl-count-detail">非互斥統計：進行中 {ready&&complete?counts.active??'未知':'未知'} · SOP 納管未完成 {ready&&complete?counts.sop??'未知':'未知'}（可重疊，依目前篩選）</p>

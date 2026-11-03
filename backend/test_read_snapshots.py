@@ -56,7 +56,9 @@ def test_portfolio_pages_are_bounded_and_consistent_across_refresh(tmp_path):
             items.extend(page['items'])
         assert len({item['id'] for item in items}) == len(items) == 65
         app.state.read_snapshots.invalidate()
-        assert client.get('/api/projects?' + urlencode(dict(view='portfolio', page=2, snapshot=page['snapshot']))).status_code == 409
+        response = client.get('/api/projects?' + urlencode(dict(view='portfolio', page=2, snapshot=page['snapshot'])))
+        assert response.status_code == 200
+        assert response.headers['x-read-snapshot'] == 'stale'
 
 
 def test_single_flight_stale_refresh_and_write_fence():

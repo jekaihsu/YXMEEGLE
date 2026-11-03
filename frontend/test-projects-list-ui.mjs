@@ -113,5 +113,24 @@ await render({...authorized,s:{...authorized.s,workspace_id:'global-version'},w:
 await flush(()=>release(new Response(JSON.stringify(pageBody(rows.slice(0,4),2)))));
 assert.deepEqual(readIntents.slice(-2),['explicit_refresh','explicit_refresh'],'global reload intent also labels tail pages');
 await flush(()=>release(new Response(JSON.stringify(pageBody(rows.slice(4),null)))));
+// Conflicts restart inside this open and discard rows from the old capture.
+await render({...authorized,s:{...authorized.s,workspace_id:'conflict'},w:{...authorized.w,workspace_id:'conflict'}});
+await flush(()=>release(new Response(JSON.stringify(pageBody(rows.slice(0,4),2)))));
+await flush(()=>release(new Response(JSON.stringify({detail:'updated'}),{status:409})));
+assert.equal(requests.at(-1)[0],'/api/projects?view=portfolio&page=1');
+assert.equal(readIntents.at(-1),readIntents.at(-2),'restart preserves this open’s fetch intent');
+assert.doesNotMatch(document.body.textContent,/部分案件無法載入/);
+await flush(()=>release(new Response(JSON.stringify({...pageBody(rows.slice(4,8),2),snapshot:'new'}))));
+await flush(()=>release(new Response(JSON.stringify({...pageBody(rows.slice(8),null),snapshot:'new'}))));
+assert.equal(document.querySelector('.pl-kpis strong').textContent,'8');
+assert.equal(document.querySelector('[data-project="A0"]'),null);
+// Missing history replaces the list atomically, never appends a new capture.
+await render({...authorized,s:{...authorized.s,workspace_id:'replacement'},w:{...authorized.w,workspace_id:'replacement'}});
+await flush(()=>release(new Response(JSON.stringify(pageBody(rows.slice(0,4),2)))));
+await flush(()=>release(new Response(JSON.stringify({...pageBody(rows.slice(4),null),total:8,page:1,snapshot:'replacement',snapshot_replaced:true,stale:true}))));
+assert.equal(document.querySelector('.pl-kpis strong').textContent,'8');
+assert.equal(document.querySelector('[data-project="A0"]'),null);
+assert.doesNotMatch(document.body.textContent,/部分案件無法載入/);
+assert.match(document.body.textContent,/案件快照較舊/);
 await flush(()=>root.unmount());dom.window.close();
 console.log('PASS projects list DOM. Groups, expansion, grid, unique pins, user switch, keyboard menu/focus, copy, source details, overview links, combined filters, bulk shell loading/error/retry and unknown counts.');
