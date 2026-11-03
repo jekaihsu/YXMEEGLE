@@ -32,3 +32,7 @@
  .workspace .source-record-filters>.search-field{flex:1 1 16rem;max-width:100%}
 }
 }
+
+@layer pages {
+.source-legacy{min-width:0;color:var(--label)}.source-legacy .source-note,.source-legacy .source-mapping-summary{background:var(--surface);border:1px solid var(--sep);border-radius:16px;padding:20px}.source-legacy .source-freshness{display:flex;flex-wrap:wrap;gap:12px;padding:16px;background:var(--surface-2);border:1px solid var(--sep);border-radius:12px;line-height:1.7}.source-legacy .dataset-as-of{color:var(--label-2);line-height:1.7}.source-legacy .source-freshness a{display:inline-flex;align-items:center;min-height:44px}.source-legacy .source-table-scroll{max-width:100%;overflow:auto}.source-legacy .source-scroll-hint{display:block;color:var(--label-2);font-size:13px}.source-legacy .data-table{background:var(--surface);color:var(--label)}
+}

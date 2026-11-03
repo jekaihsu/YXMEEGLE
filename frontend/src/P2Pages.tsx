@@ -1,3 +1,4 @@
+import {DataState} from './design/DataState';
 import {CaseDetailSkeleton} from './DetailLoadingSkeleton';
 import {cachedPanel, readPanel} from './companyDashboardCache';
 // P2-INT-F pages: #view=overview | confirmations | confirmation | contract | workitem (VCC-128..132).
@@ -70,7 +71,7 @@ function useDetailUi<T extends Record<string, unknown>>(slot: string, initial: T
 function Notice({state, message, httpStatus, onRetry, children}: {state: string; message: string; httpStatus?: number | null; onRetry?: () => void; children?: React.ReactNode}) {
  return <section className={`p2-banner state-${state}`} role={state === 'loading' ? 'status' : 'alert'} aria-live="polite">
   <div className="p2-banner-header"><span className="p2-banner-title">{DATA_STATE_LABELS[state as keyof typeof DATA_STATE_LABELS] ?? state}</span></div>
-  <p>{message}{httpStatus ? <small>（HTTP {httpStatus}）</small> : null}</p>
+  <p>{message}{state==='read_failed'&&<a href="#view=sources">查看來源健康</a>}{httpStatus ? <small>（HTTP {httpStatus}）</small> : null}</p>
   {children}
   {onRetry && <button type="button" className="button compact" onClick={onRetry}>重新讀取</button>}
  </section>;
@@ -116,9 +117,9 @@ export function P2Page({c}: {c: Ctx}) {
  }
  else if (!pageRequest?.ok) page = <UnsupportedFilters unsupported={pageRequest?.ok === false ? pageRequest.unsupported : []} invalid={pageRequest?.ok === false ? pageRequest.invalid : []} unlocated={pageRequest?.ok === false && pageRequest.reason === 'unlocated'}
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
- else if (fetched.status === 'loading' && context.route !== 'confirmations') page = context.route === 'confirmation' ? <CaseDetailSkeleton/> : <div className="p2-card"><p role="status">正在載入資料…</p><Skeleton lines={6}/></div>;
+ else if (fetched.status === 'loading' && context.route !== 'confirmations') page = context.route === 'confirmation' ? <CaseDetailSkeleton/> : <div className="p2-card"><DataState kind="Loading" title="正在載入資料" body="摘要與案件筆數尚未載入，不代表 0 筆。"/><div aria-hidden="true"><Skeleton lines={6}/></div></div>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
- else if (context.route === 'overview') page = <OverviewBody users={c.w.users} context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
+ else if (context.route === 'overview') page = <OverviewBody onRefresh={onRetry} users={c.w.users} context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
  else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} onRefresh={onRetry} open={open} setNotice={setNotice}/>;
  else if (context.route === 'confirmation') page = <CaseBody context={context} body={body} open={open} openExisting={openExisting} goBack={goBack} setNotice={setNotice}/>;
  else if (context.route === 'contract') page = <ContractBody context={context} body={body} open={open} setNotice={setNotice} goBack={goBack}/>;
@@ -157,7 +158,7 @@ function UnsupportedFilters({unsupported, invalid, unlocated, onReset}: {unsuppo
 
 type Open = (next: P2Context, replace?: boolean) => void;
 
-function OverviewBody({users, context, body, open, openEntryPoint, openSources, setNotice, goBack}: {context: P2Context; body: unknown; open: Open; openEntryPoint: (r: string) => void; openSources: () => void; setNotice: (m: string) => void; goBack?: () => void; users: User[]}) {
+function OverviewBody({onRefresh,users, context, body, open, openEntryPoint, openSources, setNotice, goBack}: {onRefresh:()=>void;context: P2Context; body: unknown; open: Open; openEntryPoint: (r: string) => void; openSources: () => void; setNotice: (m: string) => void; goBack?: () => void; users: User[]}) {
  const view = useMemo(() => buildManagerOverviewView({body, filters: overviewFilters(context), sort: context.sort, period: context.period, selectedId: context.selected}), [body, context]);
  const caseOpen = view.snapshot.cases.some(row => row.id === view.selectedId);
  const [pm, setPm] = useState(context.filters.pm ?? '');
@@ -181,7 +182,7 @@ function OverviewBody({users, context, body, open, openEntryPoint, openSources, 
    </div>
   </form>;
  return <>
-  <ManagerOverview view={view} filters={filters}
+  <ManagerOverview view={view} filters={filters} onRefresh={onRefresh}
    onSelect={id => open({...context, selected: id}, true)}
    onSort={sort => open({...context, sort}, true)}
    onBack={goBack}

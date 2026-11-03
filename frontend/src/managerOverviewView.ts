@@ -1,3 +1,4 @@
+import {taipeiTime} from './taipeiTime.ts';
 // Manager Overview view-model (VCC-128). Pure and framework-free: no React, fetch or routing; unwired.
 // Input is the JSON body of backend/manager_overview.py build_manager_overview (reviewed at b480b4b), treated
 // as untrusted. Each top-level section (snapshot, weekly_activity, source_health) is validated all-or-nothing:
@@ -8,8 +9,8 @@ import type {DataState,DataStateName} from './dataState.ts';
 
 export const OVERVIEW_LABELS={
  dash:'—',
- title:'主管總覽',
- asOf:'資料日期',
+ title:'管理總覽',
+ asOf:'資料時間',
  unverifiedMapping:'對應未驗證',
  withheld:'未核准顯示',
  invalidBody:'回應格式無效，已停止顯示此區塊',
@@ -217,7 +218,7 @@ function parseCard(raw:unknown):CardView{
  const drilldown:Drilldown={route:reqStr(dd.route),filters:need(cloneJson(need(dd.filters))),group_by:reqStr(dd.group_by)};
  const asOf=optStr(c.as_of);
  return {id,label,unitLabel,valueText:m.text,known:m.known,stateLabel:labelOf(state),reason:reqStr(c.reason),
-  asOfLabel:`${OVERVIEW_LABELS.asOf} ${asOf??OVERVIEW_LABELS.dash}`,drilldown};
+  asOfLabel:`${OVERVIEW_LABELS.asOf} ${taipeiTime(asOf,'尚未載入')}`,drilldown};
 }
 
 function parseSnapshot(raw:unknown){
@@ -338,7 +339,7 @@ export function buildManagerOverviewView(input:ManagerOverviewInput):ManagerOver
 
  const unresolved=snap?snap.unresolved:{countText:OVERVIEW_LABELS.dash,known:false,stateLabel:DATA_STATE_LABELS.unknown,reason:OVERVIEW_LABELS.invalidBody,rows:[]};
  return {
-  header:{title:OVERVIEW_LABELS.title,asOfLabel:`${OVERVIEW_LABELS.asOf} ${asOf??OVERVIEW_LABELS.dash}`,scope,
+  header:{title:OVERVIEW_LABELS.title,asOfLabel:`${OVERVIEW_LABELS.asOf} ${taipeiTime(asOf,'尚未載入')}`,scope,
    scopeLabel:scope.length?scope.map(s=>`${s.label}：${s.value}`).join('、'):OVERVIEW_LABELS.filterNone,
    filterMismatch:mismatch?OVERVIEW_LABELS.filterMismatch:null},
   snapshot:{state,stateLabel:labelOf(state),reason:snap?null:OVERVIEW_LABELS.invalidBody,

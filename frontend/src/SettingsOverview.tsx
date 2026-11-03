@@ -167,7 +167,7 @@ export function SettingsOverview({s,workspaceId}:{s:Session;workspaceId?:string}
      {/* Sources Sync Card */}
      <div className="so-card so-grid-full">
       <div className="so-card-header">
-       <h3>來源同步</h3>
+       <h3>來源同步</h3><a href="#view=sources">查看資料來源 →</a>
        <span className="so-meta-pill">{read.data.sources.length} 個來源</span>
       </div>
       {read.data.sources_access==='restricted'?(

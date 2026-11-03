@@ -53,7 +53,7 @@ try{
   await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify(body),{status})));
   await act(async()=>clock.advance(600000));
   assert.equal(pending.length,count,`${group}: zero requests in ten minutes`);
-  if(status!==200){assert.equal(warmingState.loading,false);assert.equal(document.querySelector('button').textContent,'重試')}
+  if(status!==200){assert.equal(warmingState.loading,false);assert.equal(document.querySelector('button').textContent,'重新讀取')}
   await act(async()=>warmingState.retry());assert.equal(pending.length,count+1,`${group}: explicit retry makes one request`);
   await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'ready'}))));
  }
@@ -62,7 +62,7 @@ try{
  await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify(known))));
  await act(async()=>warmingState.retry());assert.deepEqual(warmingState.data,known,'refresh keeps last data while pending');
  await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'offline'}),{status:503})));
- assert.equal(warmingState.error,'offline');assert.equal(warmingState.data,undefined);assert.deepEqual(warmingState.previous,known,'Error retains previous data and its timestamp without masking failure in existing tabs');
+ assert.equal(warmingState.error,'offline');assert.equal(warmingState.data.value,known.value);assert.equal(warmingState.data.meta.refresh_error,true);assert.deepEqual(warmingState.previous,known,'Error retains previous data and its timestamp with a visible stale failure banner');
  const retainedCount=pending.length;await act(async()=>clock.advance(600000));assert.equal(pending.length,retainedCount);
  await act(async()=>warmingState.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'recovered'}))));
  assert.equal(warmingState.data.value,'recovered');assert.equal(warmingState.error,undefined);
@@ -76,3 +76,15 @@ console.log('Report warming/202/offline/partial: ten minutes = zero requests; ex
 
 const {spawnSync}=await import('node:child_process');
 for(const scenario of ['assets-blank','asset-owner','progress-week','progress-label','points','progress-sentinel','progress-options']){const result=spawnSync(process.execPath,['test-reports-interactions.mjs'],{env:{...process.env,REPORT_CASE:scenario},encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);}
+
+// I5: failed explicit refresh retains the last report and marks its metadata stale;
+// a denied read removes that retained report rather than displaying another scope.
+const retainRoot=createRoot(document.getElementById('root'));let retained;
+function Retained(){retained=useReport('sales',{fixture:'I5'});return React.createElement('div',null,retained.data?JSON.stringify(retained.data):retained.denied?'denied':'loading')}
+await act(async()=>retainRoot.render(React.createElement(Retained)));
+await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({meta:{stale:false,gaps:[],fetched_at:'2026-11-02T11:32:00Z'},total:940}),{status:200})));
+await act(async()=>retained.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'來源讀取失敗'}),{status:500})));
+assert.equal(retained.data.total,940);assert.equal(retained.data.meta.stale,true);assert.equal(retained.data.meta.refresh_error,true);
+await act(async()=>retained.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'沒有權限'}),{status:403})));
+assert.equal(retained.data,undefined);assert.equal(retained.previous,undefined);assert.equal(retained.denied,true);assert.equal(document.body.textContent,'denied');
+await act(async()=>retainRoot.unmount());console.log('I5 retained 940-row report, failed refresh metadata and 403 cache removal passed.');

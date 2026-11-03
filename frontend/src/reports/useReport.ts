@@ -46,7 +46,9 @@ export function useReport<T>(endpoint:string,params:Query){
  const value='value' in state?state.value:undefined;
  const previous='previous' in state?state.previous:undefined;
  const error='error' in state?state.error:undefined;
- return {data:state.kind==='Denied'?undefined:value?.data,previous:state.kind==='Denied'?undefined:previous?.data,loading:state.kind==='Loading'||state.kind==='Stale',error:error instanceof ReportError&&error.warming?'報表資料尚未就緒，請按重試查看結果。':error instanceof Error?error.message:undefined,warming:error instanceof ReportError&&error.warming,retry:()=>setRefresh({key:resourceKey,id:reportId()})};
+ const retained=value?.data??previous?.data;
+ const reportData=error&&retained&&typeof retained==='object'&&'meta' in retained?{...retained,meta:{...(retained as {meta:object}).meta,stale:true,refresh_error:true}} as T:retained;
+ return {denied:state.kind==='Denied',data:state.kind==='Denied'?undefined:reportData,previous:state.kind==='Denied'?undefined:previous?.data,loading:state.kind==='Loading'||state.kind==='Stale',error:error instanceof ReportError&&error.warming?'報表資料尚未就緒，請按重試查看結果。':error instanceof Error?error.message:undefined,warming:error instanceof ReportError&&error.warming,retry:()=>setRefresh({key:resourceKey,id:reportId()})};
 }
 
 export function useReportSearch(onApply:()=>void){
