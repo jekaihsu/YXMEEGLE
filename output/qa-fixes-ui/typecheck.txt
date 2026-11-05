@@ -1,0 +1,2 @@
+npm notice run yongxiang-workspace-prototype@0.1.0 npx
+npm notice run 'tsc' --noEmit

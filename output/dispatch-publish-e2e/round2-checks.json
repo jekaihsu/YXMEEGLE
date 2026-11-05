@@ -1,0 +1,15 @@
+{
+  "checks": {
+    "npm run build": 0,
+    "npx tsc --noEmit -p tsconfig.json": 0,
+    "node test-dispatch-board.mjs": 0,
+    "node test-contrast.mjs": 0,
+    "npm run test:dispatch-publish": 0,
+    "real browser full including R1": 0,
+    "real browser recovery including R2": 0,
+    "git diff --check -- frontend output": 0
+  },
+  "api_examples_sha256": "08ec5312bd09ab80450aa8a79ced969a72ed8afbdea1529abb4e7f166c06f2fa",
+  "wire_changes_sha256": "6f18758e453d2f6fe75fa8b03c1a2ce7790ab6584ab0cbb4b951b1005905c321",
+  "backend_commit": "63be12a"
+}

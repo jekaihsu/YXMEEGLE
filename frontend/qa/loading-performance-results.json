@@ -1,0 +1,73 @@
+{
+  "baseCommit": "5c39bb0",
+  "date": "2026-10-25",
+  "units": {
+    "bytes": "decimal bytes",
+    "timings": "milliseconds"
+  },
+  "bundle": {
+    "before": {
+      "entry": {
+        "raw": 479800,
+        "gzip": 155264
+      },
+      "initialJS": {
+        "raw": 647017,
+        "gzip": 205685
+      },
+      "initialCSS": {
+        "raw": 287217,
+        "gzip": 47683
+      },
+      "allJSRaw": 1200047
+    },
+    "after": {
+      "entry": {
+        "raw": 260861,
+        "gzip": 87187
+      },
+      "initialJS": {
+        "raw": 428083,
+        "gzip": 137609
+      },
+      "initialCSS": {
+        "raw": 230282,
+        "gzip": 37903
+      },
+      "allJSRaw": 1206041
+    },
+    "compression": "Node zlib gzipSync default level 6, recomputed for both builds with the same runtime"
+  },
+  "browser": {
+    "before": {
+      "runs": 7,
+      "dcl": 346.6999999284744,
+      "fcp": 404,
+      "quoteReady": 1302.3037920000006,
+      "pagination": 146.19800000000032,
+      "pageErrors": []
+    },
+    "after": {
+      "runs": 7,
+      "dcl": 285.39999997615814,
+      "fcp": 336,
+      "quoteReady": 1304.131041999999,
+      "pagination": 50.766208000000006,
+      "pageErrors": []
+    },
+    "conditions": {
+      "downloadBytesPerSecond": 1250000,
+      "latencyMs": 40,
+      "cpuSlowdown": 4,
+      "quotes": 2000,
+      "fixture": "synthetic local HTTP; no external requests"
+    }
+  },
+  "quoteSort": {
+    "rows": 10000,
+    "beforeWarmMedianMs": 260.7,
+    "afterWarmMedianMs": 15.3,
+    "runs": 5,
+    "method": "Node, esbuild-bundled quoteApi.sortQuotes, after one warmup; deterministic shuffled quote numbers"
+  }
+}

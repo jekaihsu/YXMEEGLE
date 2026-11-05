@@ -1,0 +1,4 @@
+ok TZ=America/Los_Angeles
+ok TZ=Asia/Taipei
+ok TZ=UTC
+taipei-time passed under America/Los_Angeles, Asia/Taipei, UTC

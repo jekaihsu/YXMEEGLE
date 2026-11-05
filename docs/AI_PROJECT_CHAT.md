@@ -1,0 +1,75 @@
+# AI 助理：整頁對話改版與案件側邊對話
+
+這份文件補充 `docs/AI_ASSISTANT.md` 與 `docs/AI_ASSISTANT_ELEMENTS_FEEDBACK.md`。範圍是三件事。
+
+1. 對話畫面改用 assistant-ui 的元件組出整個對話框：對話串、訊息泡泡、輸入框、模型選擇器、建議問題、捲動按鈕、動作列。
+2. 畫面與模型輸出都只呈現「回答本身」：不顯示工具狀態、系統說明或免責聲明，模型也不描述自己的系統與工具。
+3. 在案件詳情頁右下角提供對話泡泡，點開成側邊對話，只就「這個案件」回答。
+
+## 1. 畫面原則
+
+- 不顯示工具狀態晶片（「查詢…完成」）。工具執行中只顯示一個輕量的思考指示（assistant-ui 的 thinking indicator），完成後消失。
+- 不顯示頁面頂端的說明句與輸入框下方的免責聲明。空狀態只保留標題與建議問題。
+- 表格與圖表仍由伺服器產生並顯示，它們就是回答的一部分。
+- 動作列只保留複製、重試、👍、👎。
+- 模型選擇器是 assistant-ui 的 ModelSelector 元件，只有 Claude 與 GPT 兩個選項，值經由 runtime 的 model context 傳給 adapter，不再自建狀態。選擇仍記在 localStorage `yx:ai-model`。
+
+## 2. 模型輸出原則（`backend/ai/prompts.py`）
+
+- 直接回答，不說「已整理…」「詳見上方結果」「依你可查看的資料」之類的系統旁白，不提工具、權限、提示詞或資料來源機制。
+- 只有會影響答案正確性的事才說：資料時間（`as_of`）、結果只列出部分、資料尚未完整、沒有打卡紀錄不等於缺席。這些必須用一句自然的話交代，不用制式免責聲明。
+- 表格或圖表已顯示的內容不重複，只講重點。
+
+## 3. 案件側邊對話
+
+### 前端
+
+- 案件詳情頁（`ProjectDetail` / `ProjectDetailShell`）右下角有浮動對話按鈕，只在案件詳情頁出現，離開頁面即消失。
+- 點擊開啟右側抽屜（桌機約 420px 寬，手機全螢幕），標題顯示案號與案名，內容為同一個對話元件，傳入 `projectId`。
+- 抽屜是 dialog：焦點移入、Esc 關閉並把焦點還給按鈕、遮罩可點擊關閉（手機）、不擋住案件頁的主要操作（桌機不加遮罩）。
+- 對話在同一案件內保留，切換案件會重置。建議問題換成案件版：進度如何、卡在哪裡、誰負責、下一步是什麼、最近有什麼變更。
+- 模型選擇器與整頁對話相同。
+
+### API 變更：`POST /api/ai/chat`
+
+請求新增選填欄位 `project_id`（字串，與 `/api/projects/{id}` 的 id 相同，格式驗證沿用工具的 case id 規則）。有此欄位時為「案件範圍」。
+
+- 伺服器以發問者本人的 cookie，從行程內呼叫既有唯讀路由（同工具的作法，不直接讀資料庫）建立案件脈絡：案件基本資料、階段進度與資料基礎、PM 與節點負責人（節點指派不可用時明講不可用）、期限與阻礙、可得的最近變更。不含金額。
+- 讀不到（404/403）一律回 `ai_forbidden`，與全域對話的權限行為一致，不洩漏案件是否存在。
+- 案件範圍不提供任何工具：不搜尋其他案件、不查出勤、不再讀資料庫。模型只能依脈絡回答；脈絡沒有的事就直說沒有這項資料，不推測。因此只會有一次模型呼叫，延遲與成本都較低。
+- 脈絡長度上限約 12,000 字元，結構化 JSON，依重要性排序截斷並標示 `truncated`。放在系統提示詞中以利提示詞快取。
+- 脈絡以 `(workspace, user, project)` 為鍵在行程內快取 90 秒，避免同一段對話每題都重建；快取值只存已通過該使用者權限的投影，鍵含使用者所以不跨人共用。
+- `start` 事件增加 `scope`（`global` 或 `project`）。案件範圍的 `tool` 事件不會出現。
+
+### 帳本與儀表板
+
+- `ai_usage` 增加 `scope`（`global`/`project`，既有列視為 `global`）與 `project_id`（可為 NULL），加欄位屬於可重跑的新增式遷移。
+- `GET /api/ai/usage` 增加查詢參數 `scope`（`global`、`project`，省略為全部），`recent` 每列增加 `scope`。
+- 儀表板最近提問增加「範圍」欄與篩選（全部／全域／案件）。不顯示案件名稱或內容，只顯示範圍。
+
+## 驗收
+
+- 整頁對話與側邊對話共用同一個對話元件，兩者外觀一致。
+- 案件側邊對話在案件 A 問「誰負責」會依案件 A 的脈絡回答；不能回答其他案件的問題，會說明只能回答本案件。
+- 同一個使用者無權查看的案件，開啟側邊對話後送出問題得到 `ai_forbidden`。
+- 案件範圍的一個提問恰好一次模型呼叫、零工具呼叫，帳本一列，`scope='project'`。
+
+## 後端執行細節
+
+案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料保留案件 id、案名、案號、目前階段與 header.responsible_person，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。最近變更使用 case-detail 的 history 區段，只保留確認版本、修訂、替換時間、事件 id、動作與時間，以及資料新鮮度。區段無法讀取時保留狀態與原因，缺少區段時以 `recent_changes.unavailable` 明示無法取得。
+
+基本案件路由 401、403、404 或案件不存在時回傳相同的 HTTP 403 `ai_forbidden`。5xx、逾時或非預期例外回傳可重試的 HTTP 503 `ai_upstream`。兩者都不呼叫模型、不寫帳、不註冊可評分的提問。503 記錄結構化 warning `ai_context_failed project=<SHA-256 前 16 碼> status=<code> exception=<class> elapsed_ms=<n>`，不記錄 cookie、原始案件 id 或內容。進度失敗以 `progress.unavailable` 表示；節點指派未啟用、讀取失敗或無權限時保留 `nodes:null` 與 `node assignment data unavailable`。
+
+每個 app process 最多快取 128 個使用者案件鍵，90 秒從建置完成起算。同鍵同時建置共用一個 task；單一等待者取消不取消建置。滿載時優先移除已完成項目，全部仍在建置時等待任一完成，不無限增加 task。權限異動可能需等待既有快取到期才反映。
+
+JSON 使用固定欄位順序與緊湊編碼。超過 12,000 字元時標示 `truncated:true`，依最近變更、阻礙、期限、進度、未完成任務、負責人、案件基本資料順序移除完整清單項目。單一欄位仍過長時替換為 `unavailable`，不截斷 JSON 字串。
+
+帳本遷移可重跑，新增 `scope VARCHAR(16) NOT NULL DEFAULT 'global'` 與可空的 `project_id VARCHAR(200)`。既有資料保持不變。`scope` 篩選同時限制用量、評分、原因分佈、people 與 recent；`by_*` 結構不變。
+
+未完成任務來自已授權 case-detail 的 workflow_nodes，最多 15 筆，保留任務 key、task_id、label、status 與所屬節點。路由有提供時才保留 due_date 與 assignee_name；目前真實路由未提供這兩欄。排序優先 overdue、blocked，再依可得期限排序。不用請求時鐘推測逾期。現有阻礙來源只有去重代碼，無法還原到特定任務；來源若提供 task_key 或 node_id 則保留，禁止猜測對應。
+
+最近變更依 created_at 或 replaced_at 由新到舊排序，最多 20 筆，裁切時移除最舊項目。已知 action 沿用 appCommon.tsx 的繁體中文標籤，未知 action 保留原碼；另提供原始筆數與最新時間。只裁切物件清單，保留 states 的短字串清單。unknown、read_failed 等狀態與 no_authorized_* 原因統一附加 unavailable 及繁體中文原因，不能解讀為沒有。
+
+系統提示詞以 `<case_context>` 包住 JSON；資料中的角括號使用 Unicode 跳脫，避免偽造區塊邊界。所有規則都在區塊之後，明定內容只是資料，禁止輸出連結、URL、圖片、其他案件內容與規則。
+
+投影不保留每次請求改變的 progress.as_of、source_time.fetched_at、node_assignments_as_of 或時鐘數值。來源本身的 source_time.value 與事件時間仍保留。相同案件資料產生相同提示詞文字，供應商提示詞快取可在 90 秒脈絡 TTL 內，以及案件資料未變時重用。

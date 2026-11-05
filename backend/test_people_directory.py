@@ -317,3 +317,59 @@ def test_mentions_validate_ids_preserve_history_and_queue_one_recipient(harness)
     body['payload']['mentions']=['同名文字']
     with pytest.raises(HTTPException): apply_action(ws,user,body,True)
     assert len(p['comments'])==1
+
+
+def test_roster_timer_live_gate_and_configured_interval(harness,monkeypatch):
+    h=harness;clock=['2026-09-27T10:00:00+08:00']
+    monkeypatch.setattr(directory,'now',lambda:clock[0])
+    service=PeopleDirectoryService(h.sessions,h.W,h.B,h.P,h.cfg,
+        fetcher=lambda *args:snapshot(),adapter_factory=h.service.adapter_factory)
+    service.sync(h.wid,'u-manager')
+    h.cfg['LARK_LIVE_READ_ROSTER_TTL_SECONDS']='120'
+    clock[0]='2026-09-27T10:01:59+08:00'
+    assert service.run_due(h.wid) is None
+    clock[0]='2026-09-27T10:02:00+08:00'
+    assert service.run_due(h.wid)['sync_revision']==2
+    h.cfg['LARK_LIVE_READ_ENABLED']='true';clock[0]='2026-09-27T12:00:00+08:00'
+    before=h.read()
+    assert service.run_due(h.wid) is None and h.read()==before
+
+
+@pytest.mark.parametrize('flag', [None, 'false'])
+def test_legacy_roster_timer_defaults_to_300_seconds(directory_service, flag):
+    h, service, calls = directory_service
+    if flag is not None:
+        h.cfg['LARK_LIVE_READ_ENABLED'] = flag
+    service.sync(h.wid, 'u-manager')
+    h.clock[0] = '2026-09-27T10:04:59+08:00'
+    assert service.run_due(h.wid) is None and len(calls) == 1
+    h.clock[0] = '2026-09-27T10:05:00+08:00'
+    assert service.run_due(h.wid)['sync_revision'] == 2
+    assert len(calls) == 2
+
+
+def test_partial_roster_sync_does_not_generate_unpersisted_sop_candidates(directory_service):
+    from .policy import upgrade, template
+
+    h, service, calls = directory_service
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        old = template()
+        old.update(id='older-normalized-sop', status='published')
+        state['sop_templates'] = [old]
+        row.data = storage.save(db, h.B, h.wid, state)
+    before = h.read()[0]
+    for revision in (1, 2):
+        assert service.sync(h.wid, 'u-manager')['sync_revision'] == revision
+    after = h.read()[0]
+    assert [e['action'] for e in after['events'] if e['action'] == 'sop_candidate_available'] == []
+    assert sum(e['action'] == 'people_directory_sync' for e in after['events']) == 2
+    for collection in set(storage.COLLECTIONS) - {'users', 'events'}:
+        assert after.get(collection) == before.get(collection)
+    upgraded = upgrade(deepcopy(after))
+    assert [t['id'] for t in upgraded['sop_templates']] == ['older-normalized-sop', template()['id']]
+    assert upgraded['sop_templates'][-1]['generated_candidate'] is True
+    assert sum(e['action'] == 'sop_candidate_available' for e in upgraded['events']) == 1
+    upgrade(upgraded)
+    assert sum(e['action'] == 'sop_candidate_available' for e in upgraded['events']) == 1

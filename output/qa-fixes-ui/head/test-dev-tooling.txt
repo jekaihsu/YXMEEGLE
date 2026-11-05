@@ -1,0 +1,32 @@
+✖ manifest and every locked tooling copy use patched, consistent versions (5.751875ms)
+✔ local CI runs tooling after the build and checks API responses (1.388542ms)
+✔ production does not ship the removed company cockpit route (4.4875ms)
+4:57:27 PM [vite] (client) Forced re-optimization of dependencies
+✔ default dev server binds locally and transforms the React entry without permissive CORS (1250.705167ms)
+✔ default production preview also binds locally (17.078417ms)
+✔ normal overview script runs full and shell rendering regressions (1821.849875ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3104.758333
+
+✖ failing tests:
+
+test at test-dev-tooling.mjs:30:1
+✖ manifest and every locked tooling copy use patched, consistent versions (5.751875ms)
+  Error: ENOENT: no such file or directory, open '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/node_modules/vite/node_modules/esbuild/package.json'
+      at async open (node:internal/fs/promises:697:25)
+      at async readFile (node:internal/fs/promises:1348:14)
+      at async json (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-dev-tooling.mjs:12:39)
+      at async TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-dev-tooling.mjs:39:21)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/node_modules/vite/node_modules/esbuild/package.json'
+  }

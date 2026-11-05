@@ -1,0 +1,91 @@
+✔ prefetch and StrictMode share one case request (10.91275ms)
+✔ feature off makes zero source requests and has an explicit disabled state (0.874291ms)
+✖ person attachment uses the existing revision checked task PATCH and merges returned details (1.940916ms)
+✔ uncertain outcome retries the same request UUID and exact payload (1.106084ms)
+✔ double submits are blocked while mutation is pending (0.805292ms)
+✔ revision conflict refreshes and keeps the task authority server owned (0.707041ms)
+✔ field errors retain the form field name and a definite failure gets a new request id (0.741292ms)
+✔ detail prefetch shares a pending request and a fresh result (0.523792ms)
+✔ an unmounted mutation does not replace the next case snapshot (0.723375ms)
+✔ session change clears cached list and details before the next mount (0.793625ms)
+✖ round2 forced detail replaces a pending read and keeps newest cached result (0.512417ms)
+✖ round2 browsing refreshes while an assignment edit input defers refresh (4.855959ms)
+✖ round2 sixty-second refresh runs while browsing and waits for an edit input (1.136417ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 9
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.725458
+
+✖ failing tests:
+
+test at test-node-assignments.mjs:37:1
+✖ person attachment uses the existing revision checked task PATCH and merges returned details (1.940916ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  2 !== 1
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-node-assignments.mjs:37:654)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-node-assignments.mjs:46:1
+✖ round2 forced detail replaces a pending read and keeps newest cached result (0.512417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  '舊負責人' !== '陳威廷'
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-node-assignments.mjs:50:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '舊負責人',
+    expected: '陳威廷',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-node-assignments.mjs:53:1
+✖ round2 browsing refreshes while an assignment edit input defers refresh (4.855959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  1 !== 2
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-node-assignments.mjs:55:120)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-node-assignments.mjs:60:1
+✖ round2 sixty-second refresh runs while browsing and waits for an edit input (1.136417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  3 !== 2
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-node-assignments.mjs:64:75)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

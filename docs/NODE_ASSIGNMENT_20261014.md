@@ -1,0 +1,313 @@
+# Node assignment and tasks in V4 (2026-10-14)
+
+Per-case node owners, approvals and tasks live in two V4 Lark Base tables. The web app reads and writes them with the company application identity. The workspace JSON, `project['nodes']` and the workspace version are untouched. Node-assignment data is a separate read model keyed by case code and node key, and it reaches the browser only through the routes below.
+
+## Switches
+
+The feature is off unless `NODE_ASSIGNMENT_ENABLED=true`. While off, every route answers 404 with code `disabled` and never contacts Lark.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `NODE_ASSIGNMENT_ENABLED` | `false` | Feature flag |
+| `NODE_ASSIGNMENT_BASE_TOKEN` | `H7W6b0PFWaVF1BsgqXJj3pQ9pXb` | V4 Base |
+| `NODE_ASSIGNMENT_NODE_TABLE_ID` | `tblcPZPmezkyeVb7` | 節點指派 |
+| `NODE_ASSIGNMENT_TASK_TABLE_ID` | `tblsoyGcC6K5AipF` | 任務 |
+| `NODE_ASSIGNMENT_PEOPLE_TABLE_ID` | `tblfaCO2xPUNptQH` | V4 人員名單, read only |
+| `NODE_ASSIGNMENT_CONFIRMATION_TABLE_ID` | `tblmSQrcCs9vPQZx` | 工程確認單, used only to build the link |
+| `NODE_ASSIGNMENT_READ_TTL_SECONDS` | `60` (5 to 300) | Case read cache |
+| `NODE_ASSIGNMENT_ROSTER_TTL_SECONDS` | `120` (30 to 900) | Roster cache; writes need a roster no older than this |
+| `NODE_ASSIGNMENT_STALE_MAX_SECONDS` | `900` (60 to 3600) | Oldest data served as stale after a Lark failure |
+| `NODE_ASSIGNMENT_LOCK_TIMEOUT_SECONDS` | `10` (1 to 30) | Wait for another write on the same node |
+
+The feature also needs the existing application settings `LARK_WORKER_IDENTITY=application`, `LARK_APP_ID`, `LARK_APP_SECRET` and `LARK_WORKER_ORGANIZATION`. Lark requests share the live-read rate bucket (`LARK_LIVE_READ_MAX_RPS`). Only the formal workspace `lark-<organization>` with environment `production` can use it. Writes also require the workspace setting `external_enabled`.
+
+The only writable formal tables are listed in `FORMAL_WRITE_ALLOWLIST` in `backend/remote_policy.py`. A table ID set by environment outside that list makes the feature answer 503 `lark_unconfigured`, and the client refuses the write before any request.
+
+## Lark application permissions
+
+Application identity (tenant token) scopes:
+
+- `bitable:app` to create and update records in 節點指派 and 任務. Reads are covered by the same scope.
+- `bitable:app:readonly` is already used by live reads and is sufficient for the GET routes alone.
+
+Base access:
+
+- Add the application to the V4 Base with edit permission (Base share menu, add document app, can edit).
+- If V4 uses advanced permissions, the application's role needs add and edit on 節點指派 and 任務, and read on 人員名單 for 姓名, 所屬組別, 職級, 在職 and Lark帳號.
+
+A Lark permission failure (codes 99991672, 1254302, 91403, or HTTP 401/403) is answered with code `lark_permission` and `missing_scopes`, and the server log line `node_assignment lark permission denied` names the code, path and missing scopes.
+
+## Routes
+
+All routes sit under `/api/projects/{project_id}/node-assignments`. Mutations need the signed session, pass the same-origin guard, and carry a `request_id` (1 to 120 characters). Bodies are limited to 16 KB.
+
+| Method | Path | Body |
+| --- | --- | --- |
+| GET | (the prefix itself) | none |
+| GET | `/nodes/{key}` | none |
+| POST | `/nodes/{key}/claim` | `{request_id, expected_revision}` |
+| POST | `/nodes/{key}/assign` | `{request_id, expected_revision, owner_open_ids: [1..20]}` |
+| POST | `/nodes/{key}/complete` | `{request_id, expected_revision}` |
+| POST | `/nodes/{key}/approve` | `{request_id, expected_revision}` |
+| POST | `/nodes/{key}/reject` | `{request_id, expected_revision, reason (1..500)}` |
+| POST | `/nodes/{key}/tasks` | `{request_id, title (1..200), detail? (..2000), assignee_open_id?, deadline? YYYY-MM-DD, department?}` |
+| PATCH | `/nodes/{key}/tasks/{task_id}` | `{request_id, expected_revision, status?, assignee_open_id?, deadline?, detail?}` |
+| GET | `/start-sop` | none (query `seed_tasks` true or false, default false) |
+| POST | `/start-sop` | `{request_id, preview_hash, seed_tasks?}` |
+
+`key` is one of `sales, pm, confirmation, field, control, mapping, report, pricing, settlement`. `expected_revision` is the `revision` from the last read, or `null` for a node that has no Lark row yet.
+
+### Case overview
+
+```json
+{
+  "project_id": "p1", "code": "A115001-01",
+  "summary": {"done": 1, "total": 8, "current_node": "confirmation"},
+  "nodes": [{
+    "key": "field", "label": "外業", "departments": ["外業", "水深A"],
+    "record_id": "rec...", "revision": "3f2a9c0d1b7e4a55",
+    "status": "進行中", "derived_status": "進行中",
+    "tasks": {"done": 1, "total": 3}, "progress": 0.3333,
+    "owners": [{"open_id": "ou_...", "name": "王外業"}], "assignment_method": "主管指派",
+    "assigned_by": {"open_id": "ou_...", "name": "林經理"},
+    "approver": null, "approved_at": null, "reject_reason": null,
+    "started_at": "2026-10-14T09:00:00+08:00", "finished_at": null,
+    "deadline": "2026-10-20", "auto_done": null, "warnings": []
+  }],
+  "can": {"field": {"claim": false, "assign": true, "complete": true, "approve": false, "reject": false, "create_task": true}},
+  "warnings": [], "stale": false, "stale_reason": null, "fetched_at": "2026-10-14T09:00:05+08:00",
+  "roster": {"available": true, "stale": false},
+  "writes_enabled": true, "writes_disabled_reason": null
+}
+```
+
+`auto_done` is `null`, or `{"rule", "reason"}` when the case's own data proves the node done (see Auto-done evidence); such a node reports 已完成 and progress 1 while its Lark row stays as it is. `derived_status` is authoritative. `status` is the value stored in the Lark 狀態 column; the app keeps it in step on every write, and a difference is flagged with the node warning `lark_status_drift`.
+
+### Node detail and mutation responses
+
+`GET /nodes/{key}` and every successful mutation return the same envelope with `node` (one node object as above), `can` (that node's actions), `summary`, `tasks` and `assignable_people`. A mutation response also carries `record_id` of the row it wrote. A replayed mutation returns the stored body with the header `Idempotent-Replayed: true`.
+
+```json
+{
+  "tasks": [{
+    "id": "rec...", "revision": "9b0c1d2e3f405162", "title": "控制點佈設", "detail": "北側 12 點",
+    "assignee": {"open_id": "ou_...", "name": "陳水深"}, "assigned_by": {"open_id": "ou_...", "name": "林經理"},
+    "department": "水深B", "deadline": "2026-10-20", "status": "進行中",
+    "done_at": null, "created_at": "2026-10-14T09:10:00+08:00",
+    "can": {"edit_status": true, "cancel": false, "assign": false, "claim": false, "edit_details": false}
+  }],
+  "assignable_people": [{"open_id": "ou_...", "name": "陳水深", "departments": ["水深B"]}]
+}
+```
+
+`assignable_people` is filled only for someone who manages the node.
+
+### Errors
+
+Errors are `{detail, code, ...}` with `detail` in Traditional Chinese.
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `disabled` | 404 | Flag off, or not the formal production workspace |
+| `not_found` | 404 | Unknown node, task, or a case without a confirmation code |
+| `forbidden` | 403 | Role does not allow the action; audited as denied |
+| `writes_disabled` | 403 | `external_enabled` is off, or a table outside the write allowlist |
+| `invalid` | 422 | Body failed validation |
+| `payload_too_large` | 413 | Body over 16 KB |
+| `rate_limited` | 429 | More than 30 calls per person or 300 per company in a minute. Every node-assignment write call counts once, at its first authorized outbound Lark write, whatever else it sends; 啟動 SOP counts every outbound create or update once instead (a full press can cost up to 12). Replays, no-op presses, denied attempts and calls that fail before writing cost nothing |
+| `illegal_transition` | 409 | Not allowed from the current status |
+| `revision_conflict` | 409 | Someone changed the row since `expected_revision`; `current_revision` included |
+| `duplicate_assignment_key` | 409 | More than one row for one 指派鍵; `record_ids` included, nothing is picked |
+| `idempotency_conflict` | 409 | The `request_id` was used with a different body |
+| `readback_mismatch` | 409 | The written values did not read back; replay the same `request_id` to reconcile |
+| `busy` | 409 | Another write on the same node did not finish in time |
+| `preview_stale` | 409 | 啟動 SOP: the plan or a quote deadline changed since the preview |
+| `nothing_to_start` | 409 | 啟動 SOP: no confirmation code or no planned quantity; `blockers` included |
+| `outcome_unknown` | 502 | Lark did not confirm a write; replay the same `request_id` to reconcile |
+| `lark_permission` | 502 | Lark scope or Base permission missing; `lark_code`, `missing_scopes` included |
+| `lark_error` | 502 | Lark rejected a request or returned incomplete pages |
+| `lark_unavailable` | 503 | Lark down, rate limited or timed out |
+| `lark_unconfigured` | 503 | Application identity or table configuration missing |
+| `roster_unavailable` | 503 | Writes paused because the roster cannot be refreshed |
+
+## Status model
+
+The nine nodes form one chain, 業務 to 結算. Status is derived per node in this order.
+
+1. 略過 when the app's existing approved skip (`approved_skipped` with a valid waiver) applies. Never written here.
+2. 已完成 when Lark holds 狀態 已完成 with 核准人 and 核准時間, or when auto-done evidence applies (below).
+3. 未開始 when the previous node is neither 已完成 nor 略過.
+4. 進行中 while a rejection (退回原因) is active.
+5. 待審核 when at least one task is not cancelled and every such task is 已完成.
+6. 進行中 when any task is 進行中 or 已完成.
+7. 待處理 otherwise.
+
+Task counts are done tasks over tasks that are not cancelled. The case summary counts 已完成 nodes over nine, with 略過 nodes removed from both sides.
+
+Rejecting a 待審核 or 已完成 node sets 退回原因 and clears 核准人, 核准時間 and 完成時間. The rejection holds the node at 進行中 until a task on it is completed again, which clears 退回原因. Reopening never writes to later nodes; the response warns `later_nodes_started` when a later node is 進行中, 待審核 or 已完成.
+
+Read caches use stale-while-revalidate: first reads load synchronously, with roster and case requests running concurrently through the shared rate bucket. Within the soft TTL reads are fresh; beyond it, entries up to `NODE_ASSIGNMENT_STALE_MAX_SECONDS` return immediately with `stale: true, stale_reason: "refreshing"` while one daemon refresh per key runs. Refresh failures are logged and do not fail that read. Older entries must load synchronously. Roster soft TTL remains 120 seconds; successful roster schema checks are cached for 10 minutes, failures are never cached. Writes still require a fresh case and a roster within its soft TTL, verify read-back, and replace the case cache after success.
+
+The overview adds `node_details`, keyed by all nine node keys, each containing `tasks` and `assignable_people` exactly as the node detail endpoint does (empty lists where applicable). People are visible only to actors who manage that node. Existing overview fields and the node detail endpoint remain unchanged.
+
+Read duration logs use `node_assignment read overview ms=<total> cache=<hit|stale|miss> lark_calls=<n>` (or `read detail`), without identities or tokens; calls count Bitable attempts, excluding token minting. Session responses expose `features.node_assignment: true` only when the deployment flag is enabled and application identity, organization, credentials and approved table targets are configured, independently of `workspace_shell`.
+
+## Auto-done evidence
+
+`backend/node_assignment/evidence.py` proves the early nodes from the case's own data, so nobody has to tick them in Lark. `evidence_for(project, state)` returns `{node: AutoDone(rule, reason_zh)}`; the rules live in one table, `RULES`, at the top of the module. The first rule that claims a node wins. 外業, 控制, 圖資, 報告, 計價 and 結算 are never inferred.
+
+| rule | nodes | applies when | reason |
+| --- | --- | --- | --- |
+| `c_code` | 業務 | the case code matches `^[Cc]\d+` (C115264, C115238-01) | 工編以 C 開頭，業務階段已完成 |
+| `confirmation_lines` | 業務, PM, 確認單 | the project has a confirmation source record (or a `source_confirmations` entry) and at least one `contract_items` line with its `project_id` | 已建立工程確認單（N 筆合約工項） |
+
+The overlay goes through `facts_of(snapshot, skipped, evidence)`, so the overview and detail reads, every mutation (including the status a lazily created row starts with and the 狀態 sync), 啟動 SOP and the home panels derive the same chain. An auto-done node counts as approved: its status, progress and the summary x/9 follow. Nothing is written for it: no 已完成, no 核准人, and the sync mirrors only the node a request touches, never an untouched one. An explicit 略過 wins and carries no `auto_done`. A Lark 退回原因 on an auto-done node is ignored. Every action on an auto-done node is refused: `claim`, `assign`, `complete`, `approve` and `create_task` because the node is not open, `reject` with 409 `illegal_transition` because there is nothing the app could write that would undo the evidence. `can` is all false for it, and it raises neither `lark_status_drift` nor `unapproved_completion`.
+
+## Production evidence (外業 / 控制 / 圖資 / 報告)
+
+One source of truth: the engineering progress already lives with the 工程確認單, so the four production nodes take their status and numbers from the case's own source evidence instead of hand-made tasks. Tasks stay for ad-hoc assignments only. `production_signal(project, state, reports)` in `evidence.py` is pure and reuses the `project_progress.py` helpers (`planned_of`, `work_orders_of`, `actual_of`, `v3_field_total`), so `GET /progress` and the node chain read the same joins. `reports` is an already-cached `ReportsView(warm=False)` or None: it never reads Lark and never starts a refresh.
+
+`evidence_of(project, state, reports)` merges the early `AutoDone` marks and the four `Signal`s into the one mapping that `facts_of` already receives, so list, detail, every mutation, 啟動 SOP and the home panels agree.
+
+| situation | derived status |
+| --- | --- |
+| Lark 略過 (or app waiver) | 略過, no evidence payload |
+| Lark approved | 已完成 |
+| previous node not finished | 未開始 (the evidence is still shown) |
+| rejected | 進行中, the rejection stays |
+| live tasks all done | 待審核 |
+| any task 進行中 or 已完成 | 進行中 |
+| none of the above and the node's own category has real linked daily rows, or (外業 only) exactly one v3 register case with a cumulative 外業 > 0 | 進行中, `evidence.drives_status = true` |
+| none of the above | 待處理 |
+
+Evidence never yields 待審核 or 已完成 and is never written to Lark as such. It only lifts 待處理 (including a node whose live tasks are all 待處理 or cancelled) to 進行中. The sync mirrors the derived status only onto a node row the request touched, so an untouched row keeps its Lark status and raises no `lark_status_drift` while the evidence decides its status.
+
+Each production node in the overview and detail payload carries `evidence` and `can_submit_hint` (other nodes: `null` and `false`; a skipped node: `null` and `false`):
+
+```json
+{"evidence": {"planned_qty": "123.45", "lines": 2, "items": 5, "work_orders": 2, "latest_date": "2026-10-12",
+              "actual_known": true, "actual_value": "5", "actual_source": "v4_daily",
+              "reason": "已有 2 筆日報連結到此案件", "drives_status": true},
+ "can_submit_hint": false}
+```
+
+`planned_qty` is a decimal string, `null` (with `lines` and `items` null) while the contract plan is unavailable. `work_orders` is 0 with no linked rows, and then `actual_known` is false: unknown is never rendered as 0 or 0%. `actual_source` is `v4_daily`, `v3_reports` or `null`; the v3 figure is withheld (`actual_value: null`) from viewers who may not see the reports register, but the status it implies is the same for everyone. `can_submit_hint` is true only when the actual is known, the plan is greater than 0, the actual is at least the plan, and the node is 待處理 or 進行中. The actual is a points figure (`unit_note` in `/progress`), not contract units, so it is a hint to look, never an approval.
+
+### Item progress from Lark's own revenue points (added 2026-10-17)
+
+Lark's 合約填報工項 holds `對應營業額` (the item's planned revenue points) and the formula `本工項剩餘營ˊ業額` (the field name really contains U+02CA between 營 and 業; `sources.REMAINING_POINTS_FIELD` copies it). Both are projected additively; a snapshot without the field reads as unknown. Both are the same unit, so a node percentage is legitimate. They are parsed with `Decimal` (non-negative, at most 10^9; anything else is unknown) and carried on the derived plan's items as `planned_points` and `remaining_points`. The remaining value is deliberately kept out of the task snapshot, because it changes with every linked daily row.
+
+| Item case | Status |
+| --- | --- |
+| planned > 0 and remaining <= 0 | `done` |
+| 0 < remaining < planned | `partial` |
+| remaining == planned (nothing done, or nothing linked: ambiguous) | `no_signal` |
+| remaining or planned unknown, malformed, negative, huge, or remaining > planned | `no_signal` |
+
+`no_signal` is labelled 尚無進度資料 and is never shown as 0%. Per node, over the items whose remaining is a valid number not above the plan: `earned = sum(planned - remaining)`, `planned_points = sum(planned)`, `percent = earned / planned * 100` (one decimal, half up, 0..100, shown as at most 99.9 until every item is done). `progress` is `null` until at least one item is `partial` or `done`, and while the plan is truncated.
+
+Extra `evidence` keys (existing keys unchanged; `items` stays the fill-item count):
+
+```json
+{"progress": {"percent": "30", "earned_points": "60", "planned_points": "200", "items_done": 0, "items_total": 2},
+ "items_total": 2, "items_truncated": false,
+ "work_items": [{"code": "C1-1", "name": "導線測量", "planned_qty": "50", "planned_points": "100",
+                 "remaining_points": "40", "status": "partial", "link_basis": "native"}]}
+```
+
+`work_items` holds at most 50 rows. Viewers without the reports gate (the same gate as the v3 figure) get `percent`, `earned_points`, `planned_points` and every row's points as `null`; statuses and counts stay.
+
+Effect on status: a `partial` or `done` item is evidence that the node started (進行中 by evidence, never 待審核 or 已完成). `can_submit_hint` is true only when every planned item of the node is `done` and the node is 待處理 or 進行中 (`Signal.complete_by == 'item_points'`). The `quantity` source guard for daily points against contract units is unchanged. The 流程與交付 card shows the bar, 「完成 X%（已完成 N/M 工項）」 and a collapsible 「工項明細（M）」; without progress it says 尚無進度資料（日報未連結或尚未開工）.
+
+## Who may act
+
+| Action | Allowed for | From status |
+| --- | --- | --- |
+| claim | Employed member of the node's departments, node has no owner | any open |
+| create_task | Members (for themselves) and managers (any eligible assignee) | any open |
+| assign | Manager | any open |
+| complete | Manager | 待處理, 進行中, 待審核 |
+| approve | Manager | 待審核 |
+| reject | Manager | 待審核, 已完成 |
+
+A manager is an employed 經理 whose 所屬組別 meets the node's departments, any employed 副總 or 老闆, or a person with the server company-admin business grant (`can_business_override`). For ordinary node work, server-session system administrators (`manager` role or `can_manage_roles`) also manage every node as an explicit exception to independent business authority; this never substitutes financial/native approval seats. Assignees must be employed members of the node's departments. Open means any status except 已完成 and 略過; tasks are frozen once the node is 已完成 or 略過.
+
+## Write safety
+
+Each write runs under a lock for its 指派鍵, re-checks the session and a fresh roster inside the lock, and plans against a fresh Lark read. A missing node row is created with the workflow's 指派鍵 by search, create once, search again; a second row is reported as `duplicate_assignment_key`. A pending receipt is stored before the first remote write. Every write is read back and compared. An uncertain create or update stays pending, and a replay of the same `request_id` reconciles it by reading instead of sending it again. Each success, denial and failure writes an audit row with actor, request ID, and before and after values, without tokens.
+
+## Case detail links and projection additions
+
+The canonical home target uses the existing hash route.
+
+```text
+#view=project&project=<stable-project-id>&tab=flow&node=<node-key>&task=<lark-task-record-id>
+```
+
+Encode every value with `encodeURIComponent`. `project` is the authorized workspace project ID. It is not a case code or confirmation record ID. `node` is one of the nine keys listed in Routes. `task` is optional and is the task's Lark `rec...` record ID. `tab=tasks` opens the task list with the same target contract.
+
+The case page expands the selected Lark node, scrolls its detail into view, and gives keyboard focus to that detail. When `task` is present, it scrolls to the task, focuses its row, and expands its source details. Reduced motion uses immediate scrolling. A task-only hash can discover the node from the overview's authorized `node_details`. Send both identifiers from home so that older overview payloads also locate the node.
+
+Legacy `node=<workspace-node-id>&task=<workspace-task-id>` links retain the local task inspector. A Lark node key selects the assignment panel and does not open the local completion dialog. A missing remote task shows a scoped error. A disabled assignment feature shows an unavailable message and labels the remaining local workflow separately. Neither case visibility nor mutation authorization changes.
+
+The top-level router still reads the hash. This change does not add `assignment_node` or `assignment_task` aliases and does not add query-only routing. Link creators must use the hash contract above.
+
+Node responses add `assignment_key`, `origin=lark`, `deadline_basis=related_tasks_max`, and `next_due`. `deadline` keeps the latest deadline among non-cancelled related tasks, including completed tasks. `next_due` is the earliest deadline among tasks that are neither completed nor cancelled. Both values are null when the relevant set has no date. Nodes have no native 截止日 field.
+
+Task details sort all authorized tasks before rendering. Open overdue tasks come first using the Taipei calendar date. Deadline ascending follows, with null dates last. Status priority is 進行中, 待處理, 已完成, 取消. Record ID is the stable final tie-breaker. The client uses the same ordering for the combined task tab.
+
+The client preserves `fetched_at` and `stale_reason`. Panels identify `fetched_at` as the workbench read time, not the Lark modification time. The nine-node summary and each node's task counts remain the existing Lark read model. Local SOP templates appear in an expandable section and do not change those counts.
+
+Assignment reads start when flow, tasks, or assignment participants become visible. Hover or keyboard focus can prefetch after 150 ms. Save Data and slow 2G connections disable extra prefetch. Overview responses still contain the existing embedded `node_details`. This stream does not change the service to omit those fields. Successful writes still use version checks, idempotent request IDs, remote readback, and the existing server permissions.
+
+## 啟動 SOP
+
+A project lead previews, then confirms, and by default the app only creates the missing 節點指派 rows for each production category with a planned quantity, which is what Lark's own button does; progress comes from the case's data. Seeding one 任務 row per node is an explicit opt-in (`seed_tasks: true`, below). Categories map to nodes 外業 `field`, 控制 `control`, 圖資 `mapping`, 報告 `report`. A default press costs at most two Lark writes per node (the row create and the node sync that mirrors 狀態/進度), none for a row that already exists. With seeds, each node costs at most three: the node row create, the task create, and the same node sync every task create runs (進度, and 開始時間 once work has started), so one press writes at most 12 times. Node status stays derived from the nine-node chain: the operation never forces a status, and the sync only mirrors the derived one onto the row.
+
+**Source.** Quantities, line and item counts and link-basis counts come from `state['derived_plan'][project_id]` (`plan_summary`). A category with a planned quantity of 0 is absent. Deadlines come from the project's quotes (direct `project_id`/`project_ids`, or through the case's confirmations, as `frontend/src/sourceQuotes.ts projectQuotes` does) using 外業期限, 內業期限(控), 內業期限(圖), 內業期限(報), normalized with `sources.day()`. If dated quotes disagree on a node's date, the deadline is null and the warning `deadline_conflict` names the dates. Nothing is picked.
+
+**Seed task (opt-in).** Only with `seed_tasks: true`. Unassigned, status 待處理, 指派人 is the person who pressed start. Title `<外業|控制|圖資|報告>：依計畫數量完成`. Detail lists the planned quantity, contract lines and items, link-basis counts and the node's warnings, and ends with the marker `[SOP-START:v1:<node key>]`. Department is the first of the node's departments (外業, 控制, 圖報A, 圖報A) because existing task creation requires one of them. The app records each seed task's Lark record id in its receipts table (one row per workspace, project and node holding the ids in creation order, the seed ledger). A node counts as seeded when a non-cancelled task of that node has a recorded seed id or still carries the marker, so a person deleting the marker line from 內容 does not cause a second seed. A recorded id is also read by id when the node's task link does not list it yet. These two are the only ways a seed is recognised: never by title, content or time. A CANCELLED seed task counts as absent on purpose: a manager cancels it to have 啟動 SOP seed a fresh one. A manually created task without the marker does not count, and a 已完成 or 略過 node gets its row but no task (`task: "skipped"`).
+
+**Who.** The session manager (`can_manage_roles`), the project's PM, the project or node supervisor, a manager of the node's departments, an executive (副總 or 老闆), or someone holding the business override (`can_business_override`); `Actor.manages` covers the last three. A project lead who is not an employed person in the roster is refused unless they hold the system-admin or business override (the rule of `plan_patch_task`), and the pressing account must be a Lark open id because it is written as 指派人. Authority is checked per node. Everyone else gets 403 `forbidden` with a Chinese reason, audited as `node_assignment.start_sop` with result `denied`.
+
+**Blockers** (`eligible` is true only with none and at least one row to write): `disabled`, `writes_disabled` (workspace `external_enabled` off), `no_confirmation_code`, `no_planned_quantity`, `forbidden`, `lark_unavailable`. The flag-off case answers 404 `disabled` like every route, so `disabled` is not sent as a blocker. `can_start` is true only when the caller may start at least one node, so the frontend gates the button on it instead of re-implementing authority (it is also false while the case cannot be read). **Warnings** never block: `no_pm`, `deadline_conflict`, `ambiguous_links`, `needs_review`, `derived_links`, `plan_truncated`, and `duplicate_seed` when Lark already shows more than one live seed on a node. `items_basis.unlinked` also counts native links that could not be resolved.
+
+**Preview** (`GET`, optional `?seed_tasks` (true or false), same authorization and caches as the other reads, never writes):
+
+```json
+{"project_id": "p1", "code": "A115001-01", "eligible": true, "can_start": true, "already_started": false,
+ "seed_tasks": false, "seeds_pending": 4, "seeds_optional": false,
+ "blockers": [{"code": "forbidden", "message": "..."}],
+ "warnings": [{"code": "deadline_conflict", "message": "...", "node": "field"}],
+ "nodes": [{"key": "field", "label": "外業", "category": "外業", "planned_qty": "123.45", "lines": 2, "items": 5,
+   "items_basis": {"native": 5, "derived": 0, "ambiguous": 0, "unlinked": 0}, "deadline": "2026-10-30",
+   "node_exists": false, "seed_task_exists": false, "will_create_node": true, "will_create_task": true,
+   "task_title": "外業：依計畫數量完成", "task_detail": "..."}],
+ "chain_note": "...", "preview_hash": "<sha256>", "plan_rule_version": "contract-links-20261017.1"}
+```
+
+**Started.** `already_started` is true when Lark is readable and every production node in the plan already has a 節點指派 row, whoever created it: this app, or Lark's own 開啟SOP button, which creates all nine rows and no 任務 row. Seed tasks are not part of it. `seeds_pending` counts the plan nodes whose `will_create_task` is true, exactly the seed tasks the POST would create (a finished node or a node with a live seed is not counted; 0 while Lark cannot be read) and `seeds_optional` is `already_started && seeds_pending > 0`, a started case that may still get its seed tasks. `eligible` follows the chosen path: with `seed_tasks` false (the default) it is true when there is no blocker and a node row is missing, so a Lark-started case is not eligible; with `seed_tasks=true` it is true while a node row or a seed is still missing, and a Lark-started case stays eligible while seeds are pending. The UI offers the seed path only for a case that is not started. `will_create_task`, `seeds_pending` and `seeds_optional` always describe what the seed path would do. `preview_hash` is the same for both paths.
+
+`preview_hash` is the sha256 of the canonical JSON of the project id, the confirmation code and each node's quantity, counts, deadline, task title and detail plus both rule versions. It does not include Lark state, so it stays the same while a run progresses and a changed plan or quote makes it stale.
+
+**Freshness and process model.** The preview reads the cached case snapshot (the same TTL as the other reads), so it can lag Lark by a few seconds; the POST rechecks with fresh Lark, roster, project and quote data and never trusts the preview's node states. The preview is visible to anyone who can view the project and reports `eligible: false` and `can_start: false` for those who cannot start. The per-node locks and the rate limiter are process-local, consistent with the single uvicorn worker (`scripts/run_service.py`); running more than one worker would need shared locks and a shared limiter first.
+
+**Run** (`POST`, body `{request_id, preview_hash, seed_tasks?}`; `seed_tasks` must be a boolean and defaults to false) answers `{"started", "complete", "results": [{"key", "node": "created|existing|failed", "task": "created|existing|failed|skipped", "error", "sync": "ok|failed", "warning"?, "duplicates"?}], "overview": <case overview>}`. `started` is true when this call created a row. `sync` is `failed` only when the seed landed but mirroring 進度 and 開始時間 onto the node row did not; that node is not complete, `complete` is false, and the next press (same or new `request_id`) re-runs only that mirror write and creates nothing. `warning` is present as `content_differs`: an earlier attempt that had already landed is the seed (`node` and `task` are `existing`), and its title, detail, deadline or department no longer match the confirmed plan. It is never overwritten. It is present as `duplicate_seed` when the node has more than one live seed: the node stays seeded and `complete` can be true, and `duplicates` lists the record ids of the extra ones. Before writing it checks, in order, `writes_disabled` (403), a stored result for the `request_id` (replayed with `Idempotent-Replayed`, or `idempotency_conflict` for a different body), `nothing_to_start` (409), `forbidden` (403) and `preview_stale` (409).
+
+Before a node's first write the run re-reads the session, the project record and the quotes, rebuilds that node's plan and rechecks authority with the fresh project, so a PM or supervisor removed mid-run stops the later nodes with `forbidden`. If the node's content (quantity, counts, deadline, title, detail) no longer matches the confirmed preview, that node and every remaining node report `preview_stale`; press again with a new preview and a new `request_id` to resume. Each node is seeded under the same per-node lock the other writes take, and every Lark write it makes counts against the rate limit (a full press of four new nodes is 12 writes, so a person can fully press about two projects a minute). Each result is read from what actually reached Lark, so a node row that landed while its task failed reports `node: created` (or `existing`), `task: failed` and the task's `error`. A partial failure answers 200 with `complete: false`; an HTTP error is returned only when nothing at all was created. Repeating the same `request_id` resumes: the run receipt keeps the result of every finished node, so they replay as stored. A new press re-plans from Lark and the seed ledger. A Lark failure on every node answers with that failure (`lark_permission`, `lark_error`, `outcome_unknown`, `busy`, `rate_limited`, ...). `lark_permission`, `lark_unavailable`, `rate_limited` and similar stop the run, and the remaining nodes report the same `error`.
+
+**One token per seed.** The Lark `client_token` of a seed task is derived only from the workspace, the project, the node, the SOP rule version and the seed sequence, which is the number of seeds already recognised for that node (cancelled and hard-deleted ones included). It never depends on the content, the person, the `request_id` or how many times it was tried. Every try at the same intended seed carries the same token, so Lark answers a repeat with the record it already made. A seed that is cancelled or deleted raises the sequence, so its replacement gets a new token.
+
+**State model.** Per (project, node, sequence) the app keeps a receipt that moves `none → sent → done` and never back. `sent` is saved, with its first-send time `at`, before the create is sent. `at` is stamped once and never rewritten (a receipt without one is stamped when first seen and saved before anything else can fail). `done` is saved once the record id is in the ledger and has been read back. A definitive failure (a rejected, forbidden or rate limited create) keeps the `sent` receipt. There is no time based abandonment, no title or content matching, no attempt number and no tombstone.
+
+**Deciding a press.** For each node the run reads the node's tasks fresh. If at least one live (not cancelled) seed exists, the node is seeded: both outcomes are `existing` and only the 進度/開始時間 mirror is re-run, which is how a `sync: failed` is retried. If none is live and the node is open, the run creates the seed for the next sequence under its token, even when an earlier `sent` receipt exists. Nothing visible after a `sent` receipt means the outcome is unknown, so it never makes a different seed: it resends the same token with the current confirmed content, and this stays true after `NODE_ASSIGNMENT_STALE_MAX_SECONDS`. If that resend is itself uncertain the node fails with `outcome_unknown` and 「上次建立結果不確定，請稍後再試」 (`first_sent_at` included). If Lark deduplicates it answers with the original record, which is adopted by record id; when its content differs from the confirmed plan the result carries `content_differs` and the record is never overwritten. If the record Lark answers with is already cancelled it counts toward the sequence, and the run creates a replacement under the next token before it completes, so `complete: true` never happens without a live seed. A seed is created without an assignee and with the pressing person as 指派人; a resent or deduplicated seed keeps the 指派人 of the attempt that landed.
+
+**Duplicates are loud.** When a read finds two or more live seeds for one node, the node stays seeded and `complete` can be true, the result carries `warning: "duplicate_seed"` and `duplicates` (the extra record ids), and the preview adds a non-blocking warning of the same code naming them. Nothing is cancelled or deleted automatically; a manager cancels the extra task, after which the warning disappears.
+
+**Residual risk.** Lark only deduplicates a `client_token` inside its own idempotency window. A create whose answer was lost and which lands after that window, followed by a resend after the window, can still produce one extra seed task; it is detected and reported as `duplicate_seed` once both are visible. A seed that was never recorded (the answer was lost) and whose marker is removed by a person before the app has read it cannot be recognised, so an uncertain create that is also edited and not deduplicated by Lark can create one unreported extra task. In both cases the cure is to cancel the extra task by hand.
+
+### Fill-item progress: certainty and privacy (follow-up)
+
+- Only items whose link is native or derived feed a node's status evidence, percent, `items_done` and the submit hint. Ambiguous and unlinked items are listed as 關聯待確認 with no signal, and any such item keeps the hint off.
+- `progress` carries `known_items` and `unknown_items`; the UI says the percent covers only the known items and mutes it when they are fewer than half.
+- `本工項剩餘營ˊ業額` is read from Lark for these computations only (`SERVER_ONLY_FIELDS`); no public source response carries it. A comma in a points value is accepted only as a thousands separator ("1,500", never "0,0").

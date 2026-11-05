@@ -1,0 +1,195 @@
+[
+  {
+    "label": "formal node heading clears sticky header",
+    "result": "pass",
+    "value": 127.96875
+  },
+  {
+    "label": "one formal task creator",
+    "result": "pass"
+  },
+  {
+    "label": "one formal default import",
+    "result": "pass"
+  },
+  {
+    "label": "one formal task section",
+    "result": "pass"
+  },
+  {
+    "label": "formal create keeps heading clear",
+    "result": "pass",
+    "value": 128.109375
+  },
+  {
+    "label": "formal assignment keeps heading clear",
+    "result": "pass",
+    "value": 128.109375
+  },
+  {
+    "label": "manager override explicitly counts unfinished tasks",
+    "result": "pass",
+    "value": "確定完成此節點？\n\n尚有 2 項任務未完成\n\n取消\n確認完成節點"
+  },
+  {
+    "label": "formal mobile actions reach 44px",
+    "result": "pass",
+    "value": [
+      {
+        "label": "完成節點",
+        "height": 44
+      },
+      {
+        "label": "指派負責人",
+        "height": 44
+      },
+      {
+        "label": "新增任務",
+        "height": 44
+      },
+      {
+        "label": "此節點",
+        "height": 44
+      },
+      {
+        "label": "全部任務",
+        "height": 44
+      },
+      {
+        "label": "我的",
+        "height": 44
+      },
+      {
+        "label": "未指派",
+        "height": 44
+      },
+      {
+        "label": "逾期",
+        "height": 44
+      },
+      {
+        "label": "匯入預設任務",
+        "height": 44
+      },
+      {
+        "label": "查看工項 →",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "label": "formal mobile has no horizontal overflow",
+    "result": "pass"
+  },
+  {
+    "label": "done formal node hides completion",
+    "result": "pass"
+  },
+  {
+    "label": "formal complete approve and reject use fake Lark",
+    "result": "pass"
+  },
+  {
+    "label": "local creator shares name notes owner and date",
+    "result": "pass"
+  },
+  {
+    "label": "local create keeps heading clear",
+    "result": "pass",
+    "value": 128.453125
+  },
+  {
+    "label": "local mobile actions reach 44px",
+    "result": "pass",
+    "value": [
+      {
+        "label": "指派負責人",
+        "height": 44
+      },
+      {
+        "label": "退回節點",
+        "height": 66
+      },
+      {
+        "label": "匯入預設任務",
+        "height": 44
+      },
+      {
+        "label": "新增任務",
+        "height": 44
+      },
+      {
+        "label": "此節點",
+        "height": 44
+      },
+      {
+        "label": "全案",
+        "height": 44
+      },
+      {
+        "label": "我的任務",
+        "height": 44
+      },
+      {
+        "label": "未指派",
+        "height": 44
+      },
+      {
+        "label": "逾期",
+        "height": 44
+      },
+      {
+        "label": "待確認",
+        "height": 44
+      },
+      {
+        "label": "封存紀錄",
+        "height": 44
+      },
+      {
+        "label": "查看工項 →",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "label": "local notes persist",
+    "result": "pass"
+  },
+  {
+    "label": "local initial due persists",
+    "result": "pass"
+  },
+  {
+    "label": "local mobile has no horizontal overflow",
+    "result": "pass"
+  },
+  {
+    "label": "requested jargon is absent",
+    "result": "pass"
+  },
+  {
+    "label": "local reject and reassignment clear the sticky header",
+    "result": "pass",
+    "top": 128.453125
+  },
+  {
+    "label": "local legacy completion gates render a specific reason",
+    "result": "pass",
+    "reason": "尚未完成：業主需求日期與佐證、報價單、提出日期及通知紀錄、回簽報價單或合約"
+  },
+  {
+    "label": "local Escape restores trigger focus",
+    "result": "pass"
+  },
+  {
+    "label": "formal SOP start apply",
+    "result": "could not run",
+    "evidence": "啟動 SOP 預覽\n✕\n建立內容\n取消\n確認啟動\n目前無法操作\n\n此案件沒有大於 0 的計畫數量，無法啟動 SOP"
+  },
+  {
+    "label": "local scoped default import preview",
+    "result": "pass",
+    "evidence": "匯入此節點任務 · 報價\n✕\n1 選擇版本\n2 選擇任務\n3 確認\n\n案件 SOP 預設任務 onepage-defaults · 已選 9 項 · 參考列 6\n\n已匯入 9\n業主提出報價需求\n已封存\n建立報價編號\n待處理\n通知業主報價成立\n待處理\n是否有下包需求\n待處理\n提出報價，同時通知業主已提供報價\n待處理\n追蹤報價\n待處理\n業主告知未得標／報價單有效期限到期\n待處理\n報價單是否回傳\n待處理\n收到回傳單，合約成立\n待處理\n待確認 1\n下包提出報價\n條件\n上一步\n下一步"
+  }
+]

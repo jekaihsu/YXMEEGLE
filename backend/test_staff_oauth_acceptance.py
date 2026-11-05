@@ -9,6 +9,23 @@ from fastapi.testclient import TestClient
 from .app import create_app, PersonRow
 
 
+# Used only to simulate the gap between collection and test execution.
+COLLECTION_TIME = datetime.now(timezone.utc)
+
+
+@pytest.fixture(autouse=True, params=[0, 360], ids=['immediate', 'six-minute-collection-delay'])
+def oauth_clock(request, monkeypatch):
+    clock = COLLECTION_TIME + timedelta(seconds=request.param)
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock.astimezone(tz) if tz else clock.replace(tzinfo=None)
+
+    monkeypatch.setattr(__name__ + '.datetime', FrozenDateTime)
+    monkeypatch.setattr('backend.production_access.datetime', FrozenDateTime)
+
+
 @pytest.fixture
 def staff(tmp_path, monkeypatch):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/staff.db',
@@ -85,13 +102,16 @@ def test_fresh_oauth_ignores_historical_test_default(staff,role):
     {'directory_source': {'app_id': 'another-app', 'record_id': 'synthetic-record'}},
     {'directory_last_seen_at': (datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat()},
 ])
-def test_existing_staff_session_immediately_rechecks_roster(staff, patch):
+def test_existing_staff_session_preserves_read_login_but_rechecks_privileged_access(staff, patch):
     _, client, login, change = staff
     assert login().status_code == 307
     assert client.get('/api/workspace').status_code == 200
     change(patch)
-    assert client.get('/api/workspace').status_code == 403
-    assert client.get('/api/session').json()['user'] is None
+    blocked=(patch.get('active') is False or patch.get('identity_app_id')=='another-app'
+             or patch.get('directory_status')=='left' or patch.get('directory_missing') is True)
+    assert client.get('/api/workspace').status_code == (403 if blocked else 200)
+    assert (client.get('/api/session').json()['user'] is None)==blocked
+    assert client.post('/api/people/sync').status_code==403
 
 
 @pytest.mark.parametrize('patch', [
@@ -102,23 +122,29 @@ def test_oauth_does_not_reactivate_or_remap_unverified_staff(staff, patch):
     _, client, login, change = staff
     change(patch)
     assert login().status_code in (303, 307, 403)
-    assert client.get('/api/session').json()['user'] is None
-    assert client.get('/api/workspace').status_code == 401
+    login_blocked=patch.get('active') is False or patch.get('identity_app_id')=='another-app'
+    read_blocked=login_blocked or patch.get('directory_status')=='left' or patch.get('directory_missing') is True
+    assert (client.get('/api/session').json()['user'] is None)==read_blocked
+    assert client.get('/api/workspace').status_code == (401 if login_blocked else 403 if read_blocked else 200)
+    assert client.post('/api/people/sync').status_code==(401 if login_blocked else 403)
 
 
 @pytest.mark.parametrize('stamp',[
-    (datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat(),
-    (datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat(),
+    timedelta(seconds=-901),
+    timedelta(minutes=5),
     'invalid',None,
 ])
-def test_oauth_rejects_stale_proof_before_creating_session(staff,stamp):
+def test_oauth_admits_reads_with_stale_proof_but_keeps_write_denial(staff,stamp):
     from sqlalchemy import select
     from .app import AuthRow
     app,client,login,change=staff
+    if isinstance(stamp,timedelta):
+        stamp=(datetime.now(timezone.utc)+stamp).isoformat()
     change({'directory_last_seen_at':stamp})
     response=login()
-    assert response.status_code==403
-    assert 'meegle_session' not in client.cookies
+    assert response.status_code==307
+    assert 'meegle_session' in client.cookies
     with app.state.sessions() as db:
-        assert not [row for row in db.scalars(select(AuthRow)) if row.data.get('uid')=='ou_staff']
-    assert client.get('/api/workspace').status_code==401
+        assert len([row for row in db.scalars(select(AuthRow)) if row.data.get('uid')=='ou_staff'])==1
+    assert client.get('/api/workspace').status_code==200
+    assert client.post('/api/people/sync').status_code==403

@@ -1,0 +1,366 @@
+[
+  {
+    "scenario": "loaded",
+    "width": 1280,
+    "state": "ready",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n依本週已載入預排，資格與出勤仍待核對。\n\n最後預排日期 · 2026-10-18\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-loaded-1280.png"
+  },
+  {
+    "scenario": "loading",
+    "width": 1280,
+    "state": "loading",
+    "counts": [],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n同日重疊待確認\n已核實時段衝突\n讀取中…\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-loading-1280.png"
+  },
+  {
+    "scenario": "forbidden",
+    "width": 1280,
+    "state": "forbidden",
+    "counts": [
+      "—",
+      "—",
+      "—"
+    ],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n—\n同日重疊待確認\n—\n已核實時段衝突\n—\n\n沒有派工資料的檢視權限。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-forbidden-1280.png"
+  },
+  {
+    "scenario": "read_failed",
+    "width": 1280,
+    "state": "retained",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n派工資料讀取失敗。已保留上次成功資料，數字為上次快照。\n\n最後預排日期 · 2026-10-18 · 451 分鐘前\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重試\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-read_failed-1280.png"
+  },
+  {
+    "scenario": "empty_future_window",
+    "width": 1280,
+    "state": "empty",
+    "counts": [
+      "—",
+      "—",
+      "—"
+    ],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n—\n同日重疊待確認\n—\n已核實時段衝突\n—\n\n來源在 2026-08-19 之後沒有預排紀錄。本週尚無可核實的預排。\n\n最後預排日期 · 2026-08-19\n\n尚無完整請假來源，無法保證人員可出勤。\n\n來源在 2026-08-19 之後沒有預排紀錄。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-empty_future_window-1280.png"
+  },
+  {
+    "scenario": "stale",
+    "width": 1280,
+    "state": "stale",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 746.1796875,
+      "height": 471.84375,
+      "width": 952
+    },
+    "scrollWidth": 1280,
+    "viewport": 1280,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n上次成功快照，資料待更新。\n\n最後預排日期 · 2026-10-18 · 1891 分鐘前\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-stale-1280.png"
+  },
+  {
+    "scenario": "loaded",
+    "width": 390,
+    "state": "ready",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n依本週已載入預排，資格與出勤仍待核對。\n\n最後預排日期 · 2026-10-18\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-loaded-390.png"
+  },
+  {
+    "scenario": "loading",
+    "width": 390,
+    "state": "loading",
+    "counts": [],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n同日重疊待確認\n已核實時段衝突\n讀取中…\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-loading-390.png"
+  },
+  {
+    "scenario": "forbidden",
+    "width": 390,
+    "state": "forbidden",
+    "counts": [
+      "—",
+      "—",
+      "—"
+    ],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n—\n同日重疊待確認\n—\n已核實時段衝突\n—\n\n沒有派工資料的檢視權限。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-forbidden-390.png"
+  },
+  {
+    "scenario": "read_failed",
+    "width": 390,
+    "state": "retained",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n派工資料讀取失敗。已保留上次成功資料，數字為上次快照。\n\n最後預排日期 · 2026-10-18 · 451 分鐘前\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重試\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-read_failed-390.png"
+  },
+  {
+    "scenario": "empty_future_window",
+    "width": 390,
+    "state": "empty",
+    "counts": [
+      "—",
+      "—",
+      "—"
+    ],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n—\n同日重疊待確認\n—\n已核實時段衝突\n—\n\n來源在 2026-08-19 之後沒有預排紀錄。本週尚無可核實的預排。\n\n最後預排日期 · 2026-08-19\n\n尚無完整請假來源，無法保證人員可出勤。\n\n來源在 2026-08-19 之後沒有預排紀錄。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-empty_future_window-390.png"
+  },
+  {
+    "scenario": "stale",
+    "width": 390,
+    "state": "stale",
+    "counts": [
+      "1",
+      "2",
+      "2"
+    ],
+    "card": {
+      "top": 1044.1171875,
+      "height": 455.84375,
+      "width": 326
+    },
+    "scrollWidth": 390,
+    "viewport": 390,
+    "text": "派工看板\n\n本週 2026/10/12 起 · 工作預排來源\n\n待派\n1\n同日重疊待確認\n2\n已核實時段衝突\n2\n\n上次成功快照，資料待更新。\n\n最後預排日期 · 2026-10-18 · 1891 分鐘前\n\n尚無完整請假來源，無法保證人員可出勤。\n\n重新讀取\n開啟派工看板",
+    "otherCards": [
+      "kpi",
+      "confirmation",
+      "cases",
+      "dispatch",
+      "statuses",
+      "groups",
+      "leave",
+      "trips",
+      "absence",
+      "links"
+    ],
+    "screenshot": "/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-int/output/dispatch-board/home-stale-390.png"
+  }
+]

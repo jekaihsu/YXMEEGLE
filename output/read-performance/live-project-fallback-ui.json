@@ -1,0 +1,15 @@
+{
+  "requests": [
+    {
+      "bytes": 31284,
+      "ms": 177.19999998807907,
+      "path": "/api/session"
+    },
+    {
+      "bytes": 0,
+      "ms": 30002.30000001192,
+      "path": "/api/workspace"
+    }
+  ],
+  "state": "timeout"
+}

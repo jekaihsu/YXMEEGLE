@@ -38,6 +38,7 @@ for p in Path('/proc').iterdir():
     try: cmd=(p/'cmdline').read_bytes().replace(b'\x00',b' ').decode(errors='replace')
     except (OSError,PermissionError): continue
     if 'python' not in cmd or ' -c ' in cmd: continue
+    if 'backend.request_protocol' in cmd: processes.append('uvicorn')
     for name in ['scripts/run_service.py','uvicorn','scripts/run_worker.py']:
         if name in cmd: processes.append(name)
 with urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8080')+'/api/health',timeout=10) as response:

@@ -1,0 +1,4 @@
+npm notice run yongxiang-workspace-prototype@0.1.0 test:dispatch-publish
+npm notice run node test-dispatch-publish.mjs && node test-dispatch-publish-ui.mjs
+dispatch publish model literal expectations passed
+dispatch publish mounted UI: permissions, reassign identity, pending, command lookup, 409 draft retention and work queue passed

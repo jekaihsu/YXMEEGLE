@@ -1,0 +1,16 @@
+ok - header and seven independently timed sections preserve body facts
+ok - unknown is em dash with reason and never a zero count
+ok - amount withheld ignores value, derived value and caller approval strings
+ok - forbidden rows, nested tasks, IDs, labels, times and count hints disappear
+ok - malformed body fails closed without retaining otherwise valid header facts
+ok - all C-STATE labels remain independent and stale freshness survives unknown
+ok - pending requested date never substitutes for effective or estimated date
+ok - tree starts one level deep and expands only selected native identity
+ok - unresolved edges and missing parents render explicit rows without guessed identity
+ok - caller mapping/receipt claims never grant verification or write actions
+ok - duplicate numbers remain distinct versions; duplicate native keys fail closed
+ok - UI filter and sort preserve selection and do not search technical IDs
+ok - history variant allowlists ignore injected generic row fields
+ok - source fetch time is never substituted; unsafe URLs remain unlocated
+ok - plan summary is typed, allowlisted, optional and suppressed with blocked work items
+case-detail view: 15 named tests passed

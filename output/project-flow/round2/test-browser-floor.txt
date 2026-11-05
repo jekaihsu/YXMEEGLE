@@ -1,0 +1,1 @@
+PASS browser floor rejects missing color-mix, layers and CSS API and permits supported browsers

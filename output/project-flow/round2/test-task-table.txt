@@ -1,0 +1,1 @@
+Task points keep source precision and removed or changed source rows are labelled

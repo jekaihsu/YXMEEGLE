@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+const result=await build({stdin:{contents:`export {HomeReportContent} from './src/reports/HomeTab';export {mockReport} from './src/reports/mock';export {HOWTO_SECTIONS} from './src/howToContent';export {default as AssetsTab} from './src/reports/AssetsTab';export {SavedAnswerDate} from './src/assistant/SavedAnswerDate';`,resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic',loader:{'.css':'empty'},plugins:[{name:'fixture',setup(b){b.onLoad({filter:/\/reports\/useReport\.ts$/},()=>({contents:`export const useDebounce=v=>v;export const useReport=()=>({data:globalThis.assetFixture,retry(){}});`}))}}]});
+const mod={exports:{}};new Function('require','module','exports',result.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports);
+const ui=mod.exports;
+const {JSDOM}=createRequire(import.meta.url)('jsdom');
+const {renderToStaticMarkup:render}=createRequire(import.meta.url)('react-dom/server');
+const React=createRequire(import.meta.url)('react');
+const guide=ui.HOWTO_SECTIONS.find(s=>s.id==='refresh');
+assert.match(guide.steps.join(''),/離開或返回視窗、分頁.*不會/);
+assert.match(guide.steps.join(''),/重新讀取/);
+assert.doesNotMatch(guide.steps.join(''),/約一分鐘|結束後再更新/);
+globalThis.assetFixture={meta:{fetched_at:'2026-11-03T02:00:00Z',gaps:[{id:'asset-vehicle-coverage',message:'0 / 189 張成本單有車輛紀錄'}]},kpi:{total:21,active:21,in_use:0,idle:21,coverage:0,repair:0,km:null,daily_rent_total:null},options:{},by_category:[],usage_trend:[],items:[{id:'a',name:'車輛',status:'正常',uses:0,last_used:'2026-08-01',idle_days:99,link:''}],total:1,offset:0};
+globalThis.location={search:''};
+const home=render(React.createElement(ui.HomeReportContent,{d:ui.mockReport('home',new URLSearchParams()),retry(){}}));
+assert.doesNotMatch(home,/基準畫面|940 列、398 件|即時筆數/);assert.match(home,/本頁尚未讀取筆數與資料時間/);
+const html=render(React.createElement(ui.AssetsTab));
+assert.match(html,/已記錄使用次數/);assert.match(html,/距最近已知紀錄/);assert.match(html,/0 \/ 189 張成本單有車輛紀錄/);assert.match(html,/實際使用.*待核對/);assert.doesNotMatch(html,/閒置|期間使用|最後使用/);
+globalThis.assetFixture.usage_trend=[{week:'2026-11-02',uses:3}];globalThis.assetFixture.kpi.in_use=2;
+const metricDoc=new JSDOM(render(React.createElement(ui.AssetsTab))).window.document;
+const uses=[...metricDoc.querySelectorAll('.reports-metrics>div')].find(e=>e.textContent.includes('已記錄使用次數'));assert.equal(uses.querySelector('strong').textContent,'3','recorded uses are not the number of assets with records');assert.match(uses.textContent,/有紀錄資產 2 項/);
+for(const [at,text] of [['2026-11-02T10:39:00Z','2026/11/02 18:39:00'],[null,'回答時間未提供'],['invalid','回答時間未提供']]){const date=render(React.createElement(ui.SavedAnswerDate,{at}));assert.match(date,/歷史回答/);assert.ok(date.includes(text));assert.match(date,/來源時間未提供/)}
+console.log('LIVE4B guide, incomplete asset evidence, saved answer absolute date/unknown regressions passed');

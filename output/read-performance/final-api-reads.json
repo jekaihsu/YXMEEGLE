@@ -1,0 +1,416 @@
+{
+  "concurrent": [
+    {
+      "bytes": 3523,
+      "ms": 2074.2000000476837,
+      "path": "/api/settings/overview",
+      "round": "concurrent",
+      "status": 200,
+      "timing": "identity;dur=131.6, load;dur=1367.2, project;dur=0.6, encode;dur=0.1, serialize;dur=516.8, total;dur=2016.3"
+    },
+    {
+      "bytes": 86051,
+      "ms": 3689.7999999523163,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": "concurrent",
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=26.6, load;dur=2690.8, project;dur=805.1, encode;dur=33.4, serialize;dur=30.9, total;dur=3586.8"
+    },
+    {
+      "bytes": 3820,
+      "ms": 6564.100000023842,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": "concurrent",
+      "status": 200,
+      "timing": null
+    }
+  ],
+  "samples": [
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 206.19999998807907,
+      "path": "/api/session",
+      "round": 0,
+      "status": 200,
+      "timing": "identity;dur=34.3, load;dur=61.7, serialize;dur=11.6, total;dur=107.6"
+    },
+    {
+      "bytes": 3523,
+      "ms": 525.6999999880791,
+      "path": "/api/settings/overview",
+      "round": 0,
+      "status": 200,
+      "timing": "identity;dur=19.7, load;dur=374.2, project;dur=0.5, encode;dur=0.1, serialize;dur=16.7, total;dur=411.2"
+    },
+    {
+      "bytes": 268474,
+      "ms": 611.3999999761581,
+      "path": "/api/workspace?scope=shell",
+      "round": 0,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=20.0, load;dur=30.5, project;dur=384.7, serialize;dur=78.6, total;dur=513.8"
+    },
+    {
+      "bytes": 86051,
+      "ms": 2011.300000011921,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 0,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=16.4, load;dur=1550.7, project;dur=330.1, encode;dur=11.2, serialize;dur=9.7, total;dur=1918.0"
+    },
+    {
+      "bytes": 1151,
+      "ms": 711.3999999761581,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 0,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=19.0, load;dur=588.3, serialize;dur=51.3, total;dur=658.6"
+    },
+    {
+      "bytes": 72,
+      "ms": 760.1000000238419,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 0,
+      "status": 200,
+      "timing": "identity;dur=14.8, load;dur=668.8, serialize;dur=23.3, total;dur=706.9"
+    },
+    {
+      "bytes": 3820,
+      "ms": 3769.7000000476837,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 0,
+      "status": 200,
+      "timing": null
+    },
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 119,
+      "path": "/api/session",
+      "round": 1,
+      "status": 200,
+      "timing": "identity;dur=20.9, load;dur=31.2, serialize;dur=8.4, total;dur=60.4"
+    },
+    {
+      "bytes": 3523,
+      "ms": 442.30000001192093,
+      "path": "/api/settings/overview",
+      "round": 1,
+      "status": 200,
+      "timing": "identity;dur=14.3, load;dur=324.9, project;dur=1.6, encode;dur=0.9, serialize;dur=35.3, total;dur=376.9"
+    },
+    {
+      "bytes": 268474,
+      "ms": 6967.800000011921,
+      "path": "/api/workspace?scope=shell",
+      "round": 1,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=16.4, load;dur=22.1, project;dur=461.9, serialize;dur=84.9, total;dur=585.3"
+    },
+    {
+      "bytes": 86051,
+      "ms": 9043.800000011921,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 1,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=21.4, load;dur=2235.9, project;dur=688.0, encode;dur=10.9, serialize;dur=15.9, total;dur=2972.2"
+    },
+    {
+      "bytes": 1151,
+      "ms": 777.8999999761581,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 1,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=33.0, load;dur=647.0, serialize;dur=44.0, total;dur=724.1"
+    },
+    {
+      "bytes": 72,
+      "ms": 1380.2000000476837,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 1,
+      "status": 200,
+      "timing": "identity;dur=32.6, load;dur=1255.3, serialize;dur=29.8, total;dur=1317.7"
+    },
+    {
+      "bytes": 3820,
+      "ms": 8528.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 1,
+      "status": 200,
+      "timing": null
+    },
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 148.60000002384186,
+      "path": "/api/session",
+      "round": 2,
+      "status": 200,
+      "timing": "identity;dur=31.1, load;dur=51.0, serialize;dur=10.2, total;dur=92.3"
+    },
+    {
+      "bytes": 3523,
+      "ms": 507.2999999523163,
+      "path": "/api/settings/overview",
+      "round": 2,
+      "status": 200,
+      "timing": "identity;dur=14.3, load;dur=411.4, project;dur=0.5, encode;dur=0.1, serialize;dur=20.4, total;dur=446.8"
+    },
+    {
+      "bytes": 268474,
+      "ms": 4202.399999976158,
+      "path": "/api/workspace?scope=shell",
+      "round": 2,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=28.6, load;dur=55.0, project;dur=428.9, serialize;dur=175.5, total;dur=688.0"
+    },
+    {
+      "bytes": 86051,
+      "ms": 5101.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 2,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=65.5, load;dur=4150.6, project;dur=639.8, encode;dur=20.6, serialize;dur=30.0, total;dur=4906.5"
+    },
+    {
+      "bytes": 1151,
+      "ms": 1665.5999999642372,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 2,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=56.5, load;dur=1254.0, serialize;dur=299.1, total;dur=1609.6"
+    },
+    {
+      "bytes": 72,
+      "ms": 1003.3000000119209,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 2,
+      "status": 200,
+      "timing": "identity;dur=28.9, load;dur=862.5, serialize;dur=51.4, total;dur=942.8"
+    },
+    {
+      "bytes": 3820,
+      "ms": 7395.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 2,
+      "status": 200,
+      "timing": null
+    },
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 165.80000001192093,
+      "path": "/api/session",
+      "round": 3,
+      "status": 200,
+      "timing": "identity;dur=57.9, load;dur=41.8, serialize;dur=10.2, total;dur=109.9"
+    },
+    {
+      "bytes": 3523,
+      "ms": 499.0999999642372,
+      "path": "/api/settings/overview",
+      "round": 3,
+      "status": 200,
+      "timing": "identity;dur=30.1, load;dur=393.5, project;dur=0.5, encode;dur=0.1, serialize;dur=22.9, total;dur=447.1"
+    },
+    {
+      "bytes": 268474,
+      "ms": 4872.199999988079,
+      "path": "/api/workspace?scope=shell",
+      "round": 3,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=35.0, load;dur=56.4, project;dur=392.9, serialize;dur=170.2, total;dur=654.5"
+    },
+    {
+      "bytes": 86051,
+      "ms": 3638,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 3,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=30.1, load;dur=2785.7, project;dur=668.3, encode;dur=11.8, serialize;dur=12.7, total;dur=3508.6"
+    },
+    {
+      "bytes": 1151,
+      "ms": 734.1000000238419,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 3,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=38.3, load;dur=579.2, serialize;dur=64.9, total;dur=682.4"
+    },
+    {
+      "bytes": 72,
+      "ms": 1389.5999999642372,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 3,
+      "status": 200,
+      "timing": "identity;dur=39.7, load;dur=1250.2, serialize;dur=48.2, total;dur=1338.2"
+    },
+    {
+      "bytes": 3820,
+      "ms": 7123.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 3,
+      "status": 200,
+      "timing": null
+    },
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 236,
+      "path": "/api/session",
+      "round": 4,
+      "status": 200,
+      "timing": "identity;dur=37.1, load;dur=64.9, serialize;dur=33.9, total;dur=135.9"
+    },
+    {
+      "bytes": 3523,
+      "ms": 918.5,
+      "path": "/api/settings/overview",
+      "round": 4,
+      "status": 200,
+      "timing": "identity;dur=90.2, load;dur=721.2, project;dur=2.2, encode;dur=1.0, serialize;dur=43.6, total;dur=858.2"
+    },
+    {
+      "bytes": 268474,
+      "ms": 6616.800000011921,
+      "path": "/api/workspace?scope=shell",
+      "round": 4,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=64.0, load;dur=123.2, project;dur=486.7, serialize;dur=203.3, total;dur=877.3"
+    },
+    {
+      "bytes": 86051,
+      "ms": 2274.100000023842,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 4,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=27.5, load;dur=1659.8, project;dur=451.2, encode;dur=11.9, serialize;dur=9.0, total;dur=2159.4"
+    },
+    {
+      "bytes": 1151,
+      "ms": 716.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 4,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=24.7, load;dur=594.4, serialize;dur=44.8, total;dur=664.0"
+    },
+    {
+      "bytes": 72,
+      "ms": 839.5999999642372,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 4,
+      "status": 200,
+      "timing": "identity;dur=39.6, load;dur=645.7, serialize;dur=36.5, total;dur=721.9"
+    },
+    {
+      "bytes": 3820,
+      "ms": 4081.600000023842,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 4,
+      "status": 200,
+      "timing": null
+    },
+    {
+      "bytes": 31322,
+      "caps": [
+        "sop_task_read"
+      ],
+      "ms": 112.19999998807907,
+      "path": "/api/session",
+      "round": 5,
+      "status": 200,
+      "timing": "identity;dur=21.0, load;dur=30.3, serialize;dur=7.2, total;dur=58.5"
+    },
+    {
+      "bytes": 3523,
+      "ms": 388,
+      "path": "/api/settings/overview",
+      "round": 5,
+      "status": 200,
+      "timing": "identity;dur=12.5, load;dur=302.1, project;dur=0.6, encode;dur=0.1, serialize;dur=20.0, total;dur=335.3"
+    },
+    {
+      "bytes": 268474,
+      "ms": 4141.800000011921,
+      "path": "/api/workspace?scope=shell",
+      "round": 5,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=13.8, load;dur=22.3, project;dur=172.4, serialize;dur=58.4, total;dur=266.9"
+    },
+    {
+      "bytes": 86051,
+      "ms": 1629.6000000238419,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "round": 5,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=18.0, load;dur=1113.8, project;dur=330.9, encode;dur=13.0, serialize;dur=12.5, total;dur=1488.2"
+    },
+    {
+      "bytes": 1151,
+      "ms": 740.1000000238419,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "round": 5,
+      "scope": {
+        "node_key": null
+      },
+      "status": 200,
+      "timing": "identity;dur=21.2, load;dur=607.1, serialize;dur=57.0, total;dur=685.4"
+    },
+    {
+      "bytes": 72,
+      "ms": 720,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "round": 5,
+      "status": 200,
+      "timing": "identity;dur=28.0, load;dur=463.2, serialize;dur=30.9, total;dur=522.2"
+    },
+    {
+      "bytes": 3820,
+      "ms": 3921.800000011921,
+      "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+      "round": 5,
+      "status": 200,
+      "timing": null
+    }
+  ],
+  "state": "done"
+}

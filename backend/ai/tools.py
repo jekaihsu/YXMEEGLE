@@ -1,0 +1,604 @@
+"""Read tools reuse HTTP authorization and whitelist their model-visible fields."""
+from dataclasses import dataclass
+import re
+import math
+from typing import Callable
+from urllib.parse import quote
+import json
+
+import httpx
+from fastapi import HTTPException
+from .ledger import today
+
+
+class ReadDenied(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
+class ReadValidation(Exception):
+    def __init__(self, detail, field=None):
+        self.detail, self.field = detail, field
+
+
+class Reader:
+    def __init__(self, client, assignments_enabled=False, portfolio_enabled=False):
+        self.client = client
+        self.assignments_enabled = assignments_enabled
+        self.portfolio_enabled = portfolio_enabled
+
+    async def get(self, path, **params):
+        response = await self.client.get(path, params=params)
+        if response.status_code in (401, 403, 404):
+            message = '你沒有權限查看出勤資料' if path == '/api/people/attendance' else '找不到或沒有權限查看這個案件'
+            raise ReadDenied(message)
+        if response.status_code in (408, 409, 429):
+            response.raise_for_status()
+        if 400 <= response.status_code < 500:
+            try:
+                detail = response.json().get('detail', '查詢參數無效')
+            except (ValueError, AttributeError):
+                detail = '查詢參數無效'
+            raise ReadValidation(detail)
+        response.raise_for_status()
+        data = response.json()
+        from .read_provenance import observed
+        observed(path, data, params)
+        return data
+
+
+def pick(value, *keys):
+    return {k: value[k] for k in keys if k in value}
+
+
+def valid_case_id(value):
+    return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}', value) is not None and value not in ('.', '..')
+
+
+def case_path(args):
+    return '/api/projects/' + quote(args['case_id'], safe='')
+
+
+CASE_STATUS = {'pending': '尚未開始', 'in_progress': '進行中', 'pending_review': '待審核',
+               'paused': '暫停', 'completed': '已完成', 'source_conflict': '待核對'}
+NODE_ORDER = ('sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement')
+NODE_STATES = {'not_started': '未開始', 'pending': '待處理', 'in_progress': '進行中',
+               'pending_review': '待審核', 'awaiting_review': '待審核', 'completed': '已完成',
+               'skipped': '略過', 'approved_skipped': '略過', 'paused': '暫停',
+               **{s: s for s in ('未開始', '待處理', '進行中', '待審核', '已完成', '略過')}}
+
+
+def calendar_day(value):
+    from datetime import datetime, timedelta, timezone
+    if value is None or value == '' or type(value) not in (str, int, float):
+        return None
+    try:
+        if isinstance(value, (int, float)) or re.fullmatch(r'\d{13}', value.strip()):
+            stamp = datetime.fromtimestamp(float(value) / 1000, timezone.utc)
+        else:
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?\s*(?:[Zz]|[+-]\d{2}:?\d{2})?', value.strip()):
+                return None
+            stamp = datetime.fromisoformat(value.strip().upper().replace('Z', '+00:00'))
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone(timedelta(hours=8)))
+        return stamp.astimezone(timezone(timedelta(hours=8))).date().isoformat()
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def project_state(project, day):
+    source = project.get('portfolio_nodes', project.get('nodes')) or []
+    by_key = {n['key']: n for n in reversed(source)
+              if isinstance(n, dict) and isinstance(n.get('key'), str)}
+    states = [NODE_STATES.get(str(by_key.get(key, {}).get('status')), '狀態待確認') for key in NODE_ORDER]
+    finished = {'已完成', '略過'}
+    current = next((s for s in states if s not in finished), None)
+    if all(s in finished for s in states):
+        state = '已完成'
+    elif any(s not in finished | {'未開始', '待處理', '進行中', '待審核', '暫停'} for s in states):
+        state = '待核對'
+    elif all(s in {'未開始', '待處理'} for s in states):
+        state = '尚未開始'
+    else:
+        state = current if current in {'待審核', '暫停'} else '進行中'
+    tasks = [t for n in project.get('nodes') or [] if isinstance(n, dict)
+             for t in n.get('tasks') or [] if isinstance(t, dict)
+             and t.get('status') not in ('completed', 'superseded', 'approved_skipped')]
+    due, current_day = calendar_day(project.get('due_date')), calendar_day(day)
+    closed = (project.get('execution_status') or project.get('status')) == 'completed'
+    try:
+        overdue_tasks = float(project.get('overdue_tasks') or 0) > 0
+    except (ValueError, TypeError):
+        overdue_tasks = False
+    overdue = not closed and (overdue_tasks or bool(due and current_day and due < current_day) or
+        any(isinstance(t.get('due_date'), str) and t['due_date'][:10] < day[:10] for t in tasks))
+    return dict(state=state, overdue=bool(overdue))
+
+
+async def search(reader, args):
+    if reader.portfolio_enabled:
+        value = await reader.get('/api/projects', view='portfolio')
+        items = value['items']
+    else:
+        value = await reader.get('/api/workspace')
+        items = value['projects']
+    owner = None
+    if args['owner'] == 'me':
+        owner = (await reader.get('/api/session'))['user']['id']
+    q = args['query'].strip().casefold()
+    items = [{**p, **project_state(p, today())} for p in items]
+    items = [p for p in items if
+        (not q or q in ' '.join(str(p.get(k, '')) for k in ('code', 'name', 'client')).casefold()) and
+        (not owner or p.get('pm_id') == owner) and (not args['overdue'] or p['overdue'])]
+    counts = {key: sum(p['state'] == label for p in items) for key, label in CASE_STATUS.items()}
+    counts['other'] = len(items) - sum(counts.values())
+    total = len(items)
+    status = CASE_STATUS.get(args['status'], args['status'])
+    items = [p for p in items if status == 'all' or p['state'] == status]
+    items.sort(key=lambda p: (calendar_day(p.get('due_date')) or '9999', str(p.get('id', ''))))
+    offset = args['offset']
+    return dict(population_total=total, matched_total=len(items), offset=offset,
+                next_offset=offset+8 if offset+8 < len(items) else None,
+                items=items[offset:offset+8], status_counts=counts)
+
+
+
+async def progress(reader, args):
+    value = await reader.get(case_path(args) + '/progress')
+    detail = await reader.get('/api/case-detail/' + args['case_id'])
+    assignment_data = (await owners(reader, args, detail=detail))['assignments']
+    from .work_summary import summarize, add_sop
+    value['workflow_summary'] = summarize(detail, assignment_data if reader.assignments_enabled else None)
+    await add_sop(reader, args['case_id'], value['workflow_summary'])
+    return value
+
+
+async def owners(reader, args, *, detail=None):
+    if detail is None:
+        detail = await reader.get('/api/case-detail/' + args['case_id'])
+    assignments = {'unavailable': True}
+    if reader.assignments_enabled:
+        try:
+            assignments = await reader.get(case_path(args) + '/node-assignments')
+        except (ReadDenied, httpx.HTTPStatusError, httpx.TimeoutException):
+            pass
+    return {'detail': detail, 'assignments': assignments}
+
+
+async def attendance(reader, args):
+    from datetime import date
+    day = args['date'] or today()
+    try:
+        if args['range'] not in ('today', 'week') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+            raise ValueError()
+        target, current = date.fromisoformat(day), date.fromisoformat(today())
+        if abs((target.toordinal() - target.weekday()) - (current.toordinal() - current.weekday())) > 182:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ReadValidation('請使用有效 YYYY-MM-DD 或空字串（台北日期，限目前週前後26週）', ['params', 'date']) from None
+    return {'range': args['range'], 'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
+
+
+def search_notice(data):
+    count = len(data.get('cases', []))
+    total = data.get('matched_total', count)
+    if data.get('truncated') or data.get('next_offset') is not None:
+        return dict(truncated=True, note=f'符合 {total} 筆，本頁列出 {count} 筆，起點 {data.get("offset", 0)}')
+    return {}
+
+
+def project_search(value):
+    data = {**pick(value, 'as_of', 'matched_total', 'offset', 'next_offset'), 'population_total': value['population_total'], 'cases': [pick(p, 'id', 'code', 'name', 'state', 'overdue', 'pm_id', 'due_date')
+                                              for p in value['items']]}
+    data['status_counts'] = value.get('status_counts', {})
+    for p, source in zip(data['cases'], value['items']):
+        p['pm_id'] = source.get('pm_name') or (source.get('pm') if isinstance(source.get('pm'), str) else None) or ('ID: ' + str(source['pm_id']) if source.get('pm_id') else None)
+        p['status_label'] = p['state']
+    return {**data, **search_notice(data)}
+
+
+STAGE_STATES = {'done': '完成（依 basis 判斷是否為規則推導）', 'verified': '已確認', 'active': '有進行訊號', 'waiting': '等待前置條件', 'unknown': '無法確認', 'none': '無資料'}
+
+
+PRODUCTION = ('field', 'control', 'mapping', 'report')
+GAPS = {'no_confirmation', 'confirmation_status_conflict', 'fill_items_unknown', 'plan_unavailable',
+        'plan_truncated', 'items_unlinked', 'items_ambiguous', 'no_daily_linked', 'v3_ambiguous',
+        'v3_none', 'v3_no_activity', 'reports_cold', 'reports_unavailable', 'reports_disabled', 'reports_stale'}
+
+
+def project_progress(value):
+    return dict(project_id=value['project_id'], as_of=value.get('as_of'),
+                workflow_summary=value.get('workflow_summary'),
+                stages=[dict(**pick(s, 'key', 'label', 'state', 'basis'), state_label=STAGE_STATES.get(s['state'], '狀態待確認')) for s in value['stages']
+                        if s.get('key') in ('sales', 'pm', 'confirmation', *PRODUCTION)],
+                nodes={k: pick(value['production'][k].get('progress') or {},
+                               'items_done', 'items_total', 'percent', 'unknown_items', 'basis')
+                       for k in PRODUCTION if k in value['production']},
+                gaps=[pick(g, 'id', 'message_zh') for g in value['gaps'] if g['id'] in GAPS])
+
+
+def project_owners(value):
+    detail, assignments = value['detail'], value['assignments']
+    pm = detail['header']['pm']
+    unavailable = assignments.get('unavailable', False)
+    result = dict(project_id=detail['header']['details']['case_identity'],
+                pm=dict(id=pm.get('id'), name=pm['name'] or 'name_unavailable'),
+                node_assignment_status='node assignment data unavailable' if unavailable else 'available',
+                nodes=None if unavailable else [dict(key=n['key'], label=n['label'],
+                    owners=[pick(p, 'id', 'open_id', 'name') for p in n['owners']])
+                    for n in assignments.get('nodes', [])],
+                incomplete=unavailable or assignments.get('stale', False))
+    case_time = detail.get('sections', {}).get('overview', {}).get('source_time', {}).get('value')
+    if case_time:
+        result['as_of'] = case_time
+    if assignments.get('fetched_at'):
+        result['node_assignments_as_of'] = assignments['fetched_at']
+    return result
+
+
+ATTENDANCE_LABELS = {'unaccounted': '沒有打卡紀錄', 'late': '遲到', 'missing_punch': '缺卡',
+    'on_leave': '請假', 'trip': '出差', 'out': '外出', 'early_leave': '早退',
+    'exempt': '免打卡', 'supplemented': '補卡／修正'}
+
+
+def attendance_day(view, day):
+    from datetime import date
+    days = view.get('days', [])
+    column = days.index(day) if day in days else None
+    groups = {key: [] for key in ATTENDANCE_LABELS}
+    approvals = {key: set() for key in ('on_leave', 'trip', 'out')}
+    for kind, records in (('on_leave', view.get('leaves', [])), ('trip', view.get('trips', []))):
+        for record in records:
+            if record['start'] <= day <= record['end']:
+                approvals[record.get('kind', kind)].add(record['person_id'])
+    arrived, seen = 0, set()
+    working = date.fromisoformat(day).weekday() < 5 and day <= today()
+    for person in view.get('people', []):
+        if person.get('in_service') is not True or person['id'] in seen:
+            continue
+        seen.add(person['id'])
+        evidence = person.get('attendance', [])
+        label = evidence[column] if column is not None and column < len(evidence) else None
+        tokens = set((label or '').split('、'))
+        entry = pick(person, 'id', 'name')
+        explained = [key for key in ('on_leave', 'trip', 'out', 'exempt')
+                     if ATTENDANCE_LABELS[key] in tokens or person['id'] in approvals.get(key, set())]
+        arrived += int('到班' in tokens)
+        for key, text in ATTENDANCE_LABELS.items():
+            if key != 'unaccounted' and (text in tokens or key in explained):
+                groups[key].append(entry)
+        if label is None and not explained and working:
+            groups['unaccounted'].append(entry)
+    return dict(date=day, evaluated=working, counts=dict(arrived=arrived, **{k: len(v) for k, v in groups.items()}),
+                **groups)
+
+
+APPROVAL_GROUPS = ('on_leave', 'trip', 'out')
+
+
+def counted(item, key):
+    """Punch evidence only counts on evaluated days; approvals also count on future weekdays so planned leave stays visible."""
+    from datetime import date
+    return item['evaluated'] or (key in APPROVAL_GROUPS and date.fromisoformat(item['date']).weekday() < 5)
+
+
+def project_attendance(value):
+    day, view = value['day'], value['view']
+    period = value['range']
+    dates = view.get('days', []) if period == 'week' else [day]
+    daily = [attendance_day(view, d) for d in dates]
+    result = dict(range=period, date=day, as_of=view.get('as_of'),
+        incomplete=bool(view.get('incomplete') or view.get('status') != 'ok' or view.get('refreshing') or
+                        not dates or any(d not in view.get('days', []) for d in dates)),
+        truncated=False,
+        basis='no punch obligation or holiday calendar in the source; weekends excluded, public holidays not excluded',
+        unaccounted_meaning='今天為截至查詢時間尚無打卡紀錄，不代表實際出勤判定；過去日期為沒有打卡紀錄；未來日期不推算',
+        arrived_meaning='arrived 只計到班標籤，不代表實際在場人數')
+    if period == 'today':
+        result.update(daily[0])
+        for key in ATTENDANCE_LABELS:
+            if len(result[key]) > 50:
+                result[key] = result[key][:50]
+                result['truncated'] = True
+    else:
+        people = {}
+        for item in daily:
+            for key in ATTENDANCE_LABELS:
+                if not counted(item, key):
+                    continue
+                for person in item[key]:
+                    row = people.setdefault(person['id'], dict(**person, days={}))
+                    row['days'].setdefault(key, []).append(item['date'])
+        ranked = sorted(people.values(), key=lambda p: (-len(p['days'].get('unaccounted', [])),
+            -len(p['days'].get('late', [])), -len(p['days'].get('missing_punch', [])), p['id']))
+        ranking = [dict(**pick(p, 'id', 'name'), unaccounted_days=len(p['days']['unaccounted']))
+                   for p in ranked if p['days'].get('unaccounted')]
+        result.update(week_start=dates[0] if dates else None, week_end=dates[-1] if dates else None,
+            days=[pick(item, 'date', 'evaluated', 'counts') for item in daily],
+            summary={k: dict(person_days=sum(item['counts'][k] for item in daily if counted(item, k)),
+                            people=len({p['id'] for item in daily if counted(item, k) for p in item[k]})) for k in ATTENDANCE_LABELS},
+            top_unaccounted=ranking[:10], people=ranked[:50],
+            labelled_arrival_count=sum(item['counts']['arrived'] for item in daily if item['evaluated']))
+        for key in ('late', 'missing_punch'):
+            candidates = sorted((p for p in people.values() if p['days'].get(key)),
+                key=lambda p: (-len(p['days'][key]), p['id']))
+            result['top_' + key] = [dict(**pick(p, 'id', 'name'), days=len(p['days'][key])) for p in candidates[:10]]
+        result['truncated'] = len(ranked) > 50 or len(ranking) > 10 or any(
+            sum(bool(p['days'].get(key)) for p in people.values()) > 10 for key in ('late','missing_punch'))
+    # Preserve counts before trimming lists so partial names never change the headline.
+    while len(json.dumps(result, ensure_ascii=False)) > 6000:
+        result['truncated'] = True
+        if period == 'week':
+            candidates = [result[k] for k in ('people', 'top_unaccounted') if result[k]]
+        else:
+            candidates = [result[k] for k in reversed(ATTENDANCE_LABELS) if result[k]]
+        if not candidates:
+            break
+        candidates[0].pop()
+    return result
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    schema: dict
+    label: str
+    handler: Callable
+    projector: Callable
+
+
+async def execute(app, cookie, name, args):
+    if name not in TOOLS or name == 'show_display':
+        return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
+    return await execute_dataset(app, cookie, name, args)
+
+
+def display_table(title, columns, rows, data, **extra):
+    keys = [key for key, _ in columns[:8]]
+    def cell(value):
+        if type(value) is bool:
+            return '是' if value else '否'
+        if isinstance(value, str):
+            return value[:240]
+        if value is None or type(value) in (bool, int) or (type(value) is float and math.isfinite(value)):
+            return value
+        return None
+    return dict(kind='table', title=title, columns=[dict(key=k, label=v) for k, v in columns[:8]],
+                rows=[{k: cell(row.get(k)) for k in keys} for row in rows[:50]],
+                truncated=bool(data.get('truncated') or len(rows) > 50 or len(columns) > 8),
+                **({'caption': '截至 ' + str(data['as_of'])[:16].replace('T', ' ')} if data.get('as_of') else {}), **extra)
+
+
+def display_chart(title, points, data, **extra):
+    safe_points = [dict(label=str(p['label'])[:240], value=p['value']) for p in points
+                   if type(p['value']) in (int, float) and math.isfinite(p['value'])]
+    return dict(kind='chart', title=title, variant='bars', points=safe_points[:12],
+                truncated=bool(data.get('truncated') or len(points) > 12 or len(safe_points) != len(points)),
+                **({'caption': '截至 ' + str(data['as_of'])[:16].replace('T', ' ')} if data.get('as_of') else {}), **extra)
+
+
+def display_search(data):
+    data = {**data, **search_notice(data)}
+    extra = {'note': data['note']} if data.get('note') else {}
+    return [display_table('案件搜尋結果', [('code', '案號'), ('name', '案名'), ('status_label', '案件狀態'),
+        ('pm_id', 'PM'), ('due_date', '交期')], data.get('cases', []), data, **extra)]
+
+
+def display_owners(data):
+    pm = data.get('pm', {})
+    rows = [dict(role='PM', owner=pm.get('name') if pm.get('name') != 'name_unavailable' else pm.get('id'))]
+    for node in data.get('nodes') or []:
+        for person in node['owners']:
+            rows.append(dict(role=node['label'], owner=person.get('name') or person.get('id') or person.get('open_id')))
+    extra = {'note': '節點指派資料無法取得'} if data.get('nodes') is None else {}
+    return [display_table('案件負責人', [('role', '職務或節點'), ('owner', '負責人')], rows, data, **extra)]
+
+
+def display_progress(data):
+    points = []
+    bases = set()
+    unknown = 0
+    for stage in data.get('stages', []):
+        node = data.get('nodes', {}).get(stage['key'], {})
+        percent = 100 if stage['state'] == 'done' else node.get('percent')
+        if percent is None:
+            unknown += 1
+            continue
+        points.append(dict(label=stage['label'][:240], value=float(percent)))
+        bases.add(stage['basis'])
+    basis = '、'.join(text for key, text in [('rule', '規則推算'), ('source', '來源證據')] if key in bases)
+    headline = dict(label=f'整體（已知階段平均；{basis or "無資料基礎"}；另有 {unknown} 個階段進度未知）',
+                    value=f'{sum(p["value"] for p in points) / len(points):.1f}' if points else '未知')
+    note = '；'.join(g['message_zh'] for g in data.get('gaps', []) if g.get('message_zh'))
+    charts = [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline,
+                          **({'note': note} if note else {}))]
+    summary = data.get('workflow_summary')
+    if summary:
+        charts.append(display_table('全部流程節點', [('label', '節點'), ('status', '狀態'), ('tasks_done', '完成任務'), ('tasks_total', '全部任務'), ('sop_tasks_done', 'SOP 完成'), ('sop_tasks_total', 'SOP 全部'), ('basis', '依據')], [{**row, 'basis': {'workflow_nodes': '工作流程',
+                'node_assignments.derived_status': '節點指派狀態', 'sop_tasks.case_counts': 'SOP 檢查清單',
+                'sop_tasks': 'SOP 檢查清單'}.get(row.get('basis'), '來源待確認')}
+                for row in summary.get('rows', [])], data, note=summary.get('unavailable', '')))
+    return charts
+
+
+def display_attendance(data):
+    note = data.get('unaccounted_meaning', '')
+    if data.get('incomplete'):
+        note += '；資料不完整'
+    if data.get('range') == 'week':
+        days = [item['date'] for item in data.get('days', [])]
+        excluded = {item['date'] for item in data.get('days', []) if not item.get('evaluated', True)}
+        if excluded:
+            note += '；' + '、'.join(day + ' 不評估' for day in sorted(excluded))
+        codes = dict(unaccounted='無紀錄', late='遲', missing_punch='卡', on_leave='假', trip='出',
+                     out='外', exempt='免', early_leave='早', supplemented='補')
+        rows = [dict(name=p.get('name') or p['id'], **{day: '不評估' if day in excluded else '／'.join(codes[k]
+            for k, dates in p['days'].items() if day in dates) or None for day in days}) for p in data.get('people', [])]
+        caption = f"{data.get('week_start')} 至 {data.get('week_end')}"
+        if data.get('as_of'):
+            caption += '；截至 ' + str(data['as_of'])
+        result = [display_table('每週出勤', [('name', '同事')] + [(d, d[5:]) for d in days], rows, data, note=note),
+                  display_chart('每日沒有打卡紀錄', [dict(label=item['date'], value=item['counts']['unaccounted'])
+                      for item in data.get('days', []) if item.get('evaluated', True)], data, unit='人', note=note)]
+        for display in result:
+            display['caption'] = caption
+        return result
+    counts = data.get('counts', {})
+    points = [dict(label='到班', value=counts.get('arrived', 0))]
+    people = {}
+    for key, label in ATTENDANCE_LABELS.items():
+        points.append(dict(label=label, value=counts.get(key, 0)))
+        for person in data.get(key, []):
+            row = people.setdefault(person['id'], dict(name=person.get('name') or person['id'], state=[]))
+            row['state'].append(label)
+    rows = [dict(name=p['name'], state='、'.join(p['state'])) for p in people.values()]
+    return [display_chart('單日出勤標籤', points, data, unit='人', note=note),
+            display_table('單日非到班標籤', [('name', '同事'), ('state', '狀態')], rows, data, note=note)]
+
+
+DISPLAY_PROJECTORS = {'search_cases': display_search, 'case_owners': display_owners,
+                      'case_progress': display_progress, 'attendance_today': display_attendance}
+
+
+def displays(name, result):
+    return DISPLAY_PROJECTORS[name](json.loads(result))
+
+
+def display_options(name, result):
+    """Candidate displays for one tool result, keyed by short ids the model can pick from."""
+    return displays(name, result)
+
+
+def describe_options(options, first_id):
+    described = []
+    for offset, item in enumerate(options):
+        entry = dict(id=f'd{first_id + offset}', kind=item['kind'], title=item['title'])
+        if item['kind'] == 'table':
+            entry.update(columns=[c['key'] for c in item['columns']], rows=len(item['rows']))
+        else:
+            entry.update(points=len(item['points']))
+        described.append(entry)
+    return described
+
+
+def select_display(options, args):
+    """Validate a show_display call against the server-built options; returns (display, error)."""
+    if not isinstance(args, dict) or set(args) != {'display_id', 'columns', 'max_rows'}:
+        return None, '參數錯誤'
+    item = options.get(args['display_id']) if isinstance(args['display_id'], str) else None
+    cols, limit = args['columns'], args['max_rows']
+    if item is None:
+        return None, '找不到這個 display_id'
+    if not isinstance(cols, list) or not all(isinstance(c, str) for c in cols) or type(limit) is not int or limit < 0:
+        return None, '參數錯誤'
+    item = json.loads(json.dumps(item))
+    limit = min(limit or 50, 50)
+    if item['kind'] == 'table':
+        if cols:
+            known = {c['key']: c for c in item['columns']}
+            if any(c not in known for c in cols):
+                return None, '欄位不存在：可用欄位為 ' + '、'.join(known)
+            item['columns'] = [known[c] for c in dict.fromkeys(cols)]
+            item['rows'] = [{c['key']: row.get(c['key']) for c in item['columns']} for row in item['rows']]
+        if len(item['rows']) > limit:
+            item['rows'] = item['rows'][:limit]
+            item['truncated'] = True
+    elif len(item['points']) > limit:
+        item['points'] = item['points'][:limit]
+        item['truncated'] = True
+    return item, None
+
+
+TOOLS = {
+    'list_datasets': ToolSpec(dict(type='object',properties={},required=[],additionalProperties=False), '列出可查資料', None, None),
+    'describe_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string')},required=['id'],additionalProperties=False), '查看資料參數與欄位', None, None),
+    'query_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string'),'params':dict(type='object',additionalProperties=True),
+        'limit':dict(type='integer',minimum=1,maximum=50),'offset':dict(type='integer',minimum=0,maximum=100000)},
+        required=['id','params'],additionalProperties=False), '查詢資料', None, None),
+    'show_display': ToolSpec(dict(type='object',properties={'result_id':dict(type='string'),
+        'kind':dict(type='string',enum=['table','bar','line','pie','stat']), 'columns':dict(type='array',items=dict(type='string')),
+        'mapping':dict(type='object',properties={k:dict(type='string') for k in ('x','y','series','label','value')},additionalProperties=False),
+        'max_rows':dict(type='integer',minimum=1,maximum=50)},required=['result_id','kind','columns','mapping','max_rows'],additionalProperties=False),
+        '依問題選表格、比較圖、趨勢圖或單值', None, None),
+}
+
+
+async def execute_dataset(app, cookie, name, args):
+    from .datasets import index, describe, query, REGISTRY
+    from pydantic import ValidationError
+    try:
+        spec = TOOLS[name]
+        if not isinstance(args, dict) or not set(spec.schema['required']) <= set(args) or set(args) - set(spec.schema['properties']):
+            raise ValueError()
+        if name == 'query_dataset':
+            args = {'limit':20, 'offset':0, **args}
+        if name == 'list_datasets':
+            return json.dumps(dict(datasets=index()),ensure_ascii=False), False
+        if not isinstance(args['id'], str) or args['id'] not in REGISTRY:
+            raise ValueError()
+        if name == 'describe_dataset':
+            return json.dumps(describe(args['id']),ensure_ascii=False), False
+        for field, low, high in (('limit',1,50),('offset',0,100000)):
+            if type(args[field]) is not int or not low <= args[field] <= high:
+                raise ReadValidation(f'必須為 {low} 至 {high} 的整數', [field])
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://ai.internal',
+            headers={'cookie':cookie},timeout=15) as client:
+            result = await query(Reader(client,str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED','false')).lower()=='true',
+                str(app.state.cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'),args['id'],args['params'],args['limit'],args['offset'])
+        return json.dumps(result,ensure_ascii=False),False
+    except HTTPException as exc:
+        return json.dumps(dict(error='參數錯誤',detail=exc.detail),ensure_ascii=False),True
+    except ReadValidation as exc:
+        return json.dumps(dict(error='參數錯誤',detail=exc.detail, **({'field':exc.field} if exc.field else {})),ensure_ascii=False),True
+    except ValidationError as exc:
+        error = exc.errors(include_url=False, include_input=False)[0]
+        return json.dumps(dict(error='工具參數錯誤', field=['params', *error['loc']], detail=error['msg']),ensure_ascii=False),True
+    except ReadDenied:
+        return json.dumps(dict(error='找不到或沒有權限查看資料',code='ai_forbidden'),ensure_ascii=False),True
+    except (ValueError, TypeError, KeyError, ValidationError):
+        return json.dumps(dict(error='工具參數錯誤'),ensure_ascii=False),True
+    except Exception:
+        return json.dumps(dict(error='資料暫時無法讀取，請稍後重試',retryable=True),ensure_ascii=False),True
+
+
+def result_display(results, args):
+    from pydantic import BaseModel, ConfigDict, Field, ValidationError
+    from typing import Literal
+    class Display(BaseModel):
+        model_config = ConfigDict(extra='forbid',strict=True)
+        result_id: str
+        kind: Literal['table','bar','line','pie','stat']
+        columns: list[str] = Field(max_length=8)
+        mapping: dict[str,str]
+        max_rows: int = Field(ge=1,le=50)
+    try:
+        request = Display.model_validate(args)
+        data = results[request.result_id]
+        known = {c['name']: c for c in data['columns']}
+        if set(request.mapping)-{'x','y','series','label','value'} or any(v not in known for v in request.mapping.values()):
+            raise ValueError()
+        cols = request.columns or list(known)[:8]
+        if any(c not in known for c in cols):
+            raise ValueError()
+        from .datasets import REGISTRY
+        dataset = REGISTRY.get(data['dataset_id'])
+        title = dataset.title if dataset else data['dataset_id']
+        if request.kind == 'table':
+            return display_table(title,[(k,known[k]['label']) for k in cols],data['rows'][:request.max_rows],
+                {**data,'truncated':data['truncated'] or len(data['rows'])>request.max_rows}),None
+        label = request.mapping.get('x') or request.mapping.get('label')
+        value = request.mapping.get('y') or request.mapping.get('value')
+        if value is None or known[value]['type'] != 'number' or request.kind != 'stat' and label is None:
+            raise ValueError()
+        cap = min(request.max_rows, 1 if request.kind == 'stat' else 12 if request.kind == 'pie' else 24)
+        rows = data['rows'][:cap]
+        if any(type(r.get(value)) not in (int,float) or not math.isfinite(r[value]) for r in rows):
+            raise ValueError()
+        if request.kind == 'pie' and any(r[value]<0 for r in rows):
+            raise ValueError()
+        result = dict(kind=request.kind,title=title,result_id=request.result_id,
+            points=[dict(label=str(r.get(label,'')),value=r[value],
+                **({'series':r.get(request.mapping['series'])} if 'series' in request.mapping else {})) for r in rows],
+            truncated=data['truncated'] or len(data['rows'])>cap,as_of=data['as_of'],limitations=data['limitations'])
+        return result,None
+    except (ValueError,TypeError,KeyError,ValidationError):
+        return None,'顯示參數或欄位錯誤'

@@ -1,0 +1,119 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "tables": [
+      {
+        "id": "tblENZvYAya93Twa",
+        "name": "報價總表",
+        "records_count": 423,
+        "rev": 562
+      },
+      {
+        "id": "tblQeQSQXGUR1FZR",
+        "name": "合約明細工項",
+        "records_count": 573,
+        "rev": 782
+      },
+      {
+        "id": "tblvV4X1kNVQisVj",
+        "name": "工程確認單",
+        "records_count": 106,
+        "rev": 432
+      },
+      {
+        "id": "tbllOfzO7ehuVwMB",
+        "name": "合約填報工項",
+        "records_count": 705,
+        "rev": 936
+      },
+      {
+        "id": "tbl27u3CgMYiuDrC",
+        "name": "外業營業額",
+        "records_count": 1006,
+        "rev": 18
+      },
+      {
+        "id": "tblw1tCqJgdsAJSV",
+        "name": "控制營業額",
+        "records_count": 992,
+        "rev": 63
+      },
+      {
+        "id": "tblc1YFu8Z65XQ9C",
+        "name": "圖資營業額",
+        "records_count": 997,
+        "rev": 30
+      },
+      {
+        "id": "tblR8tjUPNhXeEGC",
+        "name": "報告營業額",
+        "records_count": 1003,
+        "rev": 42
+      },
+      {
+        "id": "tbl8buCuYC2mvo31",
+        "name": "下包廠商",
+        "records_count": 5,
+        "rev": 0
+      },
+      {
+        "id": "tblX8H6MsfvidZXK",
+        "name": "案件類型選項",
+        "records_count": 46,
+        "rev": 0
+      },
+      {
+        "id": "tbl4fmZN6cBB7u1d",
+        "name": "業主連絡資訊表",
+        "records_count": 5,
+        "rev": 0
+      },
+      {
+        "id": "tblkW1JmfXSQkDDd",
+        "name": "行政區對照表",
+        "records_count": 368,
+        "rev": 4
+      },
+      {
+        "id": "tblTr7ImTbRlPlvF",
+        "name": "所屬報價版本",
+        "records_count": 5,
+        "rev": 0
+      },
+      {
+        "id": "tbljPSUkzEQFYx73",
+        "name": "使用儀器明細表",
+        "records_count": 9,
+        "rev": 0
+      },
+      {
+        "id": "tblRLkluSieXBn8i",
+        "name": "工程確認單費用明細表",
+        "records_count": 5,
+        "rev": 0
+      },
+      {
+        "id": "tblmaZ6NSpLxnKj6",
+        "name": "確認單參數",
+        "records_count": 1,
+        "rev": 6
+      },
+      {
+        "id": "tblgZZe3CVfONiSH",
+        "name": "人力成本方案",
+        "records_count": 17,
+        "rev": 19
+      }
+    ],
+    "total": 17
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.98",
+      "message": "lark-cli 1.0.98 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "keyboard": {
+    "before": {
+      "history": 4,
+      "scroll": 400
+    },
+    "after": {
+      "history": 4,
+      "scroll": 400
+    },
+    "scrollCalls": 0,
+    "focused": "step",
+    "url": "#view=project&project=p1&node=control"
+  },
+  "assignment": {
+    "row": "待指派 · 現場紀錄核對合成 林安娜 · 待處理 · 2026-10-10逾期控制 · Lark 任務改派",
+    "notice": [
+      "已儲存變更。",
+      "3 項符合"
+    ]
+  },
+  "aliases": [
+    {
+      "width": 1280,
+      "tab": "overview",
+      "dialog": false,
+      "targetTop": 195.1953125,
+      "scrollY": 0,
+      "overflow": 0
+    },
+    {
+      "width": 1280,
+      "tab": "progress",
+      "dialog": false,
+      "targetTop": 120.109375,
+      "scrollY": 1247,
+      "overflow": 0
+    },
+    {
+      "width": 1280,
+      "tab": "flow",
+      "dialog": false,
+      "targetTop": 120.03125,
+      "scrollY": 943.5,
+      "overflow": 0
+    },
+    {
+      "width": 1280,
+      "tab": "tasks",
+      "dialog": false,
+      "targetTop": 120.0703125,
+      "scrollY": 2428,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "tab": "overview",
+      "dialog": false,
+      "targetTop": 179.1953125,
+      "scrollY": 0,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "tab": "progress",
+      "dialog": false,
+      "targetTop": 120.109375,
+      "scrollY": 3717.5,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "tab": "flow",
+      "dialog": false,
+      "targetTop": 119.75,
+      "scrollY": 3255.5,
+      "overflow": 0
+    },
+    {
+      "width": 390,
+      "tab": "tasks",
+      "dialog": false,
+      "targetTop": 120,
+      "scrollY": 5646.5,
+      "overflow": 0
+    }
+  ],
+  "mobileOverview": {
+    "width": 390,
+    "overflow": 0,
+    "heading": 179.1953125,
+    "scrollY": 0,
+    "tabs": 381.9765625
+  },
+  "states": [
+    {
+      "state": "loading",
+      "width": 1280,
+      "overflow": 0
+    },
+    {
+      "state": "loading",
+      "width": 390,
+      "overflow": 0,
+      "loading": "true"
+    },
+    {
+      "state": "legacy",
+      "width": 1280,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "控制"
+    },
+    {
+      "state": "legacy",
+      "width": 390,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "控制"
+    },
+    {
+      "state": "completed",
+      "width": 1280,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "外業",
+      "completed": 100
+    },
+    {
+      "state": "completed",
+      "width": 390,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "外業",
+      "completed": 100
+    },
+    {
+      "state": "ready",
+      "width": 1280,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "外業",
+      "completed": 33
+    },
+    {
+      "state": "ready",
+      "width": 390,
+      "overflow": 0,
+      "loading": "false",
+      "selected": "外業",
+      "completed": 33
+    }
+  ]
+}

@@ -70,6 +70,10 @@ def _started(task):
     return bool(task.get('started_at') or task.get('completed_at') or task.get('status') not in ('pending',None))
 
 
+def _manual(task,prior):
+    return bool(task.get('due_date') and (not prior or task['due_date']!=prior.get('calculated_due')))
+
+
 def _materialize(ws,p,record,user):
     from .operations import add_workdays, digest, invalidate
     created=[]
@@ -77,6 +81,9 @@ def _materialize(ws,p,record,user):
         node_key=record.get('node_key') if node_key=='$group' else node_key
         node=next((n for n in p['nodes'] if n['key']==node_key),None)
         require(node is not None,'SOP 規則所需節點不存在',409)
+        from .features import task_enabled
+        scope = 'post_completion_followup' if node.get('status')=='completed' else None
+        if not task_enabled(ws, {'sop_rule_id': rule_id, 'completion_scope': scope}): continue
         binding=record['task_bindings'].get(rule_id)
         followups=p.get('sop_followups',[])
         task=find(node['tasks'],binding,'期限對應任務') if binding else next((t for t in node['tasks']+followups if t.get('sop_rule_id')==rule_id and t.get('sop_event_stream')==record['stream_id']),None)
@@ -95,7 +102,7 @@ def _materialize(ws,p,record,user):
             prior=task.get('sop_due_provenance')
             if prior!=provenance or task.get('due_date')!=calculated:
                 task.setdefault('sop_deadline_history',[]).append(dict(due_date=task.get('due_date'),provenance=deepcopy(prior),at=now()))
-            manual=bool(task.get('due_date') and (not prior or task['due_date']!=prior.get('calculated_due')))
+            manual=_manual(task,prior)
             if task.get('due_date')!=calculated and (_fixed(task) or _started(task) or manual):
                 for conflict in p['sop_deadline_conflicts']:
                     if conflict['task_id']==task['id'] and conflict['status']=='pending': conflict['status']='superseded'
@@ -126,6 +133,8 @@ def apply_sop_deadline(ws,user,body):
     if action not in ('sop_event_record','sop_deadline_resolve','sop_followup_complete'): return False
     active_user(ws,user['id']); p=find(ws['projects'],body.get('project_id'),'案件')
     if action=='sop_followup_complete':
+        from .features import require_feature
+        require_feature(ws.get('features',{}),'routines')
         from .case_cutover import require_execution
         require_execution(ws,p)
         task=find(p.get('sop_followups',[]),data.get('id'),'完成後追蹤工作')

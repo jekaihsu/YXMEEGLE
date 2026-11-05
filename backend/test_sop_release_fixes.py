@@ -2,7 +2,7 @@ from copy import deepcopy
 from unittest.mock import patch
 import pytest
 from fastapi import HTTPException
-from .seed import seed
+from .test_ux_disabled import enabled_seed as seed
 from .policy import upgrade, template
 from .operations import apply_operation
 from .sources import project_nodes

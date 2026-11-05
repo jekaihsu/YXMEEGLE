@@ -1,0 +1,7 @@
+{
+  "url": "http://127.0.0.1:8768/?verify=final#view=company",
+  "boot_cockpit_requests": 1,
+  "revisit_cockpit_requests": 1,
+  "retained_snapshot_label": "上次讀取快照，尚未重新查詢",
+  "scope": "built small demo, not company-scale benchmark"
+}

@@ -172,6 +172,7 @@ def test_demo_never_uses_isolated_live_connection(isolated):
 
 
 def test_test_digest_worker_never_sends_real_notification(isolated):
+    isolated.cfg['FEATURE_ROUTINES']='true'
     x=isolated; state=x.read(); actor=next(u for u in state['users'] if u['id']=='u-manager')
     queue(state,'digest',actor,{'recipients':[actor['id']],'text':'mock-only'},'digest-test'); x.save(state)
     x.worker.run_one(x.wid)

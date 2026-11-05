@@ -47,6 +47,8 @@ def locate(state,payload):
 def enqueue_mentions(ws,actor,p,n,t,comment,demo):
     from .operations import queue
     comment['notifications']=[]
+    from .features import task_enabled
+    if t and not task_enabled(ws,t): return
     app_id=ws.get('people_directory_status',{}).get('app_id') or actor.get('identity_app_id')
     for recipient in comment['mentions']:
         person=find(ws['users'],recipient,'標註同事')
@@ -59,6 +61,9 @@ def enqueue_mentions(ws,actor,p,n,t,comment,demo):
 
 
 def check_notification(state,actor,payload,cfg,simulated):
+    from .features import guard_task_scope
+    if payload.get('task_id'):
+        guard_task_scope(state,payload.get('project_id'),payload.get('node_id'),{payload['task_id']})
     p,comment=locate(state,payload)
     recipient=find(state['users'],payload['recipient_id'],'標註同事')
     require(comment['author_id']==actor['id'] and recipient['id'] in comment.get('mentions',[]),'通知與原留言人員不符',403)

@@ -1,0 +1,25 @@
+{
+  "samples": [
+    {
+      "round": 0,
+      "usefulMs": 21.400000035762787
+    },
+    {
+      "round": 1,
+      "usefulMs": 22.899999976158142
+    },
+    {
+      "round": 2,
+      "usefulMs": 23
+    },
+    {
+      "round": 3,
+      "usefulMs": 21.599999964237213
+    },
+    {
+      "round": 4,
+      "usefulMs": 22.599999964237213
+    }
+  ],
+  "state": "done"
+}

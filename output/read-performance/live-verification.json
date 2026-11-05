@@ -1,0 +1,59 @@
+{
+  "merged_sha": "06b85dd07df3fdb2188496aff9d6649923745756",
+  "running_deployment_id": "6ad805a624d8f4b41eb8735f",
+  "origin": "https://yongxiang-projects-20260925.zeabur.app",
+  "source_files_verified": 196,
+  "frontend_assets_match_local_build": true,
+  "read_flags_restored_to_original": true,
+  "warm_api": {
+    "/api/projects/src-604c50ce7422171b35dc": {
+      "samples": 5,
+      "median_ms": 94.4,
+      "p95_ms": 121,
+      "statuses": [
+        404
+      ],
+      "bytes": 43
+    },
+    "/api/projects/src-604c50ce7422171b35dc/sop-assignees": {
+      "samples": 5,
+      "median_ms": 80.7,
+      "p95_ms": 127.3,
+      "statuses": [
+        403
+      ],
+      "bytes": 63
+    },
+    "/api/projects/src-604c50ce7422171b35dc/sop-tasks": {
+      "samples": 5,
+      "median_ms": 95.8,
+      "p95_ms": 116.6,
+      "statuses": [
+        403
+      ],
+      "bytes": 63
+    },
+    "/api/session": {
+      "samples": 5,
+      "median_ms": 169.8,
+      "p95_ms": 403.1,
+      "statuses": [
+        200
+      ],
+      "bytes": 31284
+    },
+    "/api/settings/overview": {
+      "samples": 5,
+      "median_ms": 692.1,
+      "p95_ms": 718.6,
+      "statuses": [
+        200
+      ],
+      "bytes": 3507
+    }
+  },
+  "project_acceptance_passed": false,
+  "sop_positive_reader_verified_on_live": false,
+  "real_capabilities_modified": false,
+  "recovery_upload_canceled": true
+}

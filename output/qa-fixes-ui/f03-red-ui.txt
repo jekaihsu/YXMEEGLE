@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /無法更新工程證據/. Input:
+
+''
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-work-items-ui.mjs:30:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '',
+  expected: /無法更新工程證據/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v26.9.0

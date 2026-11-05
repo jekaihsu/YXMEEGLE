@@ -1,2 +1,13 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#f8f9fc"/><title>詠翔 · 專案工作台</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)"/><meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)"/><script>try{var a=JSON.parse(localStorage.getItem("yx.appearance")),r=document.documentElement;if(a&&(a.theme==="light"||a.theme==="dark"))r.setAttribute("data-theme",a.theme);if(a&&["s","l","xl"].indexOf(a.text)>-1)r.setAttribute("data-text",a.text)}catch(e){}</script><title>詠翔 · 專案工作台</title></head><body><div id="root"></div><script>
+window.yxBrowserSupported=false;
+try{
+ var probe=document.createElement('style');
+ probe.textContent='@layer browser-floor {}';document.head.appendChild(probe);
+ var layers=probe.sheet&&probe.sheet.cssRules.length===1&&probe.sheet.cssRules[0].cssText.indexOf('@layer')===0;
+ probe.remove();
+ window.yxBrowserSupported=!!(layers&&window.CSS&&CSS.supports('color','color-mix(in srgb, black, white)'));
+}catch(e){}
+document.documentElement.setAttribute('data-browser-supported',String(window.yxBrowserSupported));
+if(!window.yxBrowserSupported){var root=document.getElementById('root');root.textContent='請更新瀏覽器（建議 Chrome 111 或 Safari 16.4 以上）';root.setAttribute('role','alert');root.style.cssText='padding:24px;font:18px/1.6 sans-serif;color:#222;background:#fff'}
+</script><script type="module" src="/src/main.tsx"></script></body></html>

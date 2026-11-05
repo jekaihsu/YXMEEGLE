@@ -1,0 +1,3 @@
+PASS scoped panel reads. Coalescing, one-reader cancellation, scope isolation and session invalidation.
+PASS project table. Fifty-row default, overdue and deadline order, source status and loaded population.
+PASS UX table sort. Numeric and date orders, Taipei calendar days, nulls, stable item order and population labels.

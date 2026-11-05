@@ -1,0 +1,37 @@
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.dispatch-fixes-test.mjs:811:21)
+✔ F4 read_failed snapshot retains counts and retry notice (3.484958ms)
+✔ F5 inactive timed overlap counts as conflict (0.298083ms)
+✔ F9 midnight end is exclusive in day list and person grid (0.142375ms)
+✔ F9 snapshot age preserves server age (0.881458ms)
+✔ F11 accessible cards include crew, status and unassigned state (21.839875ms)
+✔ F11 snapshot age stays outside status live region (5.382209ms)
+✔ F10 member navigation hides dispatch while PM company navigation shows it (3.52925ms)
+✔ F4 cold HTTP 200 read_failed board is displayed (18.077791ms)
+✔ F7 polling ignores stable partial joins, continues pending joins, caps time and cancels switches (23.038ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78.057584

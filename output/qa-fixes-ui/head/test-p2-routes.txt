@@ -1,0 +1,7 @@
+FAIL wiring: five hash views, left navigation entries only for the two list pages, legacy views stay reachable
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\{view:'overview',label:'管理總覽'/. Input:
+
+  "import {canReadDispatch} from './dispatchAccess';\n" +
+    "import { CalendarDays, ChevronRight, Loader2, Menu, TriangleAlert, X } from 'lucide-react';\n" +
+    "import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';\n" +
+    "import { ClipboardList, FileBarChart, Clock3, FolderOpen, Gauge, GitBranch, LayoutDashboard, ListTodo, PanelLeftClose, Settings2 } from 'lucide-react';\n" +

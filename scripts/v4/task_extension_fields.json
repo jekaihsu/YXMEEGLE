@@ -1,0 +1,197 @@
+[
+ {
+  "name": "專案編號",
+  "type": "text",
+  "description": "SOP R1 T extension: stable project_id (case_id alias). Product-owned."
+ },
+ {
+  "name": "工程確認單",
+  "type": "link",
+  "link_table": "tblmSQrcCs9vPQZx",
+  "bidirectional": false,
+  "description": "SOP R1 T extension: stable case binding. One-way link; no reverse field on 工程確認單."
+ },
+ {
+  "name": "任務階段",
+  "type": "select",
+  "multiple": false,
+  "options": [
+   {
+    "name": "接案前"
+   },
+   {
+    "name": "正式"
+   }
+  ],
+  "description": "SOP R1 T extension: phase intake vs formal"
+ },
+ {
+  "name": "任務種類",
+  "type": "select",
+  "multiple": false,
+  "options": [
+   {
+    "name": "義務"
+   },
+   {
+    "name": "執行"
+   }
+  ],
+  "description": "SOP R1 T extension: obligation vs execution grain"
+ },
+ {
+  "name": "工作包編號",
+  "type": "text",
+  "description": "SOP R1 T extension: package_id"
+ },
+ {
+  "name": "父義務",
+  "type": "link",
+  "link_table": "tblsoyGcC6K5AipF",
+  "bidirectional": false,
+  "description": "SOP R1 T extension: parent obligation of an execution child"
+ },
+ {
+  "name": "範圍版本",
+  "type": "number",
+  "style": {
+   "type": "plain",
+   "precision": 0
+  },
+  "description": "SOP R1 T extension: scope_version"
+ },
+ {
+  "name": "規則版本",
+  "type": "text",
+  "description": "SOP R1 T extension: template/rule version"
+ },
+ {
+  "name": "證據版本",
+  "type": "text",
+  "description": "SOP R1 T extension: evidence version"
+ },
+ {
+  "name": "預定開始",
+  "type": "datetime",
+  "style": {
+   "format": "yyyy/MM/dd HH:mm"
+  },
+  "description": "SOP R1 T extension: planned_start_at, [start,end) interval"
+ },
+ {
+  "name": "預定結束",
+  "type": "datetime",
+  "style": {
+   "format": "yyyy/MM/dd HH:mm"
+  },
+  "description": "SOP R1 T extension: planned_end_at, exclusive end"
+ },
+ {
+  "name": "預估人時",
+  "type": "number",
+  "style": {
+   "type": "plain",
+   "precision": 1
+  },
+  "description": "SOP R1 T extension: estimated person-hours (not the deadline)"
+ },
+ {
+  "name": "組員",
+  "type": "user",
+  "multiple": true,
+  "description": "SOP R1 T extension: crew; 負責人 is the primary owner and counts once"
+ },
+ {
+  "name": "使用儀器",
+  "type": "link",
+  "link_table": "tblg3Fo23T6Gos6S",
+  "bidirectional": false,
+  "description": "SOP R1 T extension: required instruments (one-way)"
+ },
+ {
+  "name": "使用車輛",
+  "type": "link",
+  "link_table": "tblTQv8l5ntnbwyp",
+  "bidirectional": false,
+  "description": "SOP R1 T extension: required vehicles (one-way)"
+ },
+ {
+  "name": "排程狀態",
+  "type": "select",
+  "multiple": false,
+  "options": [
+   {
+    "name": "未分配"
+   },
+   {
+    "name": "草稿"
+   },
+   {
+    "name": "待核定"
+   },
+   {
+    "name": "發布中"
+   },
+   {
+    "name": "已確認"
+   },
+   {
+    "name": "衝突"
+   },
+   {
+    "name": "已取消"
+   }
+  ],
+  "description": "SOP R1 T extension: planning_status"
+ },
+ {
+  "name": "排程版本",
+  "type": "number",
+  "style": {
+   "type": "plain",
+   "precision": 0
+  },
+  "description": "SOP R1 T extension: planning revision"
+ },
+ {
+  "name": "命令編號",
+  "type": "text",
+  "description": "SOP R1 T extension: last command id (idempotency)"
+ },
+ {
+  "name": "讀回時間",
+  "type": "datetime",
+  "style": {
+   "format": "yyyy/MM/dd HH:mm"
+  },
+  "description": "SOP R1 T extension: last canonical read-back"
+ },
+ {
+  "name": "成果接受狀態",
+  "type": "select",
+  "multiple": false,
+  "options": [
+   {
+    "name": "草稿"
+   },
+   {
+    "name": "審核中"
+   },
+   {
+    "name": "已接受"
+   },
+   {
+    "name": "已退回"
+   },
+   {
+    "name": "已取代"
+   }
+  ],
+  "description": "SOP R1 T extension: delivery acceptance summary (Ledger owns the decision)"
+ },
+ {
+  "name": "接受摘要",
+  "type": "text",
+  "description": "SOP R1 T extension: acceptance receipt summary"
+ }
+]

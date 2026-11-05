@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import fs from 'node:fs/promises';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=admin'});
+for(const k of ['window','document','location','sessionStorage','HTMLElement','Event','Node','MutationObserver'])globalThis[k]=dom.window[k];
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const bundle=await build({stdin:{contents:"export {AttendanceWorkSchedules} from './src/AttendanceWorkSchedules';export {ReportLinkReview} from './src/ReportLinkReview';export {dispatchGapLabel,jobReasonLabel} from './src/adminDispatchLabels';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const path=new URL('./.live4a-test.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
+let AttendanceWorkSchedules,ReportLinkReview,dispatchGapLabel,jobReasonLabel;try{({AttendanceWorkSchedules,ReportLinkReview,dispatchGapLabel,jobReasonLabel}=await import(path.href))}finally{await fs.unlink(path)}
+const c={s:{mode:'demo',user:{role:'member'}},w:{users:[{id:'a',name:'甲'},{id:'b',name:'乙'}],work_schedules:Array.from({length:3190},(_,i)=>({id:String(i),user_id:i%2?'a':'b',day:i%2?'2026-11-03':'2026-11-04',end_time:'18:00'}))}};
+const root=createRoot(document.querySelector('#root'));const flush=fn=>act(async()=>{fn();await new Promise(r=>setTimeout(r,0))});
+await flush(()=>root.render(React.createElement(AttendanceWorkSchedules,{c})));
+assert.equal(document.querySelectorAll('tbody tr').length,25,'initial schedule DOM bounded to 25');
+assert.match(document.querySelector('caption').textContent,/班表/);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('顯示更多')).click());assert.equal(document.querySelectorAll('tbody tr').length,50);
+const select=document.querySelector('[aria-label="篩選班表人員"]');
+await flush(()=>{select.value='a';select.dispatchEvent(new Event('change',{bubbles:true}))});
+assert.equal(document.querySelectorAll('tbody tr').length,25);assert([...document.querySelectorAll('tbody tr')].every(r=>r.textContent.includes('甲')));
+assert.match(document.body.textContent,/1595/);assert.match(document.body.textContent,/3190/);
+await flush(()=>root.unmount());
+console.log('LIVE4A schedule bounded reveal + local person filter passed');
+
+const root2=createRoot(document.querySelector('#root'));
+globalThis.fetch=async url=>new Response(JSON.stringify(url.includes('/summary')?{linked:0,total:535,unlinked:535,departments:{},reasons:{}}:{rows:Array.from({length:535},(_,i)=>({id:String(i),case_mapping_status:'missing_reference',candidate_evidence:[],description:'待配對日報'})),projects:[],bridges:[],reviews:[]}),{headers:{'content-type':'application/json'}});
+await flush(()=>root2.render(React.createElement(ReportLinkReview,{c:{w:{version:1}}})));
+await flush(()=>{});
+assert.equal(document.querySelectorAll('.rl-row').length,25);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('顯示更多')).click());
+assert.equal(document.querySelectorAll('.rl-row').length,50);
+await flush(()=>root2.unmount());
+console.log('LIVE4A admin daily queue initial25/local50 over535 passed');
+
+assert.equal(dispatchGapLabel('no_leave_source'),'尚無完整請假可用時段來源');
+assert.equal(dispatchGapLabel('invalid_schedule_interval'),'缺少有效起訖時間的班表未納入');
+assert.equal(dispatchGapLabel('no_bookings_after_2026-08-19'),'2026/08/19 之後尚無派工紀錄');
+assert.equal(jobReasonLabel('blocked_feature'),'功能尚未開放');
+assert.equal(jobReasonLabel('來源待核對'),'來源待核對');
+console.log('LIVE4A Chinese reason labels passed');

@@ -94,6 +94,18 @@ class Condition:
         return Evaluation(equal if self.operation == 'Eq' else not equal)
 
 
+def _kind(value):
+    # The source encodes booleans as `bool`; runtime facts are typed `boolean`.
+    return 'boolean' if value == 'bool' else value
+
+
+def _operand(spec, raw):
+    # Source booleans are stored as the strings "1"/"0"; nothing else is coerced.
+    if spec.kind == 'boolean' and isinstance(raw, str) and raw in ('0', '1'):
+        return raw == '1'
+    return raw
+
+
 def compile_condition(source, schema: Mapping[str, FieldSpec]):
     """Compile the source's structured tree, never its BQL/formula strings.
 
@@ -127,16 +139,16 @@ def compile_condition(source, schema: Mapping[str, FieldSpec]):
                 children.append(unknown(f'unsupported_expression:{field}'))
             elif (not isinstance(field_item, dict) or
                   any(field_item.get(key, field) != field for key in ('key', 'source_key')) or
-                  field_item.get('type', spec.kind) != spec.kind):
+                  _kind(field_item.get('type', spec.kind)) != spec.kind):
                 children.append(unknown(f'field_schema_conflict:{field}'))
-            elif leaf.get('storage_key', field) != field or leaf.get('field_type', spec.kind) != spec.kind:
+            elif leaf.get('storage_key', field) != field or _kind(leaf.get('field_type', spec.kind)) != spec.kind:
                 children.append(unknown(f'field_schema_conflict:{field}'))
             elif leaf.get('operator') not in ('Eq', 'Ne'):
                 children.append(unknown(f'unsupported_operator:{field}'))
-            elif leaf.get('value_list') is not None or not spec.accepts(leaf.get('originalValue')):
+            elif leaf.get('value_list') is not None or not spec.accepts(_operand(spec, leaf.get('originalValue'))):
                 children.append(unknown(f'invalid_or_unknown_operand:{field}'))
             else:
-                children.append(Condition(leaf['operator'], field, leaf['originalValue'], spec))
+                children.append(Condition(leaf['operator'], field, _operand(spec, leaf['originalValue']), spec))
         children.extend(group(child) for child in groups)
         if not children:
             return unknown('empty_condition_group')

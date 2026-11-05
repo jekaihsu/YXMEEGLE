@@ -4,7 +4,8 @@ from copy import deepcopy
 import pytest
 from fastapi import HTTPException
 
-from .seed import seed, USERS
+from .test_ux_disabled import enabled_seed as seed
+from .seed import USERS
 from .sources import import_sources
 from .operations import apply_operation, add_workdays, missing
 from .workflow import apply_action

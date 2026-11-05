@@ -1,0 +1,390 @@
+{
+  "fixture": {
+    "projects": 319,
+    "tasks": 7018,
+    "daily_reports": 9000
+  },
+  "environment": "fictional local SQLite/demo; live reads disabled; assignment cache mocked",
+  "profiles": {
+    "disabled_assignments": {
+      "/api/projects?view=portfolio": {
+        "first": {
+          "ms": 37.58,
+          "queries": 12,
+          "decoded_json_values": 3576,
+          "bytes": 530459,
+          "wire_bytes": 22001
+        },
+        "median_ms": 52.26,
+        "warm": [
+          {
+            "ms": 52.26,
+            "queries": 12,
+            "decoded_json_values": 3576,
+            "bytes": 530459,
+            "wire_bytes": 22001
+          },
+          {
+            "ms": 29.79,
+            "queries": 12,
+            "decoded_json_values": 3576,
+            "bytes": 530459,
+            "wire_bytes": 22001
+          },
+          {
+            "ms": 53.73,
+            "queries": 12,
+            "decoded_json_values": 3576,
+            "bytes": 530459,
+            "wire_bytes": 22001
+          },
+          {
+            "ms": 28.93,
+            "queries": 12,
+            "decoded_json_values": 3576,
+            "bytes": 530459,
+            "wire_bytes": 22001
+          },
+          {
+            "ms": 54.25,
+            "queries": 12,
+            "decoded_json_values": 3576,
+            "bytes": 530459,
+            "wire_bytes": 22001
+          }
+        ]
+      },
+      "/api/home-panels?panel=assigned&limit=100": {
+        "first": {
+          "ms": 9.52,
+          "queries": 9,
+          "decoded_json_values": 451,
+          "bytes": 589,
+          "wire_bytes": 589
+        },
+        "median_ms": 7.39,
+        "warm": [
+          {
+            "ms": 7.69,
+            "queries": 9,
+            "decoded_json_values": 451,
+            "bytes": 589,
+            "wire_bytes": 589
+          },
+          {
+            "ms": 7.37,
+            "queries": 9,
+            "decoded_json_values": 451,
+            "bytes": 589,
+            "wire_bytes": 589
+          },
+          {
+            "ms": 7.42,
+            "queries": 9,
+            "decoded_json_values": 451,
+            "bytes": 589,
+            "wire_bytes": 589
+          },
+          {
+            "ms": 7.05,
+            "queries": 9,
+            "decoded_json_values": 451,
+            "bytes": 589,
+            "wire_bytes": 589
+          },
+          {
+            "ms": 7.39,
+            "queries": 9,
+            "decoded_json_values": 451,
+            "bytes": 589,
+            "wire_bytes": 589
+          }
+        ]
+      },
+      "/api/home-panels?panel=confirmation&limit=100": {
+        "first": {
+          "ms": 105.85,
+          "queries": 11,
+          "decoded_json_values": 21548,
+          "bytes": 597,
+          "wire_bytes": 597
+        },
+        "median_ms": 116.88,
+        "warm": [
+          {
+            "ms": 103.94,
+            "queries": 11,
+            "decoded_json_values": 21548,
+            "bytes": 597,
+            "wire_bytes": 597
+          },
+          {
+            "ms": 109.13,
+            "queries": 11,
+            "decoded_json_values": 21548,
+            "bytes": 597,
+            "wire_bytes": 597
+          },
+          {
+            "ms": 119.53,
+            "queries": 11,
+            "decoded_json_values": 21548,
+            "bytes": 597,
+            "wire_bytes": 597
+          },
+          {
+            "ms": 175.96,
+            "queries": 11,
+            "decoded_json_values": 21548,
+            "bytes": 597,
+            "wire_bytes": 597
+          },
+          {
+            "ms": 116.88,
+            "queries": 11,
+            "decoded_json_values": 21548,
+            "bytes": 597,
+            "wire_bytes": 597
+          }
+        ]
+      },
+      "/api/company-dashboard?offset=0&limit=5": {
+        "first": {
+          "ms": 216.4,
+          "queries": 6,
+          "decoded_json_values": 33590,
+          "bytes": 5969,
+          "wire_bytes": 1264
+        },
+        "median_ms": 243.34,
+        "warm": [
+          {
+            "ms": 243.34,
+            "queries": 6,
+            "decoded_json_values": 33590,
+            "bytes": 5969,
+            "wire_bytes": 1263
+          },
+          {
+            "ms": 239.29,
+            "queries": 6,
+            "decoded_json_values": 33590,
+            "bytes": 5969,
+            "wire_bytes": 1264
+          },
+          {
+            "ms": 255.29,
+            "queries": 6,
+            "decoded_json_values": 33590,
+            "bytes": 5969,
+            "wire_bytes": 1264
+          },
+          {
+            "ms": 215.85,
+            "queries": 6,
+            "decoded_json_values": 33590,
+            "bytes": 5969,
+            "wire_bytes": 1264
+          },
+          {
+            "ms": 246.05,
+            "queries": 6,
+            "decoded_json_values": 33590,
+            "bytes": 5969,
+            "wire_bytes": 1264
+          }
+        ]
+      },
+      "/api/my-work": {
+        "first": {
+          "ms": 231.51,
+          "queries": 10,
+          "decoded_json_values": 33591,
+          "bytes": 61778,
+          "wire_bytes": 2893
+        },
+        "median_ms": 189.96,
+        "warm": [
+          {
+            "ms": 215.88,
+            "queries": 10,
+            "decoded_json_values": 33591,
+            "bytes": 61778,
+            "wire_bytes": 2893
+          },
+          {
+            "ms": 270.24,
+            "queries": 10,
+            "decoded_json_values": 33591,
+            "bytes": 61778,
+            "wire_bytes": 2893
+          },
+          {
+            "ms": 177.5,
+            "queries": 10,
+            "decoded_json_values": 33591,
+            "bytes": 61778,
+            "wire_bytes": 2893
+          },
+          {
+            "ms": 165.88,
+            "queries": 10,
+            "decoded_json_values": 33591,
+            "bytes": 61778,
+            "wire_bytes": 2893
+          },
+          {
+            "ms": 189.96,
+            "queries": 10,
+            "decoded_json_values": 33591,
+            "bytes": 61778,
+            "wire_bytes": 2893
+          }
+        ]
+      }
+    },
+    "mocked_assignments": {
+      "/api/projects?view=portfolio": {
+        "first": {
+          "ms": 140.41,
+          "queries": 15,
+          "decoded_json_values": 13361,
+          "bytes": 541019,
+          "wire_bytes": 21043
+        },
+        "median_ms": 129.68,
+        "warm": [
+          {
+            "ms": 136.19,
+            "queries": 15,
+            "decoded_json_values": 13361,
+            "bytes": 541019,
+            "wire_bytes": 21043
+          },
+          {
+            "ms": 122.02,
+            "queries": 15,
+            "decoded_json_values": 13361,
+            "bytes": 541019,
+            "wire_bytes": 21043
+          },
+          {
+            "ms": 122.71,
+            "queries": 15,
+            "decoded_json_values": 13361,
+            "bytes": 541019,
+            "wire_bytes": 21043
+          },
+          {
+            "ms": 132.23,
+            "queries": 15,
+            "decoded_json_values": 13361,
+            "bytes": 541019,
+            "wire_bytes": 21043
+          },
+          {
+            "ms": 129.68,
+            "queries": 15,
+            "decoded_json_values": 13361,
+            "bytes": 541019,
+            "wire_bytes": 21043
+          }
+        ]
+      },
+      "/api/home-panels?panel=assigned&limit=100": {
+        "first": {
+          "ms": 181.78,
+          "queries": 12,
+          "decoded_json_values": 14114,
+          "bytes": 91923,
+          "wire_bytes": 3161
+        },
+        "median_ms": 145.07,
+        "warm": [
+          {
+            "ms": 147.88,
+            "queries": 12,
+            "decoded_json_values": 14114,
+            "bytes": 91923,
+            "wire_bytes": 3161
+          },
+          {
+            "ms": 143.07,
+            "queries": 12,
+            "decoded_json_values": 14114,
+            "bytes": 91923,
+            "wire_bytes": 3161
+          },
+          {
+            "ms": 172.84,
+            "queries": 12,
+            "decoded_json_values": 14114,
+            "bytes": 91923,
+            "wire_bytes": 3161
+          },
+          {
+            "ms": 145.07,
+            "queries": 12,
+            "decoded_json_values": 14114,
+            "bytes": 91923,
+            "wire_bytes": 3161
+          },
+          {
+            "ms": 144.01,
+            "queries": 12,
+            "decoded_json_values": 14114,
+            "bytes": 91923,
+            "wire_bytes": 3161
+          }
+        ]
+      },
+      "/api/home-panels?panel=confirmation&limit=100": {
+        "first": {
+          "ms": 206.58,
+          "queries": 12,
+          "decoded_json_values": 30548,
+          "bytes": 846,
+          "wire_bytes": 846
+        },
+        "median_ms": 202.25,
+        "warm": [
+          {
+            "ms": 202.25,
+            "queries": 12,
+            "decoded_json_values": 30548,
+            "bytes": 846,
+            "wire_bytes": 846
+          },
+          {
+            "ms": 208.14,
+            "queries": 12,
+            "decoded_json_values": 30548,
+            "bytes": 846,
+            "wire_bytes": 846
+          },
+          {
+            "ms": 177.03,
+            "queries": 12,
+            "decoded_json_values": 30548,
+            "bytes": 846,
+            "wire_bytes": 846
+          },
+          {
+            "ms": 196.27,
+            "queries": 12,
+            "decoded_json_values": 30548,
+            "bytes": 846,
+            "wire_bytes": 846
+          },
+          {
+            "ms": 208.09,
+            "queries": 12,
+            "decoded_json_values": 30548,
+            "bytes": 846,
+            "wire_bytes": 846
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,430 @@
+[
+  {
+    "scenario": "loading",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/loading-1280.png",
+    "metrics": {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "nodes": 9,
+      "loading": "true",
+      "legacy": false
+    }
+  },
+  {
+    "scenario": "loading",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/loading-390.png",
+    "metrics": {
+      "width": 390,
+      "scrollWidth": 390,
+      "nodes": 9,
+      "loading": "true",
+      "legacy": false
+    }
+  },
+  {
+    "scenario": "evidence-error",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/evidence-error-1280.png",
+    "metrics": {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "nodes": 9,
+      "loading": "false",
+      "source": "工程證據讀取失敗。合成證據來源讀取失敗重試工程證據",
+      "legacy": false
+    }
+  },
+  {
+    "scenario": "evidence-error",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/evidence-error-390.png",
+    "metrics": {
+      "width": 390,
+      "scrollWidth": 390,
+      "nodes": 9,
+      "loading": "false",
+      "source": "工程證據讀取失敗。合成證據來源讀取失敗重試工程證據",
+      "legacy": false
+    }
+  },
+  {
+    "scenario": "legacy",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/legacy-1280.png",
+    "metrics": {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "nodes": 9,
+      "loading": "false",
+      "source": "外業生產計畫187計畫數量依來源數量顯示，單位依各工項；不跨單位加總。合約明細 3 筆 · 工項 3 筆 · 需核對 0 筆原生關聯 0無此類關聯依工編推導 3以工編對應合約工項，尚非來源直接連結。關聯待確認 0無此類關聯未關聯 0無此類關聯實際回報量實際完成量未知實際完成量來源未連結。日報尚未指定所屬案件與合約工項。不代表尚未施工，也無法計算完成百分比。怎",
+      "legacy": true
+    }
+  },
+  {
+    "scenario": "legacy",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/legacy-390.png",
+    "metrics": {
+      "width": 390,
+      "scrollWidth": 390,
+      "nodes": 9,
+      "loading": "false",
+      "source": "外業生產計畫187計畫數量依來源數量顯示，單位依各工項；不跨單位加總。合約明細 3 筆 · 工項 3 筆 · 需核對 0 筆原生關聯 0無此類關聯依工編推導 3以工編對應合約工項，尚非來源直接連結。關聯待確認 0無此類關聯未關聯 0無此類關聯實際回報量實際完成量未知實際完成量來源未連結。日報尚未指定所屬案件與合約工項。不代表尚未施工，也無法計算完成百分比。怎",
+      "legacy": true
+    }
+  },
+  {
+    "scenario": "alias-overview",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-overview-1280.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=overview-1280#view=project&project=p1&tab=overview&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": 79.62066650390625,
+        "bottom": 3547.4566040039062
+      },
+      "node": {
+        "top": 760.15966796875,
+        "bottom": 2737.45654296875
+      },
+      "evidence": {
+        "top": 1063.73779296875,
+        "bottom": 2220.69873046875
+      },
+      "tasks": {
+        "top": 2244.69873046875,
+        "bottom": 2712.45654296875
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-progress",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-progress-1280.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=progress-1280#view=project&project=p1&tab=progress&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": -900.9935302734375,
+        "bottom": 2566.8424072265625
+      },
+      "node": {
+        "top": -220.4544677734375,
+        "bottom": 1756.842529296875
+      },
+      "evidence": {
+        "top": 83.1236572265625,
+        "bottom": 1240.084716796875
+      },
+      "tasks": {
+        "top": 1264.084716796875,
+        "bottom": 1731.842529296875
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-flow",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-flow-1280.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=flow-1280#view=project&project=p1&tab=flow&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": 421.140625,
+        "bottom": 3888.9765625
+      },
+      "node": {
+        "top": 1101.6796875,
+        "bottom": 3078.9765625
+      },
+      "evidence": {
+        "top": 1405.2578125,
+        "bottom": 2562.21875
+      },
+      "tasks": {
+        "top": 2586.21875,
+        "bottom": 3053.9765625
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-tasks",
+    "width": 1280,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-tasks-1280.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=tasks-1280#view=project&project=p1&tab=tasks&node=field",
+      "tab": "流程",
+      "all": "true",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": 421.140625,
+        "bottom": 4207.734375
+      },
+      "node": {
+        "top": 1101.6796875,
+        "bottom": 3397.734375
+      },
+      "evidence": {
+        "top": 1405.2578125,
+        "bottom": 2562.21875
+      },
+      "tasks": {
+        "top": 2586.21875,
+        "bottom": 3372.734375
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-overview",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-overview-390.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=overview-390#view=project&project=p1&tab=overview&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": 83.1239013671875,
+        "bottom": 6714.4051513671875
+      },
+      "node": {
+        "top": 2996.1005859375,
+        "bottom": 5920.4052734375
+      },
+      "evidence": {
+        "top": 3458.4599609375,
+        "bottom": 5363.3505859375
+      },
+      "tasks": {
+        "top": 5387.3505859375,
+        "bottom": 5903.4052734375
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-progress",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-progress-390.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=progress-390#view=project&project=p1&tab=progress&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": -3291.861083984375,
+        "bottom": 3339.420166015625
+      },
+      "node": {
+        "top": -378.884521484375,
+        "bottom": 2545.419921875
+      },
+      "evidence": {
+        "top": 83.474853515625,
+        "bottom": 1988.365234375
+      },
+      "tasks": {
+        "top": 2012.365234375,
+        "bottom": 2528.419921875
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-flow",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-flow-390.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=flow-390#view=project&project=p1&tab=flow&node=field",
+      "tab": "流程",
+      "all": "false",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": -2828.858642578125,
+        "bottom": 3802.422607421875
+      },
+      "node": {
+        "top": 84.117919921875,
+        "bottom": 3008.4228515625
+      },
+      "evidence": {
+        "top": 546.477294921875,
+        "bottom": 2451.3681640625
+      },
+      "tasks": {
+        "top": 2475.3681640625,
+        "bottom": 2991.4228515625
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-tasks",
+    "width": 390,
+    "path": "/Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/output/project-flow/alias-tasks-390.png",
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?alias=tasks-390#view=project&project=p1&tab=tasks&node=field",
+      "tab": "流程",
+      "all": "true",
+      "selected": "外業節點，進行中，1/3 項任務，Lark 任務完成度33%，逾期",
+      "top": {
+        "top": -5220.86083984375,
+        "bottom": 1777.47509765625
+      },
+      "node": {
+        "top": -2307.88427734375,
+        "bottom": 983.47509765625
+      },
+      "evidence": {
+        "top": -1845.52490234375,
+        "bottom": 59.36572265625
+      },
+      "tasks": {
+        "top": 83.36572265625,
+        "bottom": 966.47509765625
+      },
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-overview",
+    "width": 1280,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=overview-1280#view=project&project=p1&tab=overview&node=field",
+      "focus": "flow-top",
+      "top": 79.619873046875,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-progress",
+    "width": 1280,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=progress-1280#view=project&project=p1&tab=progress&node=field",
+      "focus": "flow-evidence",
+      "top": 78.35693359375,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-flow",
+    "width": 1280,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=flow-1280#view=project&project=p1&tab=flow&node=field",
+      "focus": "flow-selected",
+      "top": 83.8134765625,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-tasks",
+    "width": 1280,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=tasks-1280#view=project&project=p1&tab=tasks&node=field",
+      "focus": "flow-tasks",
+      "top": 83.85205078125,
+      "tab": "流程",
+      "all": "true",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-overview",
+    "width": 390,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=overview-390#view=project&project=p1&tab=overview&node=field",
+      "focus": "flow-top",
+      "top": 82.1553955078125,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-progress",
+    "width": 390,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=progress-390#view=project&project=p1&tab=progress&node=field",
+      "focus": "flow-evidence",
+      "top": 80.205810546875,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-flow",
+    "width": 390,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=flow-390#view=project&project=p1&tab=flow&node=field",
+      "focus": "flow-selected",
+      "top": 80.729248046875,
+      "tab": "流程",
+      "all": "false",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "alias-stable-tasks",
+    "width": 390,
+    "metrics": {
+      "url": "http://127.0.0.1:5208/?stable=tasks-390#view=project&project=p1&tab=tasks&node=field",
+      "focus": "flow-tasks",
+      "top": 81.09326171875,
+      "tab": "流程",
+      "all": "true",
+      "overflow": false
+    }
+  },
+  {
+    "scenario": "cold-load-request-census",
+    "width": 1280,
+    "requests": [
+      {
+        "url": "/api/projects/p1/node-assignments",
+        "method": "GET"
+      },
+      {
+        "url": "/api/projects/p1/progress",
+        "method": "GET"
+      }
+    ],
+    "nodeDetailRequests": 0,
+    "scrollWidth": 1280
+  },
+  {
+    "scenario": "native-keyboard-and-inspector",
+    "width": 390,
+    "arrowRight": {
+      "node": "control",
+      "ariaCurrent": "step"
+    },
+    "arrowLeft": {
+      "node": "field"
+    },
+    "inspector": {
+      "title": "外業控制點複測",
+      "portalledTo": "BODY"
+    },
+    "escapeCloses": true
+  }
+]

@@ -1,0 +1,85 @@
+{
+ "label": "before",
+ "database": "sqlite",
+ "projects": 420,
+ "business_rows": 21849,
+ "runs": 5,
+ "scenarios": {
+  "failure": {
+   "load_ms": {
+    "median": 136.7,
+    "min": 99.1,
+    "max": 165.6
+   },
+   "lock_held_ms": {
+    "median": 1367.1,
+    "min": 1318.3,
+    "max": 1454.2
+   },
+   "save_ms": {
+    "median": 1247.1,
+    "min": 1131.2,
+    "max": 1277.1
+   },
+   "total_ms": {
+    "median": 1382.8,
+    "min": 1334.3,
+    "max": 1468.8
+   }
+  },
+  "apply_unchanged": {
+   "load_ms": {
+    "median": 309.6,
+    "min": 290.2,
+    "max": 331.6
+   },
+   "load_partial_ms": {
+    "median": 4.0,
+    "min": 3.9,
+    "max": 4.2
+   },
+   "lock_held_ms": {
+    "median": 333.6,
+    "min": 309.7,
+    "max": 2790.2
+   },
+   "save_ms": {
+    "median": 0,
+    "min": 0,
+    "max": 1217.9
+   },
+   "total_ms": {
+    "median": 550.5,
+    "min": 500.0,
+    "max": 2972.3
+   }
+  },
+  "apply_changed": {
+   "load_ms": {
+    "median": 338.1,
+    "min": 264.6,
+    "max": 368.6
+   },
+   "load_partial_ms": {
+    "median": 3.9,
+    "min": 3.8,
+    "max": 4.3
+   },
+   "lock_held_ms": {
+    "median": 2674.8,
+    "min": 2665.0,
+    "max": 2743.5
+   },
+   "save_ms": {
+    "median": 1164.3,
+    "min": 1157.1,
+    "max": 1243.4
+   },
+   "total_ms": {
+    "median": 2898.0,
+    "min": 2844.6,
+    "max": 2961.2
+   }
+  }
+ }
+}

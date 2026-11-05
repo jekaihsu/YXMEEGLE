@@ -1,0 +1,26 @@
+/Users/vc/Local/YXMEEGLE/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+         6689855 function calls (5767441 primitive calls) in 0.995 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1491 to 144 due to restriction <'backend/'>
+   List reduced from 144 to 15 due to restriction <15>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.927    0.927 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/app.py:638(workspace)
+        1    0.000    0.000    0.703    0.703 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/app.py:423(public_ws)
+        1    0.008    0.008    0.501    0.501 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workspace_projection.py:160(filter_private_workspace)
+     7018    0.008    0.000    0.228    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/home_details.py:168(build_home_task)
+        2    0.000    0.000    0.177    0.089 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/app.py:273(load)
+        1    0.010    0.010    0.171    0.171 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/storage.py:393(load)
+438225/324    0.089    0.000    0.146    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workspace_projection.py:237(_strip_source_payloads)
+    14036    0.034    0.000    0.143    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workflow_rules.py:58(execution_reasons)
+      319    0.003    0.000    0.104    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/operations.py:980(project_summary)
+ 450553/1    0.065    0.000    0.092    0.092 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workspace_projection.py:148(strip_migration_archive)
+     7018    0.009    0.000    0.089    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workflow_rules.py:81(activation_reasons)
+     7018    0.022    0.000    0.068    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workflow_rules.py:116(confirmation_hash)
+     7018    0.006    0.000    0.064    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/home_details.py:46(_proxy)
+    28072    0.033    0.000    0.054    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/workflow_rules.py:67(<genexpr>)
+      319    0.005    0.000    0.051    0.000 /Users/vc/.t3/worktrees/YXMEEGLE/fix-settings-project-read-performance/backend/sop_runtime.py:25(topology_projection)
+
+

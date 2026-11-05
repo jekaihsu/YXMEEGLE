@@ -1,0 +1,9 @@
+.assignee-picker{position:relative;display:inline-block;max-width:100%}
+.assignee-picker-popover{padding:.75rem;background:var(--surface,#fff);color:var(--label,#222);border:1px solid var(--field-border,#ccc);border-radius:12px;box-shadow:0 8px 24px #0002}
+.assignee-picker-popover input{width:100%;min-height:44px;box-sizing:border-box}
+.assignee-picker-popover ul{list-style:none;padding:0;margin:.5rem 0;max-height:min(16rem,35vh);overflow:auto}
+.assignee-picker-popover [role=option]{padding:.7rem;cursor:pointer;border-radius:6px}
+.assignee-picker-popover [data-active=true]{background:var(--accent-soft,#e5edff);outline:2px solid var(--accent,#3761c8);outline-offset:-2px}
+.assignee-picker-popover [aria-selected=true]{font-weight:600}
+
+.assignee-picker-popover li{white-space:normal}

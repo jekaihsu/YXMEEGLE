@@ -1,0 +1,161 @@
+✔ four old tabs keep node, task, completion and focus while selecting one workspace (0.534208ms)
+✖ task basis excludes cancellation and superseded work and does not use opaque progress (0.774041ms)
+✖ missing daily quantity remains unknown even with zero item counts and completed tasks (0.181542ms)
+✖ known quantities retain unit text without adding unlike quantities (0.156167ms)
+✖ legacy has one honest local-task number and source state never overwrites workflow authority (3.223416ms)
+✔ task filters compose for mine, unassigned and overdue without hiding other source identities (0.078667ms)
+✔ dispatch proposal uses stable case references and never treats the assignment row as parent obligation (0.072791ms)
+✖ round2 node state overrides task ratio and skipped nodes have no bar (0.242ms)
+✖ round2 overall stays unknown when a counted node has unknown progress (0.106083ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 3
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7.064459
+
+✖ failing tests:
+
+test at test-project-flow-model.mjs:18:1
+✖ task basis excludes cancellation and superseded work and does not use opaque progress (0.774041ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  93 !== null
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:25:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 93,
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-project-flow-model.mjs:27:1
+✖ missing daily quantity remains unknown even with zero item counts and completed tasks (0.181542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'tasks' !== 'nodes'
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:30:81)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'tasks',
+    expected: 'nodes',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-project-flow-model.mjs:37:1
+✖ known quantities retain unit text without adding unlike quantities (0.156167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  null !== 100
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:41:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 100,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-project-flow-model.mjs:43:1
+✖ legacy has one honest local-task number and source state never overwrites workflow authority (3.223416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  50 !== null
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:46:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 50,
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-project-flow-model.mjs:61:1
+✖ round2 node state overrides task ratio and skipped nodes have no bar (0.242ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    {
+  +   basis: 'unknown',
+  +   label: '進度未知',
+  +   percent: null
+  -   basis: 'nodes',
+  -   label: '節點已完成',
+  -   percent: 100
+    }
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:67:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test-project-flow-model.mjs:73:1
+✖ round2 overall stays unknown when a counted node has unknown progress (0.106083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    {
+  +   basis: 'tasks',
+  +   label: 'Lark 任務完成度',
+  +   percent: 100
+  -   basis: 'unknown',
+  -   label: '部分節點進度未知（略過不計）',
+  -   percent: null
+    }
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:76:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

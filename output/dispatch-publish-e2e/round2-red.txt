@@ -1,0 +1,31 @@
+FAIL R1 saved proposal wins over approved preview and approvals are void: Expected values to be strictly equal:
++ actual - expected
+
++ '主管核實 L2 資格'
+- '修改後的核實原因'
+
+FAIL R2 failed reconciliation restores options task and parent obligation: Cannot read properties of null (reading 'textContent')
+FAIL R3 seat holder sees every hashed proposal field and exclusive interval: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'B 區水深測量'
+
+FAIL R4 absent hours stay null omitted and show estimation hint: Expected values to be strictly equal:
+
+0 !== null
+
+FAIL R5 unresolved display names never expose record IDs: Expected values to be strictly equal:
++ actual - expected
+
++ 'recSecret'
+- '名稱未能解析'
+
+FAIL R6 forbidden read clears open detail and actions: Expected values to be strictly equal:
+
+1 !== 0
+
+FAIL R6 identity epoch clears open detail before new read: Expected values to be strictly equal:
+
+1 !== 0
+

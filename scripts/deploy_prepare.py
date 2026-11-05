@@ -10,6 +10,13 @@ import json
 import re
 import secrets
 import shutil
+import subprocess
+from datetime import datetime, timezone
+
+try:
+    from .stage_inventory import inventory_digest
+except ImportError:
+    from stage_inventory import inventory_digest
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / '.runtime'
@@ -116,22 +123,65 @@ def validate_source_tables(path):
     return value
 
 
+def build_identity(root):
+    def git(*args):
+        return subprocess.check_output(['git', *args],cwd=root,text=True).strip()
+    return {'git_sha':git('rev-parse','HEAD'),
+            'dirty':bool(git('status','--porcelain','--untracked-files=no')),
+            'built_at':datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'branch':git('rev-parse','--abbrev-ref','HEAD')}
+
+
+def frontend_stage_files(source):
+    """Ship frontend runtime inputs and attribution, never local docs or evidence."""
+    runtime_suffixes = {'.ts', '.tsx', '.css', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2'}
+    excluded_dirs = {'docs', 'evidence', 'impl-evidence', 'screenshots', 'design-notes', '__tests__', '__snapshots__', 'node_modules', 'dist'}
+    for path in source.rglob('*'):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(source)
+        if any(part.startswith('.') or part.lower() in excluded_dirs for part in relative.parts):
+            continue
+        if relative.as_posix() == 'assistant/fixtures.ts':
+            continue  # SSE examples imported only by frontend tests.
+        if path.name.startswith(('test-', 'test_', 'testing', 'preview.')) or '.test.' in path.name or '.spec.' in path.name:
+            continue
+        if path.suffix.lower() in runtime_suffixes or path.name == 'LICENSE.assistant-ui':
+            yield path
+
+
 def staging():
     validate_source_tables(ROOT/'deployment/source-tables.json')
     folder = RUNTIME / ('zeabur-stage-' + secrets.token_hex(4))
     folder.mkdir(parents=True)
     exact = ['Dockerfile', '.dockerignore', 'backend/requirements.txt', 'scripts/backup_restore.py', 'scripts/backup_live_legacy.py', 'scripts/restore_drill.py',
-             'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
+             'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/run_live_read.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
              'frontend/package.json', 'frontend/package-lock.json', 'frontend/index.html',
              'frontend/tsconfig.json', 'frontend/vite.config.ts']
-    exact.append('backend/sop_source_contracts.json')
+    exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json', 'backend/report_link_vocabulary.json']
     exact += ['scripts/backup_publish.py','scripts/backup_reconcile.py',
-              'scripts/backup_offsite_acceptance.py','backend/requirements.lock']
+              'scripts/backup_offsite_acceptance.py','backend/requirements.lock',
+              'scripts/migrate_index_tables.py','scripts/backfill_index.py','scripts/migrate_ai_usage.py']
     files = [ROOT / x for x in exact]
     files += [p for p in (ROOT/'backend').glob('*.py') if not p.name.startswith('test_')]
+    files += [p for p in (ROOT/'backend'/'ai').rglob('*.py') if not p.name.startswith('test_')]
+    files += [p for p in (ROOT/'backend'/'live_read').rglob('*.py') if not p.name.startswith('test_')]
+    # ops_sync is imported by app.py when FEATURE_LARK_AUTHORITATIVE_OPS is on; its test-only helpers (testing*.py) stay out.
+    files += [p for p in (ROOT/'backend'/'ops_sync').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'lark_pilot').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'sop_import').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'node_assignment').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'dispatch_board').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'dispatch_publish').rglob('*.py') if not p.name.startswith('test')]
+    # PM weekly reports; dev_* helpers are local-only bridges and never ship.
+    files += [p for p in (ROOT/'backend'/'reports').rglob('*.py') if not p.name.startswith(('test','dev_'))]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
-        if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]
+        if source.exists(): files += list(frontend_stage_files(source))
+    # Local benchmarks and their test worlds have no runtime importers.
+    test_helpers = {'conftest.py', 'ai_projection_test_support.py', 'partial_testing.py', 'perf_fixture.py', 'write_world.py'}
+    files = [p for p in files if not (p.is_relative_to(ROOT/'backend') and
+             (p.name in test_helpers or p.name.startswith('benchmark')))]
     manifest = []
     for source in sorted(set(files)):
         if not source.is_file(): raise SystemExit('Missing expected deployment source: ' + str(source.relative_to(ROOT)))
@@ -146,6 +196,9 @@ def staging():
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
         manifest.append({'path': relative.as_posix(), 'size': source.stat().st_size, 'sha256': hashlib.sha256(source.read_bytes()).hexdigest()})
+    identity_path=folder/'backend/build-manifest.json'
+    identity_path.write_text(json.dumps(build_identity(ROOT),ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    manifest.append({'path':'backend/build-manifest.json','size':identity_path.stat().st_size,'sha256':hashlib.sha256(identity_path.read_bytes()).hexdigest()})
     manifest_value = {'directory': str(folder), 'files': manifest}
     write('zeabur-stage-manifest.json', manifest_value)
     write(folder.name + '-manifest.json', manifest_value)
@@ -154,7 +207,7 @@ def staging():
     except ImportError:
         from verify_stage_package import verify_stage
     smoke = verify_stage(folder)
-    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder)))
+    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder), inventory_sha256=inventory_digest(manifest)))
     if not smoke.get('ok'):
         raise SystemExit('Deployment package verification failed: ' + smoke.get('reason', 'unknown'))
     print(json.dumps({'staging_directory': str(folder), 'files': len(manifest), 'bytes': sum(f['size'] for f in manifest), 'runtime_smoke_passed': True}))

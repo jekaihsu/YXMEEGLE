@@ -1,0 +1,1495 @@
+test-api-response.mjs
+api response tests passed
+
+exit_code=0
+
+test-approval-detail-a11y.mjs
+approval detail a11y checks passed
+
+exit_code=0
+
+test-audit-pagination.mjs
+audit pagination: lower bounds, exact/empty totals, has_more navigation, older API and legacy fallback passed
+
+exit_code=0
+
+test-audit-project-switch.mjs
+audit trail project switch isolation and shrinking totals: ok
+
+exit_code=0
+
+test-case-detail-view.mjs
+ok - header and seven independently timed sections preserve body facts
+ok - unknown is em dash with reason and never a zero count
+ok - amount withheld ignores value, derived value and caller approval strings
+ok - forbidden rows, nested tasks, IDs, labels, times and count hints disappear
+ok - malformed body fails closed without retaining otherwise valid header facts
+ok - all C-STATE labels remain independent and stale freshness survives unknown
+ok - pending requested date never substitutes for effective or estimated date
+ok - tree starts one level deep and expands only selected native identity
+ok - unresolved edges and missing parents render explicit rows without guessed identity
+ok - caller mapping/receipt claims never grant verification or write actions
+ok - duplicate numbers remain distinct versions; duplicate native keys fail closed
+ok - UI filter and sort preserve selection and do not search technical IDs
+ok - history variant allowlists ignore injected generic row fields
+ok - source fetch time is never substituted; unsafe URLs remain unlocated
+case-detail view: 14 named tests passed
+
+exit_code=0
+
+test-case-navigation.mjs
+Warning: Each child in a list should have a unique "key" prop.
+
+Check the render method of `CaseNavigation`. See https://reactjs.org/link/warning-keys for more information.
+    at div
+    at CaseNavigation (file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.case-navigation-test.mjs:159:27)
+Case navigation: 35 assertions passed
+
+exit_code=0
+
+test-comment-draft-scope.mjs
+comment draft scope: project/node/task/user/workspace isolation and submissions passed
+
+exit_code=0
+
+test-company-cockpit.mjs
+Company cockpit and runtime health: 41 checks passed
+
+exit_code=0
+
+test-company-progressive.mjs
+Company progressive load: 12 checks passed
+
+exit_code=0
+
+test-company-route.mjs
+Company route: 4 checks passed
+
+exit_code=0
+
+test-confirmation-list-view.mjs
+PASS dense table preserves duplicate case numbers and versions in server order
+PASS footer shows three distinct server totals without deriving them
+PASS unknown totals are em dash with a reason, never zero
+PASS complete authorized empty and filtered empty remain distinct
+PASS loading and unlocated short bodies never invent a loaded zero
+PASS withheld amounts expose the G-AMT reason and no supplied values or derived values
+PASS forbidden body revokes rows, selection, totals, filters and identifiers
+PASS one malformed row fails the entire body closed to unknown
+PASS each consumed nested guard rejects malformed bodies without partial trust
+PASS unresolved cases remain explicit rows with receipt_missing vocabulary
+PASS partial, stale and read failure snapshots have per-row text and distinct retrieval time
+PASS technical IDs only appear in selected source drawer and chooser stays non-default
+PASS deadline disabled with backend reason; sorting offers asc desc clear only on supported columns
+PASS next is opaque server cursor; previous only accepts same-query actual cursor history
+PASS read-only view never projects caller write actions or raw metadata
+15 named behavioral tests passed
+
+exit_code=0
+
+test-contract-detail-view.mjs
+ok - 1 unknown quantity/unit/reason/children render em dash plus reason, never 0
+ok - 2 both amounts withheld with G-AMT reason; no value, sum or difference; altered amounts fail closed
+ok - 3 no Complete/Approve/SOP write action; links are read-only navigation
+ok - 4 malformed bodies fail closed to unknown (whole page, no partial trust)
+ok - 5 breadcrumb Confirmation -> Contract Line; missing parent is explicit, not auto-assigned
+ok - 6 sibling directory keeps equal names as separate entries, current selected, stable key order
+ok - 7 main line block: number/name/version; quantity+unit unknown; revision reason unknown
+ok - 8 child table: stable id order with disclosure; sort by category falls back to stable id; unsortable column ignored
+ok - 9 child states: partial counted rows; complete-empty only when body says so; technical ids only in nav/drawer
+ok - 10 version history: observed snapshots labelled; formal revisions unlocated; effective version unknown
+ok - 11 drawer is selection-only: null by default, contract line or listed child when selected, else null
+ok - 12 receipt_missing always surfaces as 對應未驗證 even if the warnings list omits it
+ok - 13 page states: forbidden exposes nothing; unlocated/loading/read_failed/unknown are text states; stale is a retained-snapshot note
+ok - 14 duplicate case/line numbers and names across contracts stay separate; same key listed twice is malformed
+ok - 15 input is not mutated and the view is JSON-safe
+ok - mutation M1 unknown rendered as 0 -> unknown-not-zero guard fails the guard
+ok - mutation M2 withheld amount rendered as a number -> amount guard fails the guard
+ok - mutation M2b amount strictness removed (extra keys trusted) -> amount guard fails the guard
+ok - mutation M3 write action added -> forbidden-absent guard fails the guard
+ok - mutation M3b approve label leaks into warnings -> forbidden-absent guard fails the guard
+ok - mutation M4 malformed body partially trusted -> fail-closed guard fails the guard
+ok - mutation M4b extra keys tolerated -> fail-closed guard fails the guard
+ok - mutation M4d positive count with zero rows trusted -> fail-closed guard (131-R1) fails the guard
+ok - mutation M4c mapping claim trusted -> fail-closed guard fails the guard
+24 tests passed
+
+exit_code=0
+
+test-contrast.mjs
+contrast ok
+light destructive boundary 5.38:1; text 7.16:1
+light positive badge 5.32:1
+light warning badge 4.77:1
+light critical badge 6.58:1
+light accent badge 7.11:1
+light secondary boundary 7.75:1; text 7.75:1
+dark destructive boundary 5.11:1; text 6.07:1
+dark positive badge 7.63:1
+dark warning badge 6.78:1
+dark critical badge 4.86:1
+dark accent badge 5.17:1
+dark secondary boundary 6.46:1; text 6.46:1
+
+exit_code=0
+
+test-daily-records.mjs
+Daily records (api): 11 review states render explicit labels
+Daily records: project switch and shrink keep offset, label and items consistent
+Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items
+Daily records: fallback shrink persists page 0 when the API becomes available
+Daily records (workspace-fallback): 11 review states render explicit labels
+Daily records: project switch and shrink keep offset, label and items consistent
+Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items
+Daily records: fallback shrink persists page 0 when the API becomes available
+
+exit_code=0
+
+test-data-freshness.mjs
+Data freshness: 39 checks passed
+
+exit_code=0
+
+test-data-state.mjs
+data state: 180 checks passed
+
+exit_code=0
+
+test-dev-tooling.mjs
+✔ manifest and every locked tooling copy use patched, consistent versions (1.210625ms)
+✔ local CI runs tooling after the build and checks API responses (0.375334ms)
+✔ production keeps the company route outside the initial JavaScript budget (0.606042ms)
+10:48:00 PM [vite] (client) Forced re-optimization of dependencies
+✔ default dev server binds locally and transforms the React entry without permissive CORS (664.364042ms)
+✔ default production preview also binds locally (10.069625ms)
+✔ normal overview script runs full and shell rendering regressions (1145.372208ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1824.286167
+
+exit_code=0
+
+test-draft-callsites.mjs
+draft call sites: ok (29)
+
+exit_code=0
+
+test-drilldown-context.mjs
+ok   1. round-trip is exact for every P2 route (hash and ctx)
+ok   2. back after 3-level drilldown restores each level exactly; breadcrumbs follow
+ok   3. restored context survives the hash round trip at every depth
+ok   4. tampered / oversized / unknown-version / wrong-route contexts are rejected to a safe default
+ok   5. KPI drilldown carries exactly the KPI filter set (no extra, no missing)
+ok   6. period control never leaks into case filters or other routes
+ok   7. cursor is opaque: preserved byte for byte, never decoded, not carried across routes
+ok   8. no amount / hidden-id keys are accepted anywhere in the context
+ok   9. drill edges: only declared P2 transitions; link-only targets validated
+ok   10. drill/back never alias caller objects (later edits cannot change a stored parent)
+ok   11. corrupt return frame is refused at back()
+ok   12. hash envelope: unknown or duplicated parameters reject the whole hash to the safe default
+mut ok: unknown_key_filters -> tests 4,8 fail
+mut ok: unknown_key_toplevel -> tests 4,8 fail
+mut ok: version_check -> tests 4 fail
+mut ok: period_scope -> tests 6 fail
+mut ok: kpi_drop_guard -> tests 5 fail
+mut ok: kpi_exact_set -> tests 5 fail
+mut ok: back_exact_restore -> tests 2,7 fail
+mut ok: stack_edge_chain -> tests 4,11 fail
+mut ok: stack_frame_validation -> tests 11 fail
+mut ok: drill_cursor_reset -> tests 7 fail
+mut ok: canonical_check -> tests 4 fail
+mut ok: hash_unknown_param -> tests 12 fail
+mut ok: hash_duplicate_param -> tests 12 fail
+mut ok: oversize_bound -> tests 4 fail
+drilldown-context: 12 tests, 244 checks passed
+
+exit_code=0
+
+test-execution-admission.mjs
+Execution admission: 13 checks passed
+
+exit_code=0
+
+test-financial-draft-scope.mjs
+financial draft scope: isolation, restoration, navigation and submission passed
+
+exit_code=0
+
+test-form-draft-identity.mjs
+form draft identity: ok
+draft logout cleanup: ok
+
+exit_code=0
+
+test-freshness-wiring.mjs
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.freshness-wiring-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+(node:56168) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.freshness-wiring-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.freshness-wiring-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Freshness wiring: 30 checks passed
+
+exit_code=0
+
+test-home-executable.mjs
+home executable rule checks passed: 10
+
+exit_code=0
+
+test-home-review-regressions.mjs
+Home review regressions R1-R5 rendered API checks passed
+
+exit_code=0
+
+test-input-recovery.mjs
+input recovery UI: ok
+
+exit_code=0
+
+test-integration-routes.mjs
+integration routes: all passed
+
+exit_code=0
+
+test-lark-pilot-contract.mjs
+✔ B1 pilot_disabled (15.976417ms)
+✔ B1 pilot_not_company_workspace (3.704041ms)
+✔ B1 pilot_method_not_allowed (3.549125ms)
+✔ B1 pilot_read_failed (3.398292ms)
+✔ B1 pilot_roster_missing (3.403333ms)
+✔ B1 pilot_config_invalid (3.218667ms)
+✔ B1 access_roster_expired (3.0815ms)
+✔ B1 access_not_admitted (2.973458ms)
+✔ B1 source_authorization_denied (3.313375ms)
+✔ B1 stale message uses ceiling 60 (3.93775ms)
+✔ B1 stale message uses ceiling 30 (3.221917ms)
+✔ B1 unclassified 403 undefined (3.093542ms)
+✔ B1 unclassified 403 unknown_code (3.012042ms)
+✔ B2 counts, table timestamp and field states visible (4.222667ms)
+✔ B3 source lark_live truthful live label (3.4935ms)
+✔ B3 source mock truthful live label (3.339542ms)
+✔ B3 source local truthful live label (3.504625ms)
+✔ B3 source unmapped truthful live label (3.566584ms)
+✔ B4 roster-only retry freshness false (12.151917ms)
+✔ B4 roster-only retry freshness true (8.210042ms)
+✔ B5 full workspace timeout becomes visible error and retry (8.911417ms)
+✔ B5 version change starts a new read and drops old result (7.374417ms)
+✔ B1/B2 remote lark_permission_denied failure hides counts (3.6245ms)
+✔ B1/B2 remote lark_read_failed failure hides counts (3.450542ms)
+✔ B3 unknown source rejected without a live badge (0.123125ms)
+✔ B5 roster success includes server as_of, mode false (7.636916ms)
+✔ B5 roster success includes server as_of, mode true (6.826333ms)
+✔ B3 table freshness controls live label even when envelope is fresh (3.632167ms)
+✔ B5 roster failure visible without source sync, mode false (5.372708ms)
+✔ B5 roster failure visible without source sync, mode true (5.504541ms)
+✔ roster retry timeout is visible, mode false (6.627208ms)
+✔ roster retry timeout is visible, mode true (6.204625ms)
+✔ fresh envelope cannot hide unread table (4.620333ms)
+✔ fresh envelope cannot hide no-time table (3.808042ms)
+✔ fresh envelope cannot hide incomplete table (3.2945ms)
+✔ roster displays response as_of before parent reload, mode false (4.757ms)
+✔ roster displays response as_of before parent reload, mode true (5.497583ms)
+✔ roster recovery routes only roster and re-fetches pilot, mode false (6.454666ms)
+✔ roster recovery routes only roster and re-fetches pilot, mode true (6.068625ms)
+✔ live roster recovery rejects fresh status with expired age (5.134042ms)
+✔ live roster recovery rejects fresh status with unknown age (3.515792ms)
+✔ legacy roster sync success re-fetches pilot though freshness is unconfigured (5.720625ms)
+✔ VCC-119 per-table reason no_linked_records (4.200583ms)
+✔ VCC-119 per-table reason traversal_unavailable (3.751833ms)
+✔ VCC-119 per-table reason access_denied (3.527667ms)
+✔ VCC-119 per-table reason read_failed (3.53925ms)
+✔ VCC-119 no_linked_records wording names the right parent per table (3.225666ms)
+✔ VCC-119 old payload and unknown reason degrade to plain table state (3.475292ms)
+ℹ tests 48
+ℹ suites 0
+ℹ pass 48
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 235.978042
+
+exit_code=0
+
+test-lark-pilot.mjs
+F01-F07 synthetic rendering: states, time, TTL, no controls, GET only, demo isolation and semantic status passed.
+
+exit_code=0
+
+test-live-read-regressions.mjs
+Live-read regressions passed
+
+exit_code=0
+
+test-manager-overview-view.mjs
+ok - 1. header: snapshot timestamp and readable scope; missing timestamp is a dash
+ok - 2. cases first, owner/stage/due/blocker/pending shown honestly: unknown is a dash plus reason
+ok - 3. stage and due date never render a value even if the body supplies one (no receipt / VCC-123)
+ok - 4. cards carry unit labels; drilldown descriptors pass through unchanged
+ok - 5. unavailable cards show a reason and never 0
+ok - 6. zero only for explicit complete/filtered empty evidence
+ok - 7. unresolved rows: count and state are separate; each row explicit, 對應未驗證
+ok - 8. mapping is never verified from caller strings
+ok - 9. amounts are withheld with the G-AMT reason; no value, sum or derived value
+ok - 10. weekly activity is a separate unavailable section and never filters cases
+ok - 11. Source Health panel: state labels only, no source names or counts
+ok - 12. forbidden snapshot exposes nothing; weekly forbidden too
+ok - 13. malformed body fails closed to unknown with a reason, never partially trusted
+ok - 14. no write or approval actions, and no technical ids in default columns
+ok - 15. drawer is selection-only: ids, versions and admission only inside it; missing selection is dropped
+ok - 16. sort/filter inputs: sort is view-only; filters are echoed, mismatch flagged, never applied locally
+ok - 17. retained rows under read_failed keep the error label and cards with counts are rejected
+ok - 18. 128-R1: admission accepts only the backend field set; an extra (amount) property voids the snapshot
+ok - 19. 128-R2: contradictory or malformed state invalidates the snapshot
+ok - 20. 128-R2 residual: an empty snapshot that retains a positive population card is invalid; zero and dash cards stay
+ok - 21. 128b-4030811 X1: population unavailable keeps cases listed with row keys unknown plus reason; no-row case keeps []
+ok - M1. mutation: unknown rendered as 0 -> unknown-not-zero guard (tests 5/6) would fail
+ok - M2. mutation: amount guard removed -> withheld guard (test 9) would fail
+ok - M3. mutation: caller mapping state accepted -> mapping guard (test 8) would fail
+ok - M4. mutation: stage/due force-unknown removed -> unverified due date leaks (test 3 would fail)
+ok - M5. mutation: weekly period filters cases -> separation guard (test 10) would fail
+ok - M6. mutation: malformed section partially trusted -> fail-closed guard (test 13) would fail
+ok - M7. mutation: Source Health counts leak -> no-counts guard (test 11) would fail
+ok - M8. mutation: admission field-set guard removed -> amount leaks into the drawer (test 18 would fail)
+ok - M9. mutation: malformed-state and empty-consistency guards removed -> contradictions survive (test 19 would fail)
+ok - M10. mutation: empty-state positive-card guard removed -> positive count beside empty state (test 20 would fail)
+ok - M11. mutation: null row_keys without state/reason accepted -> strict row-keys guard (test 21) would fail
+ok - M12. mutation: [] rendered as 「無」 -> empty-population copy test would fail
+manager-overview view: 33 tests, 163 checks passed
+
+exit_code=0
+
+test-my-work-integrated.mjs
+my-work integrated render: ok
+
+exit_code=0
+
+test-my-work-return-focus.mjs
+my-work return focus: ok
+
+exit_code=0
+
+test-my-work-view.mjs
+ok - 1. default table is all unfinished tasks across history; no due-date default filter
+ok - 1b. changing the weekly-activity period never removes an unfinished task
+ok - 2. mode toggle only with capability; awaiting is never approved/completed
+ok - 3. filters and selection round-trip; stale/forbidden selection dropped
+ok - 4. drawer is open only when a task is selected
+ok - 5. page states stay distinct; unknown is never zero; forbidden leaks nothing
+ok - 6. due date only when verified formal; evidence never completes
+ok - 7. actions are navigation only for existing+authorized entries; unknown outcome blocks resubmit
+ok - 8. text status labels and stable sort; retrieval time is not a key
+ok - shape tolerance: hostile input never throws and never invents values
+ok - module stays pure: no React, fetch or routing
+ok - 9. FIX1: revocation hides weekly; stale/unknown never invented; missing facts read unknown
+ok - 10. FIX2: task-level revocation applies to every dataset; status needs a known vocabulary value
+ok - 11. FIX3: no derived in-progress claim; unknown pending sentinel stays unknown and ordinary
+ok - 7. F1: absent evidence is unknown, only an explicit empty list is none; F2: data as-of
+my-work view: 15 tests, 127 checks passed
+
+exit_code=0
+
+test-native-approval-a11y.mjs
+native approval a11y checks passed
+
+exit_code=0
+
+test-native-approval-version.mjs
+native approval project-version checks passed
+
+exit_code=0
+
+test-ops-flow-view.mjs
+ops-flow view: ok
+
+exit_code=0
+
+test-ops-sync-panel.mjs
+ops-sync panel: ok
+
+exit_code=0
+
+test-overview-design.mjs
+Overview design: ready action, separate assigned waiting parity, preserved original deadline, verification/deadline states and 300-case paging passed
+
+exit_code=0
+
+test-p2-routes.mjs
+p2 routes: 11 tests passed
+mutant killed (1 failing): adapter drops deadline_to
+mutant killed (1 failing): adapter drops unsupported keys instead of reporting
+mutant killed (1 failing): set encoding without escapes
+mutant killed (2 failing): KPI drill drops unmappable backend keys
+mutant killed (2 failing): KPI drill ignores card filters
+mutant killed (1 failing): cursor history not bound to the query
+mutant killed (1 failing): cursor history ignores the current cursor
+mutant killed (1 failing): 403 mapped to read_failed
+mutant killed (1 failing): 404 on detail route not unlocated
+mutant killed (1 failing): 404 on list route becomes unlocated
+mutant killed (1 failing): 503 loses the retry affordance
+mutant killed (1 failing): Back does not restore the parent
+mutant killed (1 failing): contract -> confirmation guesses a case
+mutant killed (1 failing): task keys are navigable
+mutant killed (1 failing): gate accepts an invalid context
+mutant killed (1 failing): draft compare is order sensitive
+mutant killed (1 failing): draft compare counts blanks
+mutant killed (2 failing): overview sends list vocabulary as case filter
+p2 routes: 18 mutants killed
+
+exit_code=0
+
+test-people-attendance.mjs
+people attendance view contracts passed
+People page: search, filters, empty/reset, keyboard table, explicit refresh, re-entry, idle and permission safety passed
+
+exit_code=0
+
+test-perf.mjs
+perf tests passed
+
+exit_code=0
+
+test-pm-glance.mjs
+PM glance: state, unknown/zero, gating, privacy, existing GETs, explicit refresh, retained data, idle and source counts passed
+
+exit_code=0
+
+test-project-disabled-reasons.mjs
+Disabled primary reasons: scoped, visible, associated, enabled and secondary behavior passed
+
+exit_code=0
+
+test-recurring-draft-period.mjs
+recurring draft period identity: ok
+real action form save cleanup: ok
+
+exit_code=0
+
+test-search-input.mjs
+Search input: 1440px native typing, replacement, clear, filtering and reload protection passed
+Search input: 1024px native typing, replacement, clear, filtering and reload protection passed
+
+exit_code=0
+
+test-session-epoch.mjs
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+(node:56297) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.epoch-test-bundle.mjs:2914:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Session epoch: 41 App regression scenarios passed
+
+exit_code=0
+
+test-shell-mode.mjs
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+(node:56300) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Error: Not implemented: window.scrollTo
+    at module.exports (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at Window.scrollTo (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/.shell-test-bundle.mjs:735:12
+    at commitHookEffectListMount (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitLayoutEffectOnFiber (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:23312:15)
+    at commitLayoutMountEffects_complete (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24727:9)
+    at commitLayoutEffects_begin (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24713:7)
+    at commitLayoutEffects (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:24651:3)
+    at commitRootImpl (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26862:5)
+    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined
+Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed
+
+exit_code=0
+
+test-source-coverage-views.mjs
+Source coverage views: production Daily scope and case-only Documents metadata render correctly
+
+exit_code=0
+
+test-source-health-view.mjs
+PASS 1 attention-first; asc/desc/clear and stable source key; no retrieval fallback
+PASS 2 three independent timestamps; summary oldest relevant success or unknown
+PASS 3 distinct stages; caller receipts never authoritative; definitions never success counts
+PASS 4 partial and stale independent and coexisting
+PASS 5 viewer split; forbidden omitted from every output; search cannot alter summary
+PASS 6 drawer selection only; revocation and disappearance drop selection
+PASS 7 retry preserves opaque authorized handle; no scope expansion or unauthorized retry
+PASS 8 C-STATE text labels; unknown never zero; malformed payloads fail closed
+PASS G2 loading and unlocated suppress every scoped count
+PASS G4 timestamp sorting compares instants across mixed offsets
+PASS G5 present non-boolean stage flags are unknown and need attention
+PASS G6 source and field mappings use unverified mapping copy without authority
+PASS F1 timestamp sorting never substitutes retrieval and keeps unknown last
+PASS F2 healthy text requires absence of every negative stage flag
+PASS F3 read_failed suppresses every count rather than inventing an empty read
+PASS F4 accepted is always false even with matched caller receipts and stage flags
+PASS F5 empty states never present contradictory nonzero scope counts
+PASS F7 malformed and forbidden-looking states expose no metadata anywhere
+PASS F8 ordinary read_failed guidance offers an available administrator action
+PASS H1 null page_state stays unknown and never yields a healthy/clean label; absent or malformed too
+PASS mutation rejected: unknown source update falls back to retrieval (F1 )
+PASS mutation rejected: unknown timestamp sorts first (F1 )
+PASS mutation rejected: healthy label erased (F2 )
+PASS mutation rejected: failed read retains counts (F3 )
+PASS mutation rejected: caller receipt reference echoed (3 distinct)
+PASS mutation rejected: retrieval substituted for source update (1 attention-first)
+PASS mutation rejected: caller string re-enables mapping authority (3 distinct)
+PASS mutation rejected: caller string re-enables acceptance (F4 )
+PASS mutation rejected: field caller string re-enables YX binding (3 distinct)
+PASS mutation rejected: forbidden metadata leaked (5 viewer split)
+source health: 20 named tests passed
+
+exit_code=0
+
+test-source-lifecycle.mjs
+Source lifecycle gate: all checks passed
+
+exit_code=0
+
+test-taipei-time.mjs
+ok TZ=America/Los_Angeles
+ok TZ=Asia/Taipei
+ok TZ=UTC
+taipei-time passed under America/Los_Angeles, Asia/Taipei, UTC
+
+exit_code=0
+
+test-view-data.mjs
+View data: abort, route/reload races, session isolation, ETag/304, errors and StrictMode passed
+
+exit_code=0
+
+test-work-assigned-visibility.mjs
+Work assigned visibility checks passed
+
+exit_code=0
+
+test-work-item-detail-view.mjs
+ok 1. breadcrumb runs Confirmation → Contract Line → Work Item and tabs are the five named ones
+ok 2. unknown-not-zero: quantity, unit, plan/actual and dates render an em dash plus reason, never 0
+ok 3. amount withheld: 未核准顯示 + G-AMT reason, no value even when the body carries one
+ok 4. work orders are unlocated with an explicit row and Source Health link; body rows never render
+ok 5. rework instances are distinct rows with round history; duplicate identity fails closed
+ok 6. receipt_missing renders 對應未驗證 and body claims of verified are never upgraded
+ok 7. missing confirmation edge renders an explicit unresolved path, not a blank
+ok 8. evidence rows are evidence-only, never completion; evidence cannot set execution state
+ok 9. deliverables sort by date (default desc) then stable id; undated last
+ok 10. case_daily_reports is a link-only entry with no count, no rows, no state count
+ok 11. hand-built {states:[unlocated]} envelope without count normalizes safely
+ok 12. side dates are four distinct unknown cells with distinct reasons
+ok 13. forbidden-absent: forbidden page renders only the state; forbidden section shows no rows or hints
+ok 14. missing selection (body is only unknown) shows state only, no key, count or label
+ok 15. malformed body fails closed to unknown with a reason, never partially trusted
+ok 16. IDs live only in the drawer model; default rows carry none
+ok 17. drawer is selection-only: stale selection dropped, never resurrected
+ok 18. forbidden actions absent: no Complete/Approve/SOP write control or key anywhere
+ok 19. unknown body reason strings are not echoed (no ID smuggling through reasons)
+ok 20. history tab: completed history collapsed until expanded; round history always listed
+ok 21. 132-R1 forbidden side section: loaded owner, warnings and dates are not displayed
+ok 22. 132-R2 incomplete body: header-only partial body is an unknown page with reason
+ok 23. 132-R2 conflicting instance identity fails the whole node section closed (and drawer cannot open)
+ok 24. 132-P1 missing parent: explicit unresolved path keeps Work Item endpoint, no navigation or ID
+24/24 tests, 142 checks
+
+exit_code=0
+
+55 files, 0 failed

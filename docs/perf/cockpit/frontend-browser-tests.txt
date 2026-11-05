@@ -1,0 +1,3 @@
+ops-sync panel: ok
+Search input: 1440px native typing, replacement, clear, filtering and reload protection passed
+Search input: 1024px native typing, replacement, clear, filtering and reload protection passed

@@ -1,0 +1,27 @@
+✘ [ERROR] Could not resolve "./src/buildIdentity"
+
+    <stdin>:1:25:
+      1 │ export {buildLabel} from './src/buildIdentity';
+        ╵                          ~~~~~~~~~~~~~~~~~~~~~
+
+/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752
+  let error = new Error(text);
+              ^
+
+Error: Build failed with 1 error:
+<stdin>:1:25: ERROR: Could not resolve "./src/buildIdentity"
+    at failureErrorWithLog (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752:15)
+    at /Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1211:25
+    at /Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1163:52
+    at buildResponseToResult (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1209:7)
+    at /Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1236:16
+    at responseCallbacks.<computed> (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:886:9)
+    at handleIncomingPacket (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:941:12)
+    at Socket.readFromStdout (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+Node.js v24.19.0

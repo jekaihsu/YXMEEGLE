@@ -1,0 +1,4 @@
+Home layout v2 persona, visibility, defensive parsing and literal defaults passed.
+Home sections: 9 literal grouping, visibility, section-edge moves and saved v2 checks passed.
+Home reports layout: 6 literal section order, cases placement and old v2 migration checks passed.
+PASS 5 available-neighbour and section-edge assertions

@@ -1,0 +1,90 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {writeFile,unlink} from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+const bundle=await build({stdin:{contents:"export {useReport,useDebounce,useReportSearch} from './src/reports/useReport';export {invalidateSessionEpoch} from './src/api';export {ReportState} from './src/reports/shared';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
+const path=new URL('./.reports-requests-bundle.mjs',import.meta.url);await writeFile(path,bundle.outputFiles[0].text);let useReport,useDebounce,useReportSearch,invalidateSessionEpoch,ReportState;try{({useReport,useDebounce,useReportSearch,invalidateSessionEpoch,ReportState}=await import(path.href))}finally{await unlink(path)}
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});Object.assign(globalThis,{window:dom.window,document:dom.window.document,location:dom.window.location,IS_REACT_ACT_ENVIRONMENT:true});
+const pending=[];globalThis.fetch=(url,options)=>new Promise(resolve=>pending.push({url,options,resolve}));
+function View({group}){const state=useReport('review',{group});return React.createElement('div',null,state.loading?'loading':state.error||state.data?.value)}
+const root=createRoot(document.getElementById('root'));const render=group=>act(async()=>root.render(React.createElement(View,{group})));const reply=(i,value)=>act(async()=>pending[i].resolve(new Response(JSON.stringify({value}),{status:200})));
+await render('一組');await render('二組');assert.equal(pending[0].options.signal.aborted,false,'page owner retains pending query reads');await reply(1,'current');await reply(0,'old');assert.equal(document.body.textContent,'current');
+await render('一組');assert.equal(document.body.textContent,'old');await render('二組');assert.equal(pending.length,2);assert.equal(document.body.textContent,'current');await render('三組');await act(async()=>invalidateSessionEpoch());await reply(2,'wrong session');assert.equal(document.body.textContent,'loading');
+await act(async()=>root.unmount());assert.equal(pending[2].options.signal.aborted,true);
+console.log('Reports stale responses, session epoch and unmount cancellation passed.');
+
+const searchRoot=createRoot(document.getElementById('root'));
+function Search({search}){const [offset,setOffset]=React.useState(50);const q=useDebounce(search,()=>setOffset(0));return React.createElement('div',null,`${q}:${offset}`)}
+await act(async()=>searchRoot.render(React.createElement(Search,{search:''})));
+await act(async()=>searchRoot.render(React.createElement(Search,{search:'new'})));
+assert.equal(document.body.textContent,':50');
+await act(async()=>new Promise(r=>setTimeout(r,300)));
+assert.equal(document.body.textContent,'new:0');
+await act(async()=>searchRoot.unmount());
+console.log('Search offset resets with the debounced query.');
+
+const atomicRoot=createRoot(document.getElementById('root'));let searchActions;
+function AtomicSearch(){const [group,setGroup]=React.useState('A');const state=useReportSearch(()=>{});searchActions={...state,clear:()=>{state.applySearch('');setGroup('')},rank:()=>{state.applySearch('ranked');setGroup('B')}};useReport('review/rows',{group,q:state.q});return null}
+await act(async()=>atomicRoot.render(React.createElement(AtomicSearch)));
+await act(async()=>searchActions.setSearch('old'));
+await act(async()=>new Promise(r=>setTimeout(r,300)));
+let before=pending.length;
+await act(async()=>searchActions.clear());
+assert.equal(pending.length,before+1);assert.equal(new URL(pending.at(-1).url,'http://localhost').searchParams.has('q'),false);
+await act(async()=>searchActions.setSearch('pending'));
+before=pending.length;
+await act(async()=>searchActions.rank());
+assert.equal(pending.length,before+1);assert.equal(new URL(pending.at(-1).url,'http://localhost').searchParams.get('q'),'ranked');
+await act(async()=>new Promise(r=>setTimeout(r,300)));assert.equal(pending.length,before+1);
+await act(async()=>atomicRoot.unmount());
+console.log('Clear and ranking apply the query and filters together without stale requests.');
+
+
+const warmingRoot=createRoot(document.getElementById('root'));
+let warmingState;
+function Warming({group}){warmingState=useReport('sales',{pm:group});return warmingState.data?React.createElement('div',null,warmingState.data.value):React.createElement(ReportState,warmingState)}
+const {fakeClock}=await import('./fake-clock-fixture.mjs');const clock=fakeClock(window);
+try{
+ for(const [group,status,body] of [['warming',503,{warming:true,retry_after:5}],['accepted',202,{}],['offline',503,{detail:'offline'}],['partial',200,{value:'partial',meta:{partial:true}}]]){
+  await act(async()=>warmingRoot.render(React.createElement(Warming,{group})));
+  const count=pending.length;
+  await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify(body),{status})));
+  await act(async()=>clock.advance(600000));
+  assert.equal(pending.length,count,`${group}: zero requests in ten minutes`);
+  if(status!==200){assert.equal(warmingState.loading,false);assert.equal(document.querySelector('button').textContent,'重新讀取')}
+  await act(async()=>warmingState.retry());assert.equal(pending.length,count+1,`${group}: explicit retry makes one request`);
+  await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'ready'}))));
+ }
+ await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'retained'})));
+ const known={value:'last successful',meta:{fetched_at:'2026-11-02T00:00:00Z'}};
+ await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify(known))));
+ await act(async()=>warmingState.retry());assert.deepEqual(warmingState.data,known,'refresh keeps last data while pending');
+ await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'offline'}),{status:503})));
+ assert.equal(warmingState.error,'offline');assert.equal(warmingState.data.value,known.value);assert.equal(warmingState.data.meta.refresh_error,true);assert.deepEqual(warmingState.previous,known,'Error retains previous data and its timestamp with a visible stale failure banner');
+ const retainedCount=pending.length;await act(async()=>clock.advance(600000));assert.equal(pending.length,retainedCount);
+ await act(async()=>warmingState.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({value:'recovered'}))));
+ assert.equal(warmingState.data.value,'recovered');assert.equal(warmingState.error,undefined);
+ await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'deadline'})));
+ const stalled=pending.at(-1);await act(async()=>clock.advance(30000));assert.equal(stalled.options.signal.aborted,true);
+ await act(async()=>warmingRoot.render(React.createElement(Warming,{group:'session'})));
+ const old=pending.at(-1);await act(async()=>invalidateSessionEpoch());assert.equal(old.options.signal.aborted,true);
+ await act(async()=>warmingRoot.unmount());
+}finally{clock.restore()}
+console.log('Report warming/202/offline/partial: ten minutes = zero requests; explicit retry = one; deadline and session abort original fetch.');
+
+const {spawnSync}=await import('node:child_process');
+for(const scenario of ['assets-blank','asset-owner','progress-week','progress-label','points','progress-sentinel','progress-options']){const result=spawnSync(process.execPath,['test-reports-interactions.mjs'],{env:{...process.env,REPORT_CASE:scenario},encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);}
+
+// I5: failed explicit refresh retains the last report and marks its metadata stale;
+// a denied read removes that retained report rather than displaying another scope.
+const retainRoot=createRoot(document.getElementById('root'));let retained;
+function Retained(){retained=useReport('sales',{fixture:'I5'});return React.createElement('div',null,retained.data?JSON.stringify(retained.data):retained.denied?'denied':'loading')}
+await act(async()=>retainRoot.render(React.createElement(Retained)));
+await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({meta:{stale:false,gaps:[],fetched_at:'2026-11-02T11:32:00Z'},total:940}),{status:200})));
+await act(async()=>retained.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'來源讀取失敗'}),{status:500})));
+assert.equal(retained.data.total,940);assert.equal(retained.data.meta.stale,true);assert.equal(retained.data.meta.refresh_error,true);
+await act(async()=>retained.retry());await act(async()=>pending.at(-1).resolve(new Response(JSON.stringify({detail:'沒有權限'}),{status:403})));
+assert.equal(retained.data,undefined);assert.equal(retained.previous,undefined);assert.equal(retained.denied,true);assert.equal(document.body.textContent,'denied');
+await act(async()=>retainRoot.unmount());console.log('I5 retained 940-row report, failed refresh metadata and 403 cache removal passed.');

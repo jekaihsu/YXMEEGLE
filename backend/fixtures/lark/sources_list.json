@@ -1,0 +1,75 @@
+{
+  "fields": {
+    "code": 0,
+    "data": {
+      "items": [
+        {
+          "field_id": "fldTitle",
+          "field_name": "工程名稱",
+          "type": 1
+        },
+        {
+          "field_id": "fldLink",
+          "field_name": "所屬成本單",
+          "type": 18,
+          "property": {
+            "table_id": "tblSyntheticCost"
+          }
+        }
+      ],
+      "has_more": false
+    }
+  },
+  "pages": [
+    {
+      "code": 0,
+      "data": {
+        "items": [
+          {
+            "record_id": "recSynthetic1",
+            "fields": {
+              "工程名稱": "合成工程 1",
+              "所屬成本單": [
+                "recSyntheticCost"
+              ]
+            },
+            "created_time": 1700000000001,
+            "last_modified_time": 1700000001001
+          },
+          {
+            "record_id": "recSynthetic2",
+            "fields": {
+              "工程名稱": "合成工程 2",
+              "所屬成本單": [
+                "recSyntheticCost"
+              ]
+            },
+            "created_time": 1700000000002,
+            "last_modified_time": 1700000001002
+          }
+        ],
+        "has_more": true,
+        "page_token": "synthetic-next"
+      }
+    },
+    {
+      "code": 0,
+      "data": {
+        "items": [
+          {
+            "record_id": "recSynthetic3",
+            "fields": {
+              "工程名稱": "合成工程 3",
+              "所屬成本單": [
+                "recSyntheticCost"
+              ]
+            },
+            "created_time": 1700000000003,
+            "last_modified_time": 1700000001003
+          }
+        ],
+        "has_more": false
+      }
+    }
+  ]
+}

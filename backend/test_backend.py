@@ -5,13 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from .app import create_app, WorkspaceRow, AuthRow, BusinessRow
 from . import storage
-from .seed import seed
+from .test_ux_disabled import enabled_seed as seed
 from .sources import import_sources, number, day
 from .workflow import now
 
 @pytest.fixture
 def app(tmp_path):
-    return create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
+    return create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
 @pytest.fixture
 def client(app):
     c=TestClient(app); assert c.get('/api/session').status_code==200; return c
@@ -96,7 +96,7 @@ def test_initial_schedule_assignment_history_and_replay(client):
 
 def test_restart_and_demo_isolation(app,client,tmp_path):
     assert act(client,'comment_add',{'body':'重新啟動仍保留'}).status_code==200
-    restarted=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
+    restarted=create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
     c2=TestClient(restarted); c2.cookies.update(client.cookies); assert workspace(c2)['projects'][0]['comments'][0]['body']=='重新啟動仍保留'
     isolated=TestClient(app); isolated.get('/api/session'); assert workspace(isolated)['projects'][0]['comments']==[]
     assert isolated.get('/api/sources').json()['records']==[]; assert isolated.post('/api/sources/sync').status_code==403
@@ -118,6 +118,22 @@ def test_production_config_and_oauth_state(tmp_path):
     assert c.post('/api/demo/session',json={'user_id':'u-manager'}).status_code==403
     assert c.get('/api/auth/lark/callback?state=forged&code=fake').status_code==400
     r=c.get('/api/auth/lark/login',follow_redirects=False); assert 'app_id=test' in r.headers['location']
+
+def test_lark_oauth_denial_returns_safe_actionable_error_redirect(tmp_path):
+    from urllib.parse import parse_qs,urlparse
+    cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/oauth-denial.db','UPLOAD_DIR':str(tmp_path/'u'),
+         'APP_ENV':'development','DEMO_MODE':'false','SESSION_SECRET':'oauth-denial-test'*4,
+         'LARK_APP_ID':'test','LARK_APP_SECRET':'test','LARK_REDIRECT_URI':'https://example.org/api/auth/lark/callback',
+         'LARK_ALLOWED_TENANTS':'tenant'}
+    client=TestClient(create_app(cfg))
+    login=client.get('/api/auth/lark/login',follow_redirects=False)
+    state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
+    denied=client.get('/api/auth/lark/callback',params={'state':state,'error':'access_denied',
+        'error_description':'synthetic private provider detail'},follow_redirects=False)
+    assert denied.status_code==303
+    assert denied.headers['location']=='/?auth_error=authorization_denied'
+    assert 'synthetic' not in denied.headers['location']
+    assert 'lark_oauth_state' in denied.headers.get('set-cookie','')
 
 def test_source_normalization_formula_values_repeated_sync_and_manual_protection():
     ws=seed(True)
@@ -174,8 +190,9 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     response=client.get('/api/auth/lark/login',follow_redirects=False); state=parse_qs(urlparse(response.headers['location']).query)['state'][0]
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'valid'},follow_redirects=False); assert response.status_code==307
     assert client.get('/api/session').json()['user']['role']=='manager'
-    assert client.get('/api/workspace').status_code==403
-    # OAuth bootstrap alone grants repair access, not business access. Simulate
+    assert client.get('/api/workspace').status_code==200
+    assert client.get('/api/session').json()['access_mode']=='recovery'
+    # OAuth bootstrap permits read views; writes still need the existing authority. Simulate
     # a fresh authoritative roster result before exercising ordinary isolation.
     from .app import PersonRow
     from .workflow import now
@@ -192,7 +209,7 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     existing=TestClient(downgraded); existing.cookies.update(client.cookies)
     assert existing.get('/api/session').json()['user']['role']=='manager'
     session=existing.get('/api/session').json()
-    assert session['environment']=='lark'  # Session namespace label; workspace uses production.
+    assert session['environment']=='production'
     assert session['workspace_id']=='lark-company'
     assert workspace(existing)['environment']=='production'
     with downgraded.state.sessions() as db:
@@ -204,9 +221,10 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     first_client=TestClient(first)
     login=first_client.get('/api/auth/lark/login',follow_redirects=False)
     first_state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
-    # Company tenant membership alone must not admit an unverified employee.
-    assert first_client.get('/api/auth/lark/callback',params={'state':first_state,'code':'valid'},follow_redirects=False).status_code==403
-    assert first_client.get('/api/session').json()['user'] is None
+    # Tenant membership permits read views, without write or administrative authority.
+    assert first_client.get('/api/auth/lark/callback',params={'state':first_state,'code':'valid'},follow_redirects=False).status_code==307
+    assert first_client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert first_client.post('/api/people/sync').status_code==403
 
 def test_changed_revision_updates_dependency_references(client):
     aid=proposal(client); act(client,'approval_submit',{'approval_id':aid}); assign_demo_manager_as_pm(client); role(client,'u-manager')
@@ -230,10 +248,11 @@ def test_inherited_assignment_updates_but_explicit_owner_and_completed_work_rema
 
 def test_live_submit_fails_without_mutating_draft_or_freezing_work(tmp_path):
     import time
-    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/live.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+    app=create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/live.db','UPLOAD_DIR':str(tmp_path/'uploads'),
                     'SESSION_SECRET':'live-test-secret'*4,'APP_ENV':'development','DEMO_MODE':'false',
                     'LARK_WORKER_ORGANIZATION':'test','LARK_ALLOWED_TENANTS':'test'})
     live=seed(); live['environment']='production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     for project in live['projects']:
         project.update(source_kind='lark',execution_system='workbench',case_visibility='new_case')
     with app.state.sessions.begin() as db:
@@ -309,14 +328,14 @@ def test_v4_missing_and_ambiguous_project_mapping_is_reported():
     result=import_sources(ws,records); assert result['daily_unmatched']==1
     assert all(not project['daily_reports'] for project in ws['projects'])
 
-def test_oauth_scope_parameter_is_explicit_minimal_and_configurable(tmp_path):
+def test_oauth_login_does_not_request_feature_scopes(tmp_path):
     from urllib.parse import urlparse, parse_qs
     cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/scope.db','UPLOAD_DIR':str(tmp_path/'uploads'),'APP_ENV':'development','DEMO_MODE':'false','LARK_APP_ID':'test','LARK_APP_SECRET':'test','LARK_REDIRECT_URI':'https://example.org/callback','LARK_ALLOWED_TENANTS':'company'}
     for value,expected in [(None,'bitable:app:readonly'),('bitable:app:readonly, approval:approval:readonly bitable:app:readonly','bitable:app:readonly approval:approval:readonly')]:
         a=create_app({**cfg,**({'LARK_OAUTH_SCOPES':value} if value else {})})
         result=TestClient(a).get('/api/auth/lark/login',follow_redirects=False)
         query=parse_qs(urlparse(result.headers['location']).query)
-        assert query['scope']==[expected] and query['response_type']==['code'] and query['app_id']==['test']
+        assert 'scope' not in query and query['response_type']==['code'] and query['app_id']==['test']
     with pytest.raises(RuntimeError): create_app({**cfg,'LARK_ROLE_MAP_JSON':'{"ou_user":"administrator"}'})
 
 def test_native_approval_refresh_uses_official_user_endpoint(app,monkeypatch):
@@ -325,11 +344,12 @@ def test_native_approval_refresh_uses_official_user_endpoint(app,monkeypatch):
     live=seed(); live['projects'][0]['source_kind']='lark'
     app.state.cfg.update(LARK_WORKER_ORGANIZATION='approval-test',LARK_ALLOWED_TENANTS='approval-test')
     live['environment']='production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     for project in live['projects']:
         project.update(case_visibility='new_case',execution_system='workbench')
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-approval-test',version=1,data=live))
-        db.add(AuthRow(id='approval-session',data={'wid':'lark-approval-test','expires':time.time()+3600,'access_token':'user-token'}))
+        db.add(AuthRow(id='approval-session',data={'wid':'lark-approval-test','expires':time.time()+3600,'token_expires':time.time()+3600,'access_token':'user-token'}))
     c=TestClient(app); c.cookies.set('meegle_session',app.state.signer.dumps({'mode':'lark','uid':'u-pm','wid':'lark-approval-test','sid':'approval-session'}))
     aid=proposal(c); requests=[]
     class ReadClient:
@@ -424,6 +444,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     from . import workflow
     # Compare transport encodings at the same authorization observation time.
     checked_at=workflow.now(); monkeypatch.setattr(workflow,'now',lambda:checked_at)
+    from datetime import datetime
+    app.state.live_read.clock=lambda:datetime.fromisoformat(checked_at)
     from .app import CacheRow
     compressed=client.get('/api/workspace',headers={'Accept-Encoding':'gzip'})
     plain=client.get('/api/workspace',headers={'Accept-Encoding':'identity'})
@@ -435,6 +457,7 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     app.state.cfg.update(LARK_WORKER_ORGANIZATION='compression',LARK_ALLOWED_TENANTS='compression')
     with app.state.sessions.begin() as db:
         state=seed();state['environment']='production'
+        for project in state.get('projects', []): project['source_kind']='lark'
         state['source_visible_record_ids']=[f'base|quote|rec{i}' for i in range(100)]
         db.add(WorkspaceRow(id='lark-compression',version=1,data=state))
         db.add(AuthRow(id='compression-session',data={'wid':'lark-compression','expires':time.time()+3600,'access_token':'unused'}))
@@ -445,5 +468,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     assert compressed.status_code==200 and compressed.headers.get('content-encoding')=='gzip'
     from .source_case_policy import visible_source_snapshot
     from .workspace_projection import public_source_cache
-    assert compressed.json()==plain.json()==public_source_cache(visible_source_snapshot(state,cache))
+    freshness=app.state.live_read.status('lark-compression')
+    expected={**public_source_cache(visible_source_snapshot(state,cache)),
+              'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
+    assert compressed.json()==plain.json()==expected
     assert client.get('/api/sources',headers={'Accept-Encoding':'gzip'}).json()['records']==[]

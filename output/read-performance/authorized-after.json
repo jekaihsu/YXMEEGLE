@@ -1,0 +1,409 @@
+{
+  "fixture_projects": 319,
+  "samples": 5,
+  "sop_reader": true,
+  "environment": "local SQLite/demo; live reads off; shell/index on",
+  "endpoints": {
+    "/api/session": {
+      "first": {
+        "ms": 5.95,
+        "status": 200,
+        "bytes": 9444,
+        "sql_queries": 4,
+        "decoded_json_values": 132,
+        "business_rows": 130,
+        "server_timing": "identity;dur=2.5, load;dur=1.8, serialize;dur=0.9, total;dur=5.3"
+      },
+      "median_ms": 5.33,
+      "p95_ms": 8.31,
+      "range_ms": [
+        4.52,
+        8.31
+      ],
+      "warm": [
+        {
+          "ms": 5.33,
+          "status": 200,
+          "bytes": 9444,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.0, load;dur=1.8, serialize;dur=0.9, total;dur=4.8"
+        },
+        {
+          "ms": 6.21,
+          "status": 200,
+          "bytes": 9444,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.4, load;dur=2.1, serialize;dur=1.1, total;dur=5.6"
+        },
+        {
+          "ms": 8.31,
+          "status": 200,
+          "bytes": 9444,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.5, load;dur=4.3, serialize;dur=0.9, total;dur=7.6"
+        },
+        {
+          "ms": 4.89,
+          "status": 200,
+          "bytes": 9444,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=1.9, load;dur=1.7, serialize;dur=0.8, total;dur=4.4"
+        },
+        {
+          "ms": 4.52,
+          "status": 200,
+          "bytes": 9444,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=1.8, load;dur=1.6, serialize;dur=0.7, total;dur=4.0"
+        }
+      ]
+    },
+    "/api/settings/overview": {
+      "first": {
+        "ms": 3.83,
+        "status": 200,
+        "bytes": 960,
+        "sql_queries": 7,
+        "decoded_json_values": 68,
+        "business_rows": 65,
+        "server_timing": "identity;dur=2.0, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=1.2, total;dur=3.4"
+      },
+      "median_ms": 3.01,
+      "p95_ms": 3.23,
+      "range_ms": [
+        2.97,
+        3.23
+      ],
+      "warm": [
+        {
+          "ms": 3.2,
+          "status": 200,
+          "bytes": 960,
+          "sql_queries": 7,
+          "decoded_json_values": 68,
+          "business_rows": 65,
+          "server_timing": "identity;dur=2.0, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=0.6, total;dur=2.7"
+        },
+        {
+          "ms": 3.01,
+          "status": 200,
+          "bytes": 960,
+          "sql_queries": 7,
+          "decoded_json_values": 68,
+          "business_rows": 65,
+          "server_timing": "identity;dur=1.8, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=0.6, total;dur=2.6"
+        },
+        {
+          "ms": 3.23,
+          "status": 200,
+          "bytes": 960,
+          "sql_queries": 7,
+          "decoded_json_values": 68,
+          "business_rows": 65,
+          "server_timing": "identity;dur=2.0, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=0.6, total;dur=2.8"
+        },
+        {
+          "ms": 2.97,
+          "status": 200,
+          "bytes": 960,
+          "sql_queries": 7,
+          "decoded_json_values": 68,
+          "business_rows": 65,
+          "server_timing": "identity;dur=1.8, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=0.6, total;dur=2.5"
+        },
+        {
+          "ms": 2.97,
+          "status": 200,
+          "bytes": 960,
+          "sql_queries": 7,
+          "decoded_json_values": 68,
+          "business_rows": 65,
+          "server_timing": "identity;dur=1.7, load;dur=0.1, project;dur=0.0, encode;dur=0.0, serialize;dur=0.6, total;dur=2.5"
+        }
+      ]
+    },
+    "/api/projects/p001": {
+      "first": {
+        "ms": 25.7,
+        "status": 200,
+        "bytes": 63592,
+        "sql_queries": 8,
+        "decoded_json_values": 2742,
+        "business_rows": 2740,
+        "server_timing": "identity;dur=1.8, load;dur=13.8, project;dur=5.6, encode;dur=1.8, serialize;dur=1.4, total;dur=24.4"
+      },
+      "median_ms": 25.24,
+      "p95_ms": 31.87,
+      "range_ms": [
+        23.86,
+        31.87
+      ],
+      "warm": [
+        {
+          "ms": 31.87,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 2742,
+          "business_rows": 2740,
+          "server_timing": "identity;dur=2.7, load;dur=14.3, project;dur=9.0, encode;dur=2.3, serialize;dur=1.8, total;dur=30.1"
+        },
+        {
+          "ms": 23.86,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 2742,
+          "business_rows": 2740,
+          "server_timing": "identity;dur=2.4, load;dur=12.9, project;dur=5.3, encode;dur=1.3, serialize;dur=1.4, total;dur=23.2"
+        },
+        {
+          "ms": 25.24,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 2742,
+          "business_rows": 2740,
+          "server_timing": "identity;dur=2.5, load;dur=14.2, project;dur=5.3, encode;dur=1.3, serialize;dur=1.3, total;dur=24.6"
+        },
+        {
+          "ms": 24.99,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 2742,
+          "business_rows": 2740,
+          "server_timing": "identity;dur=2.3, load;dur=13.7, project;dur=5.6, encode;dur=1.3, serialize;dur=1.4, total;dur=24.4"
+        },
+        {
+          "ms": 26.11,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 2742,
+          "business_rows": 2740,
+          "server_timing": "identity;dur=2.4, load;dur=13.9, project;dur=5.4, encode;dur=1.3, serialize;dur=1.9, total;dur=24.9"
+        }
+      ]
+    },
+    "/api/workspace": {
+      "first": {
+        "ms": 701.12,
+        "status": 200,
+        "bytes": 14978477,
+        "sql_queries": 12,
+        "decoded_json_values": 33593,
+        "business_rows": 33588,
+        "server_timing": "identity;dur=3.6, load;dur=123.9, project;dur=443.7, serialize;dur=123.7, total;dur=694.9"
+      },
+      "median_ms": 678.64,
+      "p95_ms": 722.87,
+      "range_ms": [
+        635.05,
+        722.87
+      ],
+      "warm": [
+        {
+          "ms": 722.87,
+          "status": 200,
+          "bytes": 14978477,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=3.1, load;dur=142.0, project;dur=464.6, serialize;dur=108.8, total;dur=718.5"
+        },
+        {
+          "ms": 664.06,
+          "status": 200,
+          "bytes": 14978477,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.6, load;dur=129.6, project;dur=418.5, serialize;dur=109.0, total;dur=659.7"
+        },
+        {
+          "ms": 707.03,
+          "status": 200,
+          "bytes": 14978477,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.7, load;dur=160.8, project;dur=425.5, serialize;dur=113.8, total;dur=702.9"
+        },
+        {
+          "ms": 635.05,
+          "status": 200,
+          "bytes": 14978477,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.3, load;dur=153.8, project;dur=371.5, serialize;dur=103.3, total;dur=630.9"
+        },
+        {
+          "ms": 678.64,
+          "status": 200,
+          "bytes": 14978477,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.4, load;dur=171.7, project;dur=397.5, serialize;dur=102.9, total;dur=674.5"
+        }
+      ]
+    },
+    "/api/projects/p001/sop-tasks": {
+      "first": {
+        "ms": 12.5,
+        "status": 200,
+        "bytes": 1133,
+        "sql_queries": 13,
+        "decoded_json_values": 746,
+        "business_rows": 744,
+        "server_timing": "identity;dur=2.3, load;dur=6.3, serialize;dur=3.2, total;dur=11.8"
+      },
+      "median_ms": 10.85,
+      "p95_ms": 14.32,
+      "range_ms": [
+        9.9,
+        14.32
+      ],
+      "warm": [
+        {
+          "ms": 10.48,
+          "status": 200,
+          "bytes": 1133,
+          "sql_queries": 13,
+          "decoded_json_values": 746,
+          "business_rows": 744,
+          "server_timing": "identity;dur=2.1, load;dur=6.3, serialize;dur=1.4, total;dur=9.9"
+        },
+        {
+          "ms": 10.85,
+          "status": 200,
+          "bytes": 1133,
+          "sql_queries": 13,
+          "decoded_json_values": 746,
+          "business_rows": 744,
+          "server_timing": "identity;dur=2.1, load;dur=6.3, serialize;dur=1.6, total;dur=10.0"
+        },
+        {
+          "ms": 14.32,
+          "status": 200,
+          "bytes": 1133,
+          "sql_queries": 13,
+          "decoded_json_values": 746,
+          "business_rows": 744,
+          "server_timing": "identity;dur=3.7, load;dur=7.9, serialize;dur=2.2, total;dur=13.8"
+        },
+        {
+          "ms": 10.86,
+          "status": 200,
+          "bytes": 1133,
+          "sql_queries": 13,
+          "decoded_json_values": 746,
+          "business_rows": 744,
+          "server_timing": "identity;dur=2.6, load;dur=6.4, serialize;dur=1.3, total;dur=10.3"
+        },
+        {
+          "ms": 9.9,
+          "status": 200,
+          "bytes": 1133,
+          "sql_queries": 13,
+          "decoded_json_values": 746,
+          "business_rows": 744,
+          "server_timing": "identity;dur=2.0, load;dur=6.0, serialize;dur=1.4, total;dur=9.4"
+        }
+      ]
+    },
+    "/api/projects/p001/sop-assignees": {
+      "first": {
+        "ms": 9.73,
+        "status": 200,
+        "bytes": 52,
+        "sql_queries": 8,
+        "decoded_json_values": 737,
+        "business_rows": 735,
+        "server_timing": "identity;dur=2.1, load;dur=6.4, serialize;dur=0.6, total;dur=9.2"
+      },
+      "median_ms": 9.68,
+      "p95_ms": 10.2,
+      "range_ms": [
+        9.24,
+        10.2
+      ],
+      "warm": [
+        {
+          "ms": 10.2,
+          "status": 200,
+          "bytes": 52,
+          "sql_queries": 8,
+          "decoded_json_values": 737,
+          "business_rows": 735,
+          "server_timing": "identity;dur=2.4, load;dur=6.6, serialize;dur=0.6, total;dur=9.6"
+        },
+        {
+          "ms": 9.68,
+          "status": 200,
+          "bytes": 52,
+          "sql_queries": 8,
+          "decoded_json_values": 737,
+          "business_rows": 735,
+          "server_timing": "identity;dur=2.2, load;dur=6.3, serialize;dur=0.6, total;dur=9.1"
+        },
+        {
+          "ms": 9.77,
+          "status": 200,
+          "bytes": 52,
+          "sql_queries": 8,
+          "decoded_json_values": 737,
+          "business_rows": 735,
+          "server_timing": "identity;dur=2.1, load;dur=6.5, serialize;dur=0.7, total;dur=9.2"
+        },
+        {
+          "ms": 9.24,
+          "status": 200,
+          "bytes": 52,
+          "sql_queries": 8,
+          "decoded_json_values": 737,
+          "business_rows": 735,
+          "server_timing": "identity;dur=2.0, load;dur=6.1, serialize;dur=0.6, total;dur=8.7"
+        },
+        {
+          "ms": 9.4,
+          "status": 200,
+          "bytes": 52,
+          "sql_queries": 8,
+          "decoded_json_values": 737,
+          "business_rows": 735,
+          "server_timing": "identity;dur=2.0, load;dur=6.2, serialize;dur=0.7, total;dur=8.9"
+        }
+      ]
+    }
+  },
+  "concurrent_three_reads": [
+    {
+      "path": "/api/session",
+      "ms": 8.26,
+      "status": 200
+    },
+    {
+      "path": "/api/settings/overview",
+      "ms": 7.95,
+      "status": 200
+    },
+    {
+      "path": "/api/projects/p001",
+      "ms": 27.34,
+      "status": 200
+    }
+  ]
+}

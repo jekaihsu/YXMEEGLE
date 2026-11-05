@@ -1,0 +1,12 @@
+npm notice run yongxiang-workspace-prototype@0.1.0 test:dispatch-publish
+npm notice run node test-dispatch-publish.mjs && node test-dispatch-publish-ui.mjs && node test-dispatch-round2.mjs
+dispatch publish model passed against 40 captured backend examples
+dispatch publish UI passed with captured options, task prefill, drafts, member seats, UUID retry, 409/503, reconciliation and all 21 fields
+PASS R1 saved proposal wins over approved preview and approvals are void
+PASS R2 failed reconciliation restores options task and parent obligation
+PASS R3 seat holder sees every hashed proposal field and exclusive interval
+PASS R4 absent hours stay null omitted and show estimation hint
+PASS R5 unresolved display names never expose record IDs
+PASS R6 forbidden read clears open detail and actions
+PASS R6 identity epoch clears open detail before new read
+PASS wire errors use plain Chinese and receipt reasons survive parsing

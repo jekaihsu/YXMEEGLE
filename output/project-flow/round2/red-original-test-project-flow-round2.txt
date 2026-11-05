@@ -1,0 +1,174 @@
+FAIL round2 local workflow stays available with assignments AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- false
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:57:42
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:55:1
+FAIL round2 local flow list translates both pending and in-progress task statuses AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
++   '林安娜 · pending · 未排期限',
++   '林安娜 · in_progress · 未排期限'
+-   '林安娜 · 尚未開始 · 未排期限',
+-   '林安娜 · 進行中 · 未排期限'
+  ]
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:61:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:59:1
+FAIL round2 completed and skipped node mounted progress AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 100
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:66:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:63:1
+FAIL round2 keyboard replaces history and never scrolls the selected panel AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 1
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:72:46
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:68:1
+FAIL round2 one selected node for panel and local operations AssertionError [ERR_ASSERTION]: The input did not match the regular expression /外業 · SOP/. Input:
+
+'控制 · SOP 1'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:76:84
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:74:1
+FAIL round2 dispatch independent of node writes AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:81:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:79:1
+FAIL round2 source timestamp and honest manager fallback AssertionError [ERR_ASSERTION]: The input did not match the regular expression /節點與任務.*2026\/10\/18 08:00:00 \(台北時間\)/. Input:
+
+'Lark 節點 N／任務 T · 讀取時間 2026-10-18T00:00:00Z更新節點與任務'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:86:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:84:1
+FAIL round2 overview goes to page header AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'flow-top'
+- 'project-page-top'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:89:114
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:89:1
+FAIL round2 attention excludes manager-wide completion and unowned not-started nodes AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '控制 · 待處理圖資 · 待處理報告 · 待處理計價 · 待處理結算 · 待處理'
+- ''
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:92:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:90:1
+FAIL round2 attention includes actual pending task, approval and owned not-started work AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    '控制 · 待認領',
+    '圖資 · 待審核',
+    '報告 · 待處理',
++   '計價 · 待認領',
++   '結算 · 待認領'
+  ]
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:96:9
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:94:1
+FAIL round2 manager resolved from loaded users and absent source distinguished AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '來源未提供'
+- '來源未提供負責組別，未能對應到本組主管'
+        ^
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:102:113
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:98:1
+FAIL round2 background and file shortcut restored collapsed AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- false
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:106:47
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:104:1
+FAIL round2 assignment readback wins over an in-flight stale detail and avoids refetch AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 1
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:113:82
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:108:1
+FAIL round2 failed evidence retains node and offers retry in item sheet AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '到工程進度看完整證據'
+- '查看此節點證據'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:118:64
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:116:1
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   'round2 local workflow stays available with assignments',
++   'round2 local flow list translates both pending and in-progress task statuses',
++   'round2 completed and skipped node mounted progress',
++   'round2 keyboard replaces history and never scrolls the selected panel',
++   'round2 one selected node for panel and local operations',
++   'round2 dispatch independent of node writes',
++   'round2 source timestamp and honest manager fallback',
++   'round2 overview goes to page header',
++   'round2 attention excludes manager-wide completion and unowned not-started nodes',
++   'round2 attention includes actual pending task, approval and owned not-started work',
++   'round2 manager resolved from loaded users and absent source distinguished',
++   'round2 background and file shortcut restored collapsed',
++   'round2 assignment readback wins over an in-flight stale detail and avoids refetch',
++   'round2 failed evidence retains node and offers retry in item sheet'
++ ]
+- []
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:122:43 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'round2 local workflow stays available with assignments',
+    'round2 local flow list translates both pending and in-progress task statuses',
+    'round2 completed and skipped node mounted progress',
+    'round2 keyboard replaces history and never scrolls the selected panel',
+    'round2 one selected node for panel and local operations',
+    'round2 dispatch independent of node writes',
+    'round2 source timestamp and honest manager fallback',
+    'round2 overview goes to page header',
+    'round2 attention excludes manager-wide completion and unowned not-started nodes',
+    'round2 attention includes actual pending task, approval and owned not-started work',
+    'round2 manager resolved from loaded users and absent source distinguished',
+    'round2 background and file shortcut restored collapsed',
+    'round2 assignment readback wins over an in-flight stale detail and avoids refetch',
+    'round2 failed evidence retains node and offers retry in item sheet'
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.9.0
