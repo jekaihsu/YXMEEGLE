@@ -28,6 +28,23 @@ def cell(value):
     return value.strip() if isinstance(value, str) else value
 
 
+
+def sop_select_value(fields):
+    """#222：讀「違反SOP」單選（舊名「是否有檢核程序」）。新名優先，不讀緣由欄。"""
+    if not isinstance(fields, dict):
+        return ''
+    if '違反SOP' in fields:
+        return cell(fields.get('違反SOP'))
+    return cell(fields.get('是否有檢核程序'))
+
+
+def is_sop_violation(fields):
+    """統一口徑：「是」才算違反；「否」、空白、缺值都不算。"""
+    return sop_select_value(fields) == '是'
+
+
+
+
 def links(value):
     if isinstance(value, list): return [x for v in value for x in links(v)]
     if isinstance(value, dict): return value.get('record_ids') or []
@@ -95,7 +112,7 @@ def normalize(raw, base=BASE_TOKEN):
             group = group or '未分組'
             dt = day(f.get('出工日期') or f.get('工作日期-薪資')) if dept == 'field' else day(f.get('工作日期-營業額明細'))
             flags = [flag for flag in FLAGS if cell(f.get(flag))]
-            if cell(f.get('是否有檢核程序')) == '否': flags.append('違反檢核程序')
+            if is_sop_violation(f): flags.append('違反檢核程序')
             reviews[dept].append(dict(id=r['id'], no=str(cell(f.get('工作單號'))), date=dt or '', group=normalize_group(group),group_label=str(group),
                 person=str(cell(f.get('營業額人員-明細') or f.get('姓名') or f.get('此單出工人'))),
                 case_code=str(cell(f.get('案件編號') or f.get('所屬案件'))),
