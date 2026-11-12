@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /部分來源時間未知/. Input:
+
+'<div class="source-health-root"><section class="source-health-banner" role="status" aria-label="頁面資料狀態"><h1>來源與資料健康</h1><span class="source-health-status-badge">資料待更新</span><p>最近成功讀取 · 尚無成功紀錄</p></section><section class="source-health-diagnostic-section" aria-label="來源健康診斷"><div class="source-read-list"><article class="source-read-row"><div><h2>工程來源</h2><span class="source-health-tag">資料待更新</span></div><p>最近成功 · 2026/10/26 08:00:00 (台北時間) · 8 小時前</p><p class="source-read-error">讀取失敗</p><button type="button" class="source-health-btn-retry">重試</button></article><article class="source-read-row"><div><h2>班表來源</h2><span class="source-health-tag">狀態未知</span></div><p>最近成功 · 尚無成功紀錄</p><span>請聯絡管理員</span></article></div></section></div>'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-source-health-ui.mjs:10:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '<div class="source-health-root"><section class="source-health-banner" role="status" aria-label="頁面資料狀態"><h1>來源與資料健康</h1><span class="source-health-status-badge">資料待更新</span><p>最近成功讀取 · 尚無成功紀錄</p></section><section class="source-health-diagnostic-section" aria-label="來源健康診斷"><div class="source-read-list"><article class="source-read-row"><div><h2>工程來源</h2><span class="source-health-tag">資料待更新</span></div><p>最近成功 · 2026/10/26 08:00:00 (台北時間) · 8 小時前</p><p class="source-read-error">讀取失敗</p><button type="button" class="source-health-btn-retry">重試</button></article><article class="source-read-row"><div><h2>班表來源</h2><span class="source-health-tag">狀態未知</span></div><p>最近成功 · 尚無成功紀錄</p><span>請聯絡管理員</span></article></div></section></div>',
+  expected: /部分來源時間未知/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

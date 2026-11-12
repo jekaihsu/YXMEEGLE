@@ -36,6 +36,8 @@ socket.getaddrinfo = reject_network
 
 from backend.sop_contracts import catalog, VERSION, CATALOG_VERSION
 from backend.policy import template
+from backend.sop_import.catalog import load_catalog, validate
+assert validate(load_catalog()), 'Missing local checklist catalog'
 source = catalog()
 assert source['version'] == CATALOG_VERSION and source['templates'], 'Missing source catalog'
 policy = template()
@@ -44,7 +46,7 @@ assert any(n['task_definitions'] for n in policy['nodes']), 'Empty SOP task defi
 
 from backend.app import app
 import httpx
-checks = {'catalog': True, 'policy_template': True}
+checks = {'catalog': True, 'policy_template': True, 'local_sop_catalog': True}
 async def probe():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://testserver') as client:
         for route in ('health', 'session', 'workspace', 'projects', 'daily-reports', 'sources'):

@@ -1,0 +1,187 @@
+"""HTTP routes. Every route answers 404 while NODE_ASSIGNMENT_ENABLED is off."""
+from contextlib import nullcontext
+import json
+import re
+from dataclasses import replace
+from uuid import uuid4
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+
+from .domain import NodeAction, NodeKey
+from .errors import Failure
+from .operations import (
+    find_task, parse_create_task, parse_node_command, parse_patch_task, plan_create_task, plan_node,
+    parse_start_sop, plan_patch_task, request_id)
+from .service import Context, NodeAssignmentService
+from .start_sop_service import StartSopRunner
+
+PREFIX = '/api/projects/{project_id}/node-assignments'
+MAX_BODY = 16 * 1024
+NODE_ROUTE_ACTIONS = {a.value: a for a in NodeAction if a is not NodeAction.CREATE_TASK}
+TASK_ID = re.compile(r'rec[A-Za-z0-9]{1,40}')
+
+
+def register(app, *, identity, load_case, sessions, receipt_model, audit_model, cfg, skipped_nodes,
+             transport=None, client_options=None, clock=None, reports=None, reports_visible=None, phase=None):
+    """load_case(session_data, user, project_id) -> (state, project) for a case visible to that user."""
+    options = {'transport': transport, 'client_options': client_options, 'reports': reports,
+               'reports_visible': reports_visible}
+    if clock is not None:
+        options['clock'] = clock
+    service = NodeAssignmentService(cfg, sessions=sessions, receipt_model=receipt_model, audit_model=audit_model,
+                                    skipped_nodes=skipped_nodes, **options)
+    enabled = service.config.enabled
+    start_sop = StartSopRunner(service)
+
+    def respond(result=None, failure=None):
+        if failure is not None:
+            return JSONResponse(failure.body(), status_code=failure.status, headers={'Cache-Control': 'no-store'})
+        status, body, replayed = result
+        headers = {'Cache-Control': 'no-store'}
+        if replayed:
+            headers['Idempotent-Replayed'] = 'true'
+        return JSONResponse(body, status_code=status, headers=headers)
+
+    def disabled():
+        return respond(failure=Failure('disabled', '節點指派功能尚未啟用'))
+
+    def context(request, project_id):
+        data, user = identity(request)
+        with (phase(request, 'load') if phase else nullcontext()):
+            state, project = load_case(data, user, project_id)
+
+        def authorize():
+            fresh_data, fresh_user = identity(request)
+            if fresh_data['wid'] != data['wid'] or fresh_user['id'] != user['id'] or not fresh_user.get('active', True):
+                raise Failure('forbidden', '登入身分已變更，請重新整理後再操作')
+            return fresh_user
+        def refresh():
+            fresh_user = authorize()
+            fresh_state, fresh_project = load_case(data, fresh_user, project_id)
+            return Context(data['wid'], fresh_user, fresh_state, fresh_project, authorize, refresh)
+        return Context(data['wid'], user, state, project, authorize, refresh)
+
+    def ensure_sop(request, project_id):
+        if not enabled:
+            return {'state': 'not_ready', 'reason': 'writes_disabled'}
+        ctx = context(request, project_id)
+        with service.locks.hold((ctx.wid, 'ensure-sop:' + project_id), service.config.lock_timeout_seconds):
+            preview = start_sop.preview(ctx)
+            if preview['blockers']:
+                reason = preview['blockers'][0]['code']
+                if reason == 'forbidden':
+                    raise Failure('forbidden', '僅案件 PM、主管或節點主管可以啟動')
+                return {'state': 'not_ready', 'reason': reason}
+            if not preview['can_start']:
+                raise Failure('forbidden', '僅案件 PM、主管或節點主管可以啟動')
+            if preview['already_started']:
+                return {'state': 'already_started'}
+            from .operations import StartSopCommand
+            _, result, _ = start_sop.run(ctx, 'ensure-' + preview['preview_hash'], StartSopCommand(preview['preview_hash'], False))
+            if not result['complete']:
+                return {'state': 'not_ready', 'reason': next((r['error'] for r in result['results'] if r['error']), 'sync_failed')}
+            return {'state': 'started' if result['started'] else 'already_started'}
+
+    service.ensure_sop = ensure_sop
+    app.state.node_assignment = service
+
+    def node_key(value):
+        try:
+            return NodeKey(value)
+        except ValueError:
+            raise Failure('not_found', '沒有這個節點') from None
+
+    def guarded(run):
+        try:
+            return respond(run())
+        except Failure as exc:
+            return respond(failure=exc)
+
+    def body_of(raw):
+        if len(raw) > MAX_BODY:
+            raise Failure('payload_too_large', '請求內容過大，請縮減文字')
+        try:
+            body = json.loads(raw)
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            raise Failure('invalid', '請求內容必須是有效的 JSON') from None
+        if not isinstance(body, dict):
+            raise Failure('invalid', '請求內容必須是 JSON 物件')
+        return body
+
+    async def mutation(request, project_id, prepare):
+        """Authorize and load the case before reading any input, then plan."""
+        if not enabled:
+            return disabled()
+        raw = await request.body()
+        return await run_in_threadpool(guarded, lambda: prepare(context(request, project_id), body_of(raw)))
+
+    def payload(body):
+        return {'body': {k: v for k, v in body.items() if k != 'request_id'}}
+
+    @app.get(PREFIX)
+    def overview(request: Request, project_id: str):
+        if not enabled:
+            return disabled()
+        return guarded(lambda: (200, service.overview(context(request, project_id)), False))
+
+    @app.get(PREFIX + '/start-sop')
+    def start_sop_preview(request: Request, project_id: str):
+        if not enabled:
+            return disabled()
+        seed = request.query_params.get('seed_tasks')
+        if seed not in (None, 'true', 'false'):
+            return respond(failure=Failure('invalid', 'seed_tasks 必須是 true 或 false'))
+        return guarded(lambda: (200, start_sop.preview(context(request, project_id), seed == 'true'), False))
+
+    @app.post(PREFIX + '/start-sop')
+    async def start_sop_run(request: Request, project_id: str):
+        return await mutation(request, project_id, lambda ctx, body: start_sop.run(
+            ctx, request_id(body), parse_start_sop(body)))
+
+    @app.get(PREFIX + '/nodes/{key}')
+    def detail(request: Request, project_id: str, key: str):
+        if not enabled:
+            return disabled()
+        return guarded(lambda: (200, service.detail(context(request, project_id), node_key(key)), False))
+
+    @app.post(PREFIX + '/nodes/{key}/tasks')
+    async def create_task(request: Request, project_id: str, key: str):
+        def prepare(ctx, body):
+            target, rid, command = node_key(key), request_id(body), parse_create_task(body)
+
+            def plan(s, resumed):
+                return plan_create_task(s, command, resumed.client_token if resumed else str(uuid4()))
+            return service.mutate(ctx, target, 'create_task', rid, payload(body), plan)
+        return await mutation(request, project_id, prepare)
+
+    @app.patch(PREFIX + '/nodes/{key}/tasks/{task_id}')
+    async def update_task(request: Request, project_id: str, key: str, task_id: str):
+        def prepare(ctx, body):
+            target = node_key(key)
+            if not TASK_ID.fullmatch(task_id):
+                raise Failure('not_found', '沒有這個任務')
+            rid, command = request_id(body), parse_patch_task(body)
+
+            def plan(s, resumed):
+                current = replace(command, expected_revision=resumed.base_revision) if resumed else command
+                return plan_patch_task(s, find_task(s, task_id), current)
+            return service.mutate(ctx, target, 'update_task', rid, {'task_id': task_id, **payload(body)}, plan)
+        return await mutation(request, project_id, prepare)
+
+    @app.post(PREFIX + '/nodes/{key}/{action}')
+    async def node_action(request: Request, project_id: str, key: str, action: str):
+        def prepare(ctx, body):
+            target = node_key(key)
+            if action not in NODE_ROUTE_ACTIONS:
+                raise Failure('not_found', '不支援的節點操作')
+            act = NODE_ROUTE_ACTIONS[action]
+            rid, command = request_id(body), parse_node_command(act, body)
+
+            def plan(s, resumed):
+                return plan_node(s, command, resumed.base_revision if resumed else command.expected_revision)
+            return service.mutate(ctx, target, act.value, rid, payload(body), plan)
+        return await mutation(request, project_id, prepare)
+
+    return service

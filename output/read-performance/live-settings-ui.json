@@ -1,0 +1,92 @@
+[
+  {
+    "round": 0,
+    "readyMs": 2752.199999988079,
+    "requests": [
+      {
+        "bytes": 31284,
+        "ms": 220.29999995231628,
+        "path": "/api/session"
+      },
+      {
+        "bytes": 3507,
+        "ms": 521.8000000119209,
+        "path": "/api/settings/overview"
+      },
+      {
+        "bytes": 1683,
+        "ms": 125.5,
+        "path": "/api/admin/runtime-health"
+      }
+    ],
+    "workspaceRequested": false
+  },
+  {
+    "round": 1,
+    "readyMs": 680,
+    "requests": [
+      {
+        "bytes": 31284,
+        "ms": 129.30000001192093,
+        "path": "/api/session"
+      },
+      {
+        "bytes": 3507,
+        "ms": 407.60000002384186,
+        "path": "/api/settings/overview"
+      }
+    ],
+    "workspaceRequested": false
+  },
+  {
+    "round": 2,
+    "readyMs": 656.6000000238419,
+    "requests": [
+      {
+        "bytes": 31284,
+        "ms": 128.39999997615814,
+        "path": "/api/session"
+      },
+      {
+        "bytes": 3507,
+        "ms": 418.69999998807907,
+        "path": "/api/settings/overview"
+      }
+    ],
+    "workspaceRequested": false
+  },
+  {
+    "round": 3,
+    "readyMs": 794,
+    "requests": [
+      {
+        "bytes": 31284,
+        "ms": 180.9000000357628,
+        "path": "/api/session"
+      },
+      {
+        "bytes": 3507,
+        "ms": 514.6000000238419,
+        "path": "/api/settings/overview"
+      }
+    ],
+    "workspaceRequested": false
+  },
+  {
+    "round": 4,
+    "readyMs": 600.3000000119209,
+    "requests": [
+      {
+        "bytes": 31284,
+        "ms": 126.60000002384186,
+        "path": "/api/session"
+      },
+      {
+        "bytes": 3507,
+        "ms": 380.80000001192093,
+        "path": "/api/settings/overview"
+      }
+    ],
+    "workspaceRequested": false
+  }
+]

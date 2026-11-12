@@ -1,0 +1,26 @@
+✔ the list parser carries evidence and the submit hint, and nulls stay null (5.8705ms)
+✔ a payload from an older server without evidence still parses (0.275416ms)
+✔ malformed evidence is rejected as a whole payload (1.145417ms)
+✔ evidence line wording (0.188042ms)
+✔ an unbounded or non-decimal quantity is neutralized to null and the list still parses (1.057ms)
+✔ the quantity formatter never throws (0.084375ms)
+✔ the parser carries the item progress and work items and defaults them for an older server (0.210667ms)
+✔ hostile item numbers and statuses are neutralized without rejecting the payload (0.186ms)
+✔ a percent outside 0..100 drops the percent but keeps the counts (0.333583ms)
+✔ work items are capped at fifty when parsed (0.240375ms)
+✔ progress wording (0.080667ms)
+✔ clicking a work item opens its detail and Escape closes it (29.565791ms)
+✔ item progress needs a certain link and a valid pair of points (0.065541ms)
+✔ a truncated list says how many are shown (1.34325ms)
+✔ the item table is touch sized and cannot overflow at 390px (0.28525ms)
+✔ a percent over few known items says it covers only them (0.06475ms)
+✔ selected node evidence renders every work item with honest per-item signals (1.264625ms)
+✔ unlinked daily evidence keeps unknown text without a zero percent (0.740583ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44.665334

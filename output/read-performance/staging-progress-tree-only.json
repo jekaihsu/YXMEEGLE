@@ -1,0 +1,15 @@
+{
+  "samples": [
+    {
+      "bytes": 3842,
+      "json": true,
+      "ms": 18896.30000001192,
+      "status": 200
+    },
+    {
+      "error": "TimeoutError",
+      "ms": 20002.899999976158
+    }
+  ],
+  "state": "done"
+}

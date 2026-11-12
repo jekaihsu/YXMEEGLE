@@ -1,0 +1,206 @@
+import json
+
+import httpx2
+import pytest
+from openai import AsyncOpenAI
+
+from .test_ai_database import app, client, ai_database_url
+from .test_ai_api import BODY, events, live_server, dataset_call
+from .test_ai_providers import wire
+from .test_p2_int_routes import http
+from .test_project_progress import progress
+from .ai import providers
+from .ai.tools import display_table, display_chart
+
+
+def sdk_tool(app, client, monkeypatch, name, args, ids=('d1',)):
+    requests = []
+    if name == 'search_cases':
+        args = dict(status='all', owner='anyone', overdue=False, offset=0, **args)
+    offset = args.pop('offset', 0)
+    args = dict(id=name, params=args, limit=20, offset=offset)
+    call = dict(type='function_call', id='fc_1', call_id='call_1', name='query_dataset',
+                arguments=json.dumps(args), status='completed')
+    shows = [dict(type='function_call', id=f'fs_{i}', call_id=f'show_{i}', name='show_display',
+                  arguments=json.dumps(dict(display_id=ident, columns=[], max_rows=0)), status='completed')
+             for i, ident in enumerate(ids)]
+    def handler(request):
+        requests.append(json.loads(request.content))
+        if len(requests) == 2:
+            data = next(json.loads(i['output']) for i in requests[-1]['input'] if i.get('type')=='function_call_output' and i['call_id']=='call_1')
+            for i, show in enumerate(shows):
+                kind = 'bar' if name=='attendance_today' and i==0 else 'table'
+                mapping = {'x':'label','y':'value'} if kind=='bar' else {}
+                show['arguments'] = json.dumps(dict(result_id=data['result_id'],kind=kind,columns=[],mapping=mapping,max_rows=50))
+        output = [call] if len(requests) == 1 else shows if len(requests) == 2 else []
+        response = dict(id='resp_1', object='response', model='gpt-6.1-terra', status='completed', output=output,
+            usage=dict(input_tokens=10, input_tokens_details=dict(cached_tokens=0), output_tokens=1,
+                       output_tokens_details=dict(reasoning_tokens=0), total_tokens=11))
+        values = [dict(type='response.output_item.done', item=item, output_index=i, sequence_number=1 + i) for i, item in enumerate(output)]
+        values.append(dict(type='response.completed', response=response, sequence_number=9))
+        return httpx2.Response(200, headers={'content-type': 'text/event-stream'}, content=wire(values))
+    monkeypatch.setattr(providers, 'AsyncOpenAI', lambda **kwargs: AsyncOpenAI(**kwargs,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))))
+    app.state.ai_providers = {'gpt': providers.GPT('fictional')}
+    result = events(client.post('/api/ai/chat', json=dict(BODY, model='gpt')))
+    assert result[-1]['type'] == 'done', result
+    sdk_tool.events = result
+    assert not [e for e in result if e['type'] == 'tool' and e['name'] != 'show_display' and e.get('displays')]
+    shown = [e for e in result if e['type'] == 'tool' and e['name'] == 'show_display' and e['status'] == 'done']
+    projected = json.loads(requests[1]['input'][-1]['output']) if False else next(
+        json.loads(i['output']) for i in requests[1]['input'] if i.get('type') == 'function_call_output' and i['call_id'] == 'call_1')
+    return [d for e in shown for d in e['displays']], projected
+
+
+def test_search_real_route_sdk_sse(app, client, monkeypatch):
+    source = client.get('/api/projects').json()['items'][0]
+    displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query=source['code']))
+    assert displays[0]['kind']=='table' and displays[0]['title']=='案件總覽'
+    assert displays[0]['rows']==[{k: ('是' if v else '否') if type(v) is bool else v for k,v in row.items()} for row in projected['rows']]
+    assert displays[0]['rows'][0]['name'] == source['name']
+
+
+def test_owners_real_route_sdk_sse(app, client, monkeypatch):
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    source = client.get('/api/case-detail/' + pid).json()
+    displays, projected = sdk_tool(app, client, monkeypatch, 'case_owners', dict(case_id=pid))
+    assert displays[0]['title']=='案件負責人'
+    assert displays[0]['rows'][0]==dict(role='PM',owner=source['header']['pm']['name'])
+
+
+def test_progress_real_route_sdk_sse(app, client, monkeypatch):
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    source = client.get('/api/projects/' + pid + '/progress').json()
+    displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
+    assert projected['as_of'] == source['as_of']
+    assert displays[0]['kind']=='table' and displays[0]['title']=='案件進度'
+    assert displays[0]['rows']==[{k: ('是' if v else '否') if type(v) is bool else v for k,v in row.items()} for row in projected['rows']]
+
+
+def test_display_caps_and_scalar_cells():
+    rows = [dict(a='x' * 300, b={'private': True}, c=['private'], d=None, e=1) for _ in range(60)]
+    table = display_table('title', [(k, k) for k in 'abcdefghi'], rows, {})
+    assert len(table['columns']) == 8 and len(table['rows']) == 50 and table['truncated'] is True
+    assert table['rows'][0] == dict(a='x' * 240, b=None, c=None, d=None, e=1, f=None, g=None, h=None)
+    chart = display_chart('title', [dict(label=str(i), value=i) for i in range(20)], {})
+    assert chart['points'] == [dict(label=str(i), value=i) for i in range(12)]
+    assert chart['truncated'] is True
+    json.dumps([table, chart], allow_nan=False)
+    assert display_table('t', [('v', 'v')], [dict(v=float('nan'))], {})['rows'] == [dict(v=None)]
+    safe = display_chart('t', [dict(label='x' * 300, value=1), dict(label='bad', value=float('inf'))], {})
+    assert safe['points'] == [dict(label='x' * 240, value=1)] and safe['truncated']
+
+
+def test_curl_real_app_sse_feedback(app, client, live_server):
+    import subprocess
+    from .test_ai_api import Fake
+    from .ai.providers import ToolCall
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    app.state.ai_providers = {'claude': Fake(calls=[dataset_call('owners', 'case_owners', dict(case_id=pid))], shows=[ToolCall('show', 'show_display', dict(display_id='d1', columns=[], max_rows=0))])}
+    cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
+    base = ['curl', '-sS', '--max-time', '10', '-H', 'Content-Type: application/json', '-b', cookie]
+    stream = subprocess.run([*base, '-N', '--data', json.dumps(BODY), live_server + '/api/ai/chat'],
+                            capture_output=True, text=True, check=True).stdout
+    values = [json.loads(line[6:]) for line in stream.splitlines() if line.startswith('data: ')]
+    uid = values[0]['usage_id']
+    assert not [v for v in values if v['type'] == 'tool' and v['name'] == 'case_owners' and v.get('displays')]
+    done, = [v for v in values if v['type'] == 'tool' and v['name'] == 'show_display' and v['status'] == 'done']
+    assert done['displays'][0]['rows']
+    feedback = subprocess.run([*base, '--data', json.dumps(dict(usage_id=uid, rating='up')),
+                              live_server + '/api/ai/feedback'], capture_output=True, text=True, check=True).stdout
+    assert json.loads(feedback) == dict(usage_id=uid, rating='up', reason=None)
+    print('\n$ curl -N -b "$SESSION" -H "Content-Type: application/json" --data "$BODY" ' + live_server + '/api/ai/chat')
+    print('data: ' + json.dumps(values[0], ensure_ascii=False))
+    print('data: ' + json.dumps(done, ensure_ascii=False))
+    print('$ curl -b "$SESSION" -H "Content-Type: application/json" --data \'{"usage_id":"' + uid + '","rating":"up"}\' ' + live_server + '/api/ai/feedback')
+    print(feedback)
+
+
+def test_display_projector_failure_keeps_answer(app, client, monkeypatch, caplog):
+    def broken(*args):
+        return None, '顯示參數或欄位錯誤'
+    monkeypatch.setattr('backend.ai.agent.result_display', broken)
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    displays, projected = sdk_tool(app, client, monkeypatch, 'case_owners', dict(case_id=pid))
+    assert displays == [] and projected['rows']
+    assert any(e.get('name')=='show_display' and e['status']=='error' for e in sdk_tool.events)
+
+
+def test_search_partial_real_route_sdk_sse(app, client, monkeypatch):
+    from copy import deepcopy
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, wid)
+        state = storage.load(db, BusinessRow, row)
+        template = state['projects'][0]
+        for i in range(12):
+            state['projects'].append(dict(deepcopy(template), id=f'ai-partial-{i}', code=f'AI-PARTIAL-{i}',
+                                          nodes=[], quotes=[], daily_reports=[], changes=[]))
+        row.data = storage.save(db, BusinessRow, wid, state)
+    source = client.get('/api/projects?q=AI-PARTIAL&limit=8').json()
+    assert source['total'] == 12 and len(source['items']) == 8
+    displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query='AI-PARTIAL'))
+    assert projected['truncated'] is True
+    assert projected['total']==12 and projected['next_offset']==8
+    assert displays[0]['truncated'] is True
+    assert len(displays[0]['rows']) == 8
+
+
+def test_prompt_repeats_display_caveats():
+    from .ai.prompts import system_prompt
+    prompt = system_prompt()
+    assert 'note' in prompt and '自己的話' in prompt
+    assert '部分資料' in prompt and 'truncated=true' in prompt
+    assert 'as_of' in prompt and '不可捏造時間' in prompt
+    assert 'gaps' in prompt and '摘要' in prompt
+
+
+@pytest.mark.parametrize('truncated', [False, True])
+def test_progress_known_percent_and_gaps_real_route(progress, monkeypatch, truncated):
+    from .test_project_progress import chain_state, set_points
+    run, client, app = progress
+    state, pid, _ = chain_state()
+    set_points(state, pid, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
+    state['derived_plan'][pid]['truncated'] = truncated
+    assert run(state, pid).status_code == 200
+    app.state.reports._refresh_error = True
+    source = client.get('/api/projects/' + pid + '/progress').json()
+    assert 'reports_stale' in {g['id'] for g in source['gaps']}
+    from .test_ai_tools import tool
+    from .ai.tools import display_progress
+    projected = tool(app, client, 'case_progress', dict(case_id=pid))
+    chart = display_progress(projected)[0]
+    expected = [dict(label='業務', value=100.0), dict(label='PM', value=100.0), dict(label='確認單', value=100.0)]
+    if not truncated:
+        expected.append(dict(label='外業', value=73.5))
+    assert chart['points'] == expected
+    assert chart['headline'] == dict(
+        label='整體（已知階段平均；規則推算' + ('；另有 4' if truncated else '、來源證據；另有 3') + ' 個階段進度未知）',
+        value='100.0' if truncated else '93.4')
+    assert chart['note'] == '；'.join(g['message_zh'] for g in projected['gaps'])
+    assert '週報快照已過期，等待重新讀取' in chart['note']
+    if truncated:
+        assert '合約規劃項目過多，清單已截斷' in chart['note']
+
+
+def test_prompt_has_no_banned_narration():
+    from .ai.prompts import system_prompt
+    prompt = system_prompt()
+    assert '直接回答' in prompt
+    assert '一句自然的話' in prompt
+    assert '即使表格或圖表已顯示' not in prompt
+    for phrase in ('已整理', '詳見上方結果', '依你可查看的資料'):
+        assert phrase not in prompt
+
+
+def test_show_display_selects_columns_and_rows_and_rejects_bad_ids(app, client):
+    from .ai.tools import select_display
+    table = display_table('t', [('a', 'A'), ('b', 'B')], [dict(a=i, b=i * 2) for i in range(10)], {})
+    pool = {'d1': table}
+    shown, problem = select_display(pool, dict(display_id='d1', columns=['b'], max_rows=3))
+    assert problem is None and shown['columns'] == [dict(key='b', label='B')]
+    assert shown['rows'] == [dict(b=0), dict(b=2), dict(b=4)] and shown['truncated'] is True
+    assert len(pool['d1']['rows']) == 10 and len(pool['d1']['columns']) == 2
+    assert select_display(pool, dict(display_id='d2', columns=[], max_rows=0))[0] is None
+    assert select_display(pool, dict(display_id='d1', columns=['zzz'], max_rows=0))[0] is None

@@ -18,6 +18,12 @@ from .lark_adapter import application_adapter,RemoteFailure
 COLLECTIONS=('approvals','node_skip_requests','financial_requests')
 
 
+def _attempt_key(value):
+    if not value:return (0,0.0)
+    try:return (1,datetime.fromisoformat(value).timestamp())
+    except (TypeError,ValueError):return (0,0.0)
+
+
 class NativeApprovalPoller:
     def __init__(self,sessions,W,B,P,cfg,adapter_factory=None):
         self.sessions,self.W,self.B,self.P,self.cfg=sessions,W,B,P,cfg
@@ -27,6 +33,8 @@ class NativeApprovalPoller:
         state=upgrade(storage.load(db,self.B,row))
         from .workspace_environment import normalize_environment
         normalize_environment(state,row.id,self.cfg)
+        from .features import resolve_features
+        state['features']=resolve_features(self.cfg)
         people={r.person_id:deepcopy(r.data) for r in db.scalars(select(self.P).where(self.P.organization_id==row.id))}
         state['users']=[people.pop(p['id'],p) for p in state['users']]+list(people.values())
         state['native_approval_authority']={'app_id':self.cfg.get('LARK_APP_ID'),'tenant':self.cfg.get('LARK_WORKER_ORGANIZATION')}
@@ -57,6 +65,8 @@ class NativeApprovalPoller:
             if state.get('environment')!='production':return None
             item=next((x for x in state.get(collection,[]) if x['id']==ident),None)
             if not item or item.get('simulated'):return None
+            from .features import enabled
+            if item.get('type') in ('change','extension') and not enabled(state,'change_extension'):return None
             binding=item.get('native_binding')
             if not binding or not binding.get('attempted') or creation_not_performed(binding):return None
             previous=item.get('native_poll_status',{}).get('last_attempt_at')
@@ -74,6 +84,9 @@ class NativeApprovalPoller:
             row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
             state=self._load(db,row);require(state.get('environment')=='production','正式工作區已變更',403)
             item=find(state.get(collection,[]),ident,'原審批')
+            if item.get('type') in ('change','extension'):
+                from .features import require_feature
+                require_feature(state.get('features',{}),'change_extension')
             require(item.get('native_binding',{}).get('binding_hash')==binding['binding_hash'],'原審批版本已被替換',409)
 
     def _commit(self,wid,collection,ident,binding,receipt,observation,error=None,definite=False):
@@ -82,6 +95,8 @@ class NativeApprovalPoller:
             if not row:return
             state=self._load(db,row);item=next((i for i in state.get(collection,[]) if i['id']==ident),None)
             if not item or item.get('native_binding',{}).get('binding_hash')!=binding['binding_hash']:return
+            from .features import enabled
+            if item.get('type') in ('change','extension') and not enabled(state,'change_extension'):return
             status=item.setdefault('native_poll_status',{});current_binding=item['native_binding']
             if observation:item['native_observation']=observation
             if error:
@@ -134,9 +149,16 @@ class NativeApprovalPoller:
         with self.sessions() as db:
             row=db.get(self.W,wid)
             if not row:return []
+            preview=storage.load_partial(db,self.B,row,collections=tuple(c for c in COLLECTIONS if c in storage.COLLECTIONS))
+            if not any(i.get('native_binding',{}).get('attempted') and not i.get('simulated')
+                       for c in COLLECTIONS for i in preview.get(c,[])): return []
             state=self._load(db,row)
-            candidates=[(c,i['id']) for c in COLLECTIONS for i in state.get(c,[])
+            candidates=[(c,i['id'],i.get('native_poll_status',{}).get('last_attempt_at') or '')
+                        for c in COLLECTIONS for i in state.get(c,[])
                         if i.get('native_binding',{}).get('attempted') and not i.get('simulated')]
+        # Never-polled first, then least recently attempted, so a full batch of
+        # old items cannot starve newer ones. Stable sort keeps ties deterministic.
+        candidates=[(c,i) for c,i,_ in sorted(candidates,key=lambda x:_attempt_key(x[2]))]
         results=[]
         for collection,ident in candidates:
             if len(results)>=10:break

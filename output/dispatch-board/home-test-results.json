@@ -1,0 +1,87 @@
+[
+  {
+    "command": "npm run build",
+    "exit_code": 0,
+    "log": "home-build.log"
+  },
+  {
+    "command": "npx tsc --noEmit -p tsconfig.json",
+    "exit_code": 0,
+    "log": "home-typecheck.log"
+  },
+  {
+    "command": "node test-dispatch-board.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-board.log"
+  },
+  {
+    "command": "node test-contrast.mjs",
+    "exit_code": 0,
+    "log": "test-contrast.log"
+  },
+  {
+    "command": "node test-home-attendance-unknown.mjs",
+    "exit_code": 0,
+    "log": "test-home-attendance-unknown.log"
+  },
+  {
+    "command": "node test-home-counts.mjs",
+    "exit_code": 0,
+    "log": "test-home-counts.log"
+  },
+  {
+    "command": "node test-home-dispatch.mjs",
+    "exit_code": 0,
+    "log": "test-home-dispatch.log"
+  },
+  {
+    "command": "node test-home-executable.mjs",
+    "exit_code": 0,
+    "log": "test-home-executable.log"
+  },
+  {
+    "command": "node test-home-layout.mjs",
+    "exit_code": 0,
+    "log": "test-home-layout.log"
+  },
+  {
+    "command": "node test-home-people-cards.mjs",
+    "exit_code": 0,
+    "log": "test-home-people-cards.log"
+  },
+  {
+    "command": "node test-home-people.mjs",
+    "exit_code": 0,
+    "log": "test-home-people.log"
+  },
+  {
+    "command": "node test-home-query-refresh.mjs",
+    "exit_code": 0,
+    "log": "test-home-query-refresh.log"
+  },
+  {
+    "command": "node test-home-report-cards.mjs",
+    "exit_code": 0,
+    "log": "test-home-report-cards.log"
+  },
+  {
+    "command": "node test-home-reports-retry.mjs",
+    "exit_code": 0,
+    "log": "test-home-reports-retry.log"
+  },
+  {
+    "command": "node test-home-reports.mjs",
+    "exit_code": 0,
+    "log": "test-home-reports.log"
+  },
+  {
+    "command": "node test-home-review-regressions.mjs",
+    "exit_code": 0,
+    "log": "test-home-review-regressions.log"
+  },
+  {
+    "command": "node test-unified-home.mjs",
+    "exit_code": 0,
+    "log": "test-unified-home.log"
+  }
+]

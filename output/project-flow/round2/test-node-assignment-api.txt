@@ -1,0 +1,21 @@
+✔ list parses into chain order and preserves literal progress (7.143375ms)
+✔ mutations encode identifiers and send fresh UUIDs (0.781541ms)
+✔ 422 errors preserve field messages (0.244417ms)
+✔ 404 and successful disabled responses disable the feature (0.208292ms)
+✔ malformed node payload becomes a local readable error (0.162708ms)
+✔ detail refuses a response for a different node (0.163167ms)
+✔ detail resolves person IDs to names and hides unresolved technical IDs (0.188292ms)
+✔ parses the exact documented overview and detail JSON (0.2965ms)
+✔ missing node rows preserve null revisions and send null expected_revision (0.206125ms)
+✔ mutation returns the parsed full detail envelope (0.118625ms)
+✔ string invalid detail survives and ordinary 404 does not disable assignments (0.134666ms)
+✔ overview parses embedded tasks and people, and supports older envelopes (0.321875ms)
+✔ auto_done is carried as rule and reason, null stays null and a malformed one is rejected (0.191208ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12.161458

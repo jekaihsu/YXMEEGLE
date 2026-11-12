@@ -1,0 +1,386 @@
+[
+  {
+    "test": "test-api-response.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-approval-detail-a11y.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-audit-pagination.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-audit-project-switch.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-avatar.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-browser-floor.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-case-amount-label.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-case-detail-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-case-navigation.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-comment-draft-scope.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-company-cockpit.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-company-progressive.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-company-route.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-confirmation-list-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-confirmations-loading.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-contract-detail-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-contrast.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-daily-records.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-data-freshness.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-data-state.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-dev-tooling.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-dispatch-board.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-dispatch-fixes.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-dispatch-publish-ui.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-dispatch-publish.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-dispatch-round2.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-draft-callsites.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-drilldown-context.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-execution-admission.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-financial-draft-scope.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-form-draft-identity.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-freshness-wiring.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-attendance-unknown.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-counts.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-dispatch.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-executable.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-layout.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-panels.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-home-people-cards.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-people.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-query-refresh.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-report-cards.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-reports-retry.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-reports.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-review-regressions.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-home-target-navigation.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-input-recovery.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-integration-routes.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-lark-pilot-contract.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-lark-pilot.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-live-read-regressions.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-manager-overview-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-my-work-integrated.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-my-work-return-focus.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-my-work-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-native-approval-a11y.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-native-approval-version.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-node-assignment-api.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-node-assignments.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-node-evidence.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-ops-flow-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-ops-sync-panel.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-overview-design.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-p2-routes.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-people-attendance.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-perf.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-plan-panel.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-pm-glance.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-project-disabled-reasons.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-project-progress.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-recurring-draft-period.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reload-generation.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-build.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-interactions.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-reports-mock.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-progress-fixes.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-progress.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-requests.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-reports-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-search-input.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-session-epoch.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-settings-overview.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-shell-mode.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-source-coverage-views.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-source-health-view.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-source-lifecycle.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-start-sop.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-taipei-time.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-task-table.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-unified-home.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-ux-case-detail.mjs",
+    "exit": 1
+  },
+  {
+    "test": "test-ux-disabled.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-ux-table-sort.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-view-data.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-work-assigned-visibility.mjs",
+    "exit": 0
+  },
+  {
+    "test": "test-work-item-detail-view.mjs",
+    "exit": 0
+  }
+]

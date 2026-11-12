@@ -1,0 +1,34 @@
+ok - 1. header: snapshot timestamp and readable scope; missing timestamp is a dash
+ok - 2. cases first, owner/stage/due/blocker/pending shown honestly: unknown is a dash plus reason
+ok - 3. stage and due date never render a value even if the body supplies one (no receipt / VCC-123)
+ok - 4. cards carry unit labels; drilldown descriptors pass through unchanged
+ok - 5. unavailable cards show a reason and never 0
+ok - 6. zero only for explicit complete/filtered empty evidence
+ok - 7. unresolved rows: count and state are separate; each row explicit, 對應未驗證
+ok - 8. mapping is never verified from caller strings
+ok - 9. amounts are withheld with the G-AMT reason; no value, sum or derived value
+ok - 10. weekly activity is a separate unavailable section and never filters cases
+ok - 11. Source Health panel: state labels only, no source names or counts
+ok - 12. forbidden snapshot exposes nothing; weekly forbidden too
+ok - 13. malformed body fails closed to unknown with a reason, never partially trusted
+ok - 14. no write or approval actions, and no technical ids in default columns
+ok - 15. drawer is selection-only: ids, versions and admission only inside it; missing selection is dropped
+ok - 16. sort/filter inputs: sort is view-only; filters are echoed, mismatch flagged, never applied locally
+ok - 17. retained rows under read_failed keep the error label and cards with counts are rejected
+ok - 18. 128-R1: admission accepts only the backend field set; an extra (amount) property voids the snapshot
+ok - 19. 128-R2: contradictory or malformed state invalidates the snapshot
+ok - 20. 128-R2 residual: an empty snapshot that retains a positive population card is invalid; zero and dash cards stay
+ok - 21. 128b-4030811 X1: population unavailable keeps cases listed with row keys unknown plus reason; no-row case keeps []
+ok - M1. mutation: unknown rendered as 0 -> unknown-not-zero guard (tests 5/6) would fail
+ok - M2. mutation: amount guard removed -> withheld guard (test 9) would fail
+ok - M3. mutation: caller mapping state accepted -> mapping guard (test 8) would fail
+ok - M4. mutation: stage/due force-unknown removed -> unverified due date leaks (test 3 would fail)
+ok - M5. mutation: weekly period filters cases -> separation guard (test 10) would fail
+ok - M6. mutation: malformed section partially trusted -> fail-closed guard (test 13) would fail
+ok - M7. mutation: Source Health counts leak -> no-counts guard (test 11) would fail
+ok - M8. mutation: admission field-set guard removed -> amount leaks into the drawer (test 18 would fail)
+ok - M9. mutation: malformed-state and empty-consistency guards removed -> contradictions survive (test 19 would fail)
+ok - M10. mutation: empty-state positive-card guard removed -> positive count beside empty state (test 20 would fail)
+ok - M11. mutation: null row_keys without state/reason accepted -> strict row-keys guard (test 21) would fail
+ok - M12. mutation: [] rendered as 「無」 -> empty-population copy test would fail
+manager-overview view: 33 tests, 163 checks passed

@@ -9,7 +9,7 @@ async page=>{
  await page.locator('.flow-operations').waitFor();
  const tabs=page.getByRole('navigation',{name:'案件頁面'});
  checks.fivePages=JSON.stringify(await tabs.getByRole('button').allTextContents())===JSON.stringify(expected);
- checks.legacyOperations=await page.locator('.flow-operation-picker select').inputValue()==='review';
+ checks.legacyOperations=await page.locator('.flow-operation-picker [aria-selected=true]').getAttribute('data-section')==='review';
  checks.operationsOutsideTaskBorder=await page.locator('.flow-operations').evaluate(el=>!el.closest('.node-section'));
  checks.noNestedEightTabs=await page.locator('.flow-operations .ops-tabs').count()===0;
  checks.desktopTabNoVerticalScroll=await tabs.evaluate(el=>el.scrollHeight<=el.clientHeight+1);
@@ -21,9 +21,9 @@ async page=>{
  await page.getByRole('button',{name:/^報價（\d+）$/}).click();checks.quoteRoute=await tabs.getByRole('button',{name:'案件資料'}).getAttribute('aria-current')==='page';
  for(const key of ['files','family','basic','participants']){await page.goto(origin+`/#view=project&project=${p.id}&node=${n.id}&tab=${key}`);checks['legacy_'+key]=await tabs.getByRole('button',{name:'案件資料'}).getAttribute('aria-current')==='page'}
  await page.goto(origin+`/#view=project&project=${p.id}&node=${n.id}&tab=flow`);await page.locator('.flow-operations').waitFor();
- await page.locator('.flow-operation-picker select').selectOption('finance');
+ await page.locator('.flow-operation-picker [data-section=finance]').click();
  checks.noDirectAccounting=await page.getByText('財務資料僅供核對，不在工作台直接記帳、登錄收付款或核准帳務。重大財務確認依核定 Lark 流程辦理。').isVisible()&&await page.getByRole('button',{name:'核准款項'}).count()===0;
- await page.locator('.flow-operation-picker select').selectOption('review');
+ await page.locator('.flow-operation-picker [data-section=review]').click();
  for(const width of [900,390]){
   await page.setViewportSize({width,height:900});await page.evaluate(()=>window.scrollTo(0,0));
   checks['noPageOverflow_'+width]=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1);

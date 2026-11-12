@@ -1,0 +1,1 @@
+View data: abort, route/reload races, session isolation, ETag/304, errors and StrictMode passed

@@ -23,7 +23,7 @@ for entry in Path('/proc').iterdir():
   if b'-c' in arguments:continue
   matched=[]
   if any(a.endswith(b'/scripts/run_service.py') or a==b'scripts/run_service.py' for a in arguments):matched.append('run_service')
-  if b'uvicorn' in arguments and b'backend.app:app' in arguments:matched.append('web')
+  if (b'uvicorn' in arguments or b'backend.request_protocol' in arguments) and b'backend.app:app' in arguments:matched.append('web')
   if any(a.endswith(b'/scripts/run_worker.py') or a==b'scripts/run_worker.py' for a in arguments):matched.append('worker')
   if not matched:continue
   uid=None

@@ -1,0 +1,707 @@
+{
+  "source": "yx-read-baseline.LDAo5m",
+  "fixture_projects": 319,
+  "samples": 5,
+  "method": "five alternating before/after processes; one warm request after one first request per endpoint per process; same fixture and flags",
+  "endpoints": {
+    "/api/session": {
+      "median_ms": 6.54,
+      "p95_ms": 14.39,
+      "range_ms": [
+        5.24,
+        14.39
+      ],
+      "warm": [
+        {
+          "ms": 5.24,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.1, load;dur=2.0, serialize;dur=0.8, total;dur=4.8"
+        },
+        {
+          "ms": 5.83,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.4, load;dur=2.0, serialize;dur=0.9, total;dur=5.3"
+        },
+        {
+          "ms": 14.39,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=5.4, load;dur=5.2, serialize;dur=2.1, total;dur=12.8"
+        },
+        {
+          "ms": 6.91,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.4, load;dur=2.5, serialize;dur=1.1, total;dur=6.0"
+        },
+        {
+          "ms": 6.54,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.8, load;dur=2.1, serialize;dur=1.0, total;dur=5.9"
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 5.92,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=2.7, load;dur=1.9, serialize;dur=0.8, total;dur=5.4"
+        },
+        {
+          "ms": 8.46,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=3.9, load;dur=2.8, serialize;dur=1.1, total;dur=7.8"
+        },
+        {
+          "ms": 11.59,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=4.4, load;dur=3.3, serialize;dur=2.8, total;dur=10.5"
+        },
+        {
+          "ms": 7.49,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=3.0, load;dur=2.8, serialize;dur=1.0, total;dur=6.8"
+        },
+        {
+          "ms": 8.52,
+          "status": 200,
+          "bytes": 9429,
+          "sql_queries": 4,
+          "decoded_json_values": 132,
+          "business_rows": 130,
+          "server_timing": "identity;dur=3.8, load;dur=2.8, serialize;dur=1.2, total;dur=7.8"
+        }
+      ]
+    },
+    "/api/settings/overview": {
+      "median_ms": 153.5,
+      "p95_ms": 240.07,
+      "range_ms": [
+        120.36,
+        240.07
+      ],
+      "warm": [
+        {
+          "ms": 124.77,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 120.36,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 240.07,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 153.5,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 226.34,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 122.72,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 134.05,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 231.66,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 159.7,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        },
+        {
+          "ms": 186.2,
+          "status": 200,
+          "bytes": 944,
+          "sql_queries": 9,
+          "decoded_json_values": 33591,
+          "business_rows": 33588,
+          "server_timing": null
+        }
+      ]
+    },
+    "/api/projects/p001": {
+      "median_ms": 51.51,
+      "p95_ms": 86.13,
+      "range_ms": [
+        45.74,
+        86.13
+      ],
+      "warm": [
+        {
+          "ms": 45.74,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.4, load;dur=26.2, project;dur=13.0, serialize;dur=3.6, total;dur=45.2"
+        },
+        {
+          "ms": 45.95,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.4, load;dur=26.3, project;dur=12.9, serialize;dur=3.9, total;dur=45.4"
+        },
+        {
+          "ms": 86.13,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=4.2, load;dur=50.4, project;dur=20.5, serialize;dur=7.9, total;dur=83.0"
+        },
+        {
+          "ms": 52.18,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.9, load;dur=29.9, project;dur=14.0, serialize;dur=4.7, total;dur=51.5"
+        },
+        {
+          "ms": 51.51,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.6, load;dur=29.0, project;dur=14.7, serialize;dur=4.5, total;dur=50.9"
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 66.33,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.4, load;dur=44.7, project;dur=14.4, serialize;dur=4.1, total;dur=65.6"
+        },
+        {
+          "ms": 66.56,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=2.3, load;dur=45.5, project;dur=13.9, serialize;dur=4.3, total;dur=66.0"
+        },
+        {
+          "ms": 145.7,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=9.4, load;dur=95.9, project;dur=21.7, serialize;dur=10.8, total;dur=137.8"
+        },
+        {
+          "ms": 81.25,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=3.0, load;dur=56.8, project;dur=16.0, serialize;dur=4.7, total;dur=80.6"
+        },
+        {
+          "ms": 86.04,
+          "status": 200,
+          "bytes": 63592,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": "identity;dur=3.4, load;dur=61.8, project;dur=15.6, serialize;dur=4.5, total;dur=85.4"
+        }
+      ]
+    },
+    "/api/workspace": {
+      "median_ms": 692.31,
+      "p95_ms": 1590.96,
+      "range_ms": [
+        611.5,
+        1590.96
+      ],
+      "warm": [
+        {
+          "ms": 611.5,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.4, load;dur=134.0, project;dur=370.9, serialize;dur=99.8, total;dur=607.1"
+        },
+        {
+          "ms": 614.16,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.5, load;dur=135.9, project;dur=371.7, serialize;dur=100.1, total;dur=610.2"
+        },
+        {
+          "ms": 1590.96,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=3.6, load;dur=249.0, project;dur=1006.0, serialize;dur=324.5, total;dur=1583.1"
+        },
+        {
+          "ms": 708.84,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.8, load;dur=159.1, project;dur=430.3, serialize;dur=112.0, total;dur=704.1"
+        },
+        {
+          "ms": 692.31,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.5, load;dur=178.7, project;dur=397.5, serialize;dur=109.5, total;dur=688.2"
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 610.94,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.2, load;dur=138.6, project;dur=370.1, serialize;dur=95.9, total;dur=606.8"
+        },
+        {
+          "ms": 625.29,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.4, load;dur=150.0, project;dur=369.6, serialize;dur=99.1, total;dur=621.1"
+        },
+        {
+          "ms": 1271.94,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=3.1, load;dur=260.2, project;dur=808.8, serialize;dur=191.3, total;dur=1263.5"
+        },
+        {
+          "ms": 727.7,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=2.6, load;dur=170.7, project;dur=438.3, serialize;dur=111.6, total;dur=723.2"
+        },
+        {
+          "ms": 701.06,
+          "status": 200,
+          "bytes": 14978462,
+          "sql_queries": 12,
+          "decoded_json_values": 33593,
+          "business_rows": 33588,
+          "server_timing": "identity;dur=3.2, load;dur=160.5, project;dur=432.3, serialize;dur=100.9, total;dur=696.9"
+        }
+      ]
+    },
+    "/api/projects/p001/sop-tasks": {
+      "median_ms": 38.49,
+      "p95_ms": 55.01,
+      "range_ms": [
+        32.31,
+        55.01
+      ],
+      "warm": [
+        {
+          "ms": 32.31,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 32.62,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 55.01,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 38.49,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 39.65,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 60.59,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 57.07,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 130.48,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 63.33,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 82.4,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        }
+      ]
+    },
+    "/api/projects/p001/sop-assignees": {
+      "median_ms": 57.6,
+      "p95_ms": 86.64,
+      "range_ms": [
+        48.03,
+        86.64
+      ],
+      "warm": [
+        {
+          "ms": 48.03,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 49.23,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 86.64,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 57.92,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 57.6,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        }
+      ],
+      "first_samples": [
+        {
+          "ms": 31.22,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 31.7,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 65.77,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 40.45,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        },
+        {
+          "ms": 45.2,
+          "status": 403,
+          "bytes": 63,
+          "sql_queries": 8,
+          "decoded_json_values": 12051,
+          "business_rows": 12049,
+          "server_timing": null
+        }
+      ]
+    }
+  },
+  "concurrent_three_reads": [
+    [
+      {
+        "path": "/api/session",
+        "ms": 8.31,
+        "status": 200
+      },
+      {
+        "path": "/api/settings/overview",
+        "ms": 175.52,
+        "status": 200
+      },
+      {
+        "path": "/api/projects/p001",
+        "ms": 53.23,
+        "status": 200
+      }
+    ],
+    [
+      {
+        "path": "/api/session",
+        "ms": 8.27,
+        "status": 200
+      },
+      {
+        "path": "/api/settings/overview",
+        "ms": 174.43,
+        "status": 200
+      },
+      {
+        "path": "/api/projects/p001",
+        "ms": 54.08,
+        "status": 200
+      }
+    ],
+    [
+      {
+        "path": "/api/session",
+        "ms": 16.26,
+        "status": 200
+      },
+      {
+        "path": "/api/settings/overview",
+        "ms": 245.65,
+        "status": 200
+      },
+      {
+        "path": "/api/projects/p001",
+        "ms": 83.49,
+        "status": 200
+      }
+    ],
+    [
+      {
+        "path": "/api/session",
+        "ms": 8.7,
+        "status": 200
+      },
+      {
+        "path": "/api/settings/overview",
+        "ms": 200.57,
+        "status": 200
+      },
+      {
+        "path": "/api/projects/p001",
+        "ms": 64.74,
+        "status": 200
+      }
+    ],
+    [
+      {
+        "path": "/api/session",
+        "ms": 9.63,
+        "status": 200
+      },
+      {
+        "path": "/api/settings/overview",
+        "ms": 196.13,
+        "status": 200
+      },
+      {
+        "path": "/api/projects/p001",
+        "ms": 77.31,
+        "status": 200
+      }
+    ]
+  ]
+}

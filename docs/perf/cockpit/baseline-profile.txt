@@ -1,0 +1,33 @@
+Wed Oct 14 22:36:05 2026    /Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/docs/perf/cockpit/baseline.prof
+
+         16661021 function calls (15804859 primitive calls) in 1.717 seconds
+
+   Ordered by: cumulative time
+   List reduced from 499 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    35216    0.077    0.000    0.836    0.000 workflow_rules.py:58(execution_reasons)
+        2    0.009    0.005    0.775    0.387 workspace_projection.py:144(filter_private_workspace)
+    14036    0.014    0.000    0.745    0.000 home_details.py:153(build_home_task)
+    21180    0.024    0.000    0.575    0.000 workflow_rules.py:81(activation_reasons)
+        3    0.260    0.087    0.561    0.187 client.py:72(request)
+        2    0.000    0.000    0.451    0.226 sources.py:63(request)
+72001/71978    0.180    0.000    0.439    0.000 {built-in method builtins.any}
+    22708    0.004    0.000    0.433    0.000 workflow.py:54(blocked)
+66716/66708    0.009    0.000    0.315    0.000 {built-in method builtins.next}
+        2    0.001    0.000    0.260    0.130 client.py:110(_request)
+  6835108    0.255    0.000    0.255    0.000 workflow.py:55(<genexpr>)
+856664/648    0.153    0.000    0.219    0.000 workspace_projection.py:219(_strip_source_payloads)
+    35216    0.117    0.000    0.214    0.000 workflow_rules.py:67(<genexpr>)
+  5208486    0.180    0.000    0.180    0.000 {method 'get' of 'dict' objects}
+    14036    0.040    0.000    0.123    0.000 workflow_rules.py:114(confirmation_hash)
+    14036    0.012    0.000    0.116    0.000 home_details.py:31(_proxy)
+    28072    0.046    0.000    0.082    0.000 home_details.py:34(<genexpr>)
+    14036    0.022    0.000    0.069    0.000 workflow.py:30(is_owner)
+1844081/1844073    0.056    0.000    0.056    0.000 {built-in method builtins.isinstance}
+14043/14041    0.006    0.000    0.049    0.000 __init__.py:183(dumps)
+    14043    0.006    0.000    0.041    0.000 encoder.py:183(encode)
+    35216    0.020    0.000    0.034    0.000 workflow_rules.py:13(assignable)
+    14043    0.033    0.000    0.033    0.000 encoder.py:205(iterencode)
+    56396    0.011    0.000    0.032    0.000 source_lifecycle.py:36(needs_review)
+    28076    0.016    0.000    0.032    0.000 workflow.py:9(now)

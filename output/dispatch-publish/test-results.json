@@ -1,0 +1,37 @@
+[
+  {
+    "name": "build",
+    "command": "npm run build",
+    "exit_code": 0
+  },
+  {
+    "name": "typescript",
+    "command": "npx tsc --noEmit -p tsconfig.json",
+    "exit_code": 0
+  },
+  {
+    "name": "dispatch-board",
+    "command": "node test-dispatch-board.mjs",
+    "exit_code": 0
+  },
+  {
+    "name": "contrast",
+    "command": "node test-contrast.mjs",
+    "exit_code": 0
+  },
+  {
+    "name": "dispatch-publish",
+    "command": "npm run test:dispatch-publish",
+    "exit_code": 0
+  },
+  {
+    "name": "home-dispatch",
+    "command": "node test-home-dispatch.mjs",
+    "exit_code": 0
+  },
+  {
+    "name": "diff-check",
+    "command": "git diff --check",
+    "exit_code": 0
+  }
+]

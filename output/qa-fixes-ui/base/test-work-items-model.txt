@@ -1,0 +1,14 @@
+✔ C115264 retains three immutable identities, individual plans, unknown actuals and progress (0.591541ms)
+✔ ambiguous and unlinked items never contribute even with complete source points (0.136791ms)
+✔ points are explicitly named, never actual, with an aggregate only for a complete verified set (0.078958ms)
+✔ invalid, missing and contradictory point values remain unknown (0.08575ms)
+✔ departments only use their own production rows and counts (0.140334ms)
+✔ boundary rejects absent or duplicate immutable IDs and invalid optional progress fields (0.41075ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3.01525

@@ -1,0 +1,16 @@
+ok - 1. default table is all unfinished tasks across history; no due-date default filter
+ok - 1b. changing the weekly-activity period never removes an unfinished task
+ok - 2. mode toggle only with capability; awaiting is never approved/completed
+ok - 3. filters and selection round-trip; stale/forbidden selection dropped
+ok - 4. drawer is open only when a task is selected
+ok - 5. page states stay distinct; unknown is never zero; forbidden leaks nothing
+ok - 6. due date only when verified formal; evidence never completes
+ok - 7. actions are navigation only for existing+authorized entries; unknown outcome blocks resubmit
+ok - 8. text status labels and stable sort; retrieval time is not a key
+ok - shape tolerance: hostile input never throws and never invents values
+ok - module stays pure: no React, fetch or routing
+ok - 9. FIX1: revocation hides weekly; stale/unknown never invented; missing facts read unknown
+ok - 10. FIX2: task-level revocation applies to every dataset; status needs a known vocabulary value
+ok - 11. FIX3: no derived in-progress claim; unknown pending sentinel stays unknown and ordinary
+ok - 7. F1: absent evidence is unknown, only an explicit empty list is none; F2: data as-of
+my-work view: 15 tests, 127 checks passed

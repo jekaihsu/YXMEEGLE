@@ -1,0 +1,9 @@
+{
+  "complete_map_verified": true,
+  "key_count": 42,
+  "changed_keys": [
+    "INDEX_TABLES_ENABLED",
+    "WORKSPACE_SHELL_ENABLED"
+  ],
+  "sop_writes": "false"
+}

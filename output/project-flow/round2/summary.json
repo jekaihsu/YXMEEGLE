@@ -1,0 +1,19 @@
+{
+  "build": "pass",
+  "typecheck": "pass",
+  "scripts": 99,
+  "passed": 90,
+  "failed": 9,
+  "failures": [
+    "node test-dev-tooling.mjs",
+    "node test-home-panels.mjs",
+    "node test-home-target-navigation.mjs",
+    "node test-ops-sync-panel.mjs",
+    "node test-plan-panel.mjs",
+    "node test-reports-interactions.mjs",
+    "node test-search-input.mjs",
+    "node test-shell-mode.mjs",
+    "node test-ux-case-detail.mjs"
+  ],
+  "additional_failures": []
+}

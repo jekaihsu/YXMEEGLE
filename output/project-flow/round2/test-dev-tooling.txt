@@ -1,0 +1,31 @@
+✔ manifest and every locked tooling copy use patched, consistent versions (0.846542ms)
+✔ local CI runs tooling after the build and checks API responses (0.0945ms)
+✖ production keeps the company route outside the initial JavaScript budget (0.40975ms)
+9:57:50 PM [vite] (client) Forced re-optimization of dependencies
+✔ default dev server binds locally and transforms the React entry without permissive CORS (527.444208ms)
+✔ default production preview also binds locally (7.583875ms)
+✔ normal overview script runs full and shell rendering regressions (1346.18675ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1884.6345
+
+✖ failing tests:
+
+test at test-dev-tooling.mjs:51:1
+✖ production keeps the company route outside the initial JavaScript budget (0.40975ms)
+  AssertionError [ERR_ASSERTION]: entry JavaScript is 413044 bytes (budget 300000)
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-dev-tooling.mjs:72:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

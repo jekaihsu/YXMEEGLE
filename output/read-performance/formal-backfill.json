@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "commands": [
+    {
+      "command": "scripts/migrate_index_tables.py",
+      "exit_code": 0,
+      "seconds": 3.888,
+      "stdout": "Index tables verified"
+    },
+    {
+      "command": "scripts/backfill_index.py",
+      "exit_code": 0,
+      "seconds": 11.122,
+      "stdout": "{'workspace': 'lark-1aad6a938e891946', 'projects': 420, 'tasks': 9553, 'dry_run': False}"
+    }
+  ],
+  "index_readiness": {
+    "version": 35438,
+    "projects": 420,
+    "indexed_projects": 420,
+    "counter_version": 35438
+  }
+}

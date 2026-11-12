@@ -1,0 +1,173 @@
+"""Single-flight snapshots with bounded cold waits and stale reads."""
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, Future
+import asyncio
+import multiprocessing
+import os
+from collections import OrderedDict
+from copy import deepcopy
+from datetime import datetime, timezone
+import hashlib
+import json
+import math
+import logging
+from threading import Lock
+import time
+from fastapi import HTTPException
+from . import compute
+
+
+def setting(cfg, key, default, minimum, maximum):
+    try: value=float(cfg.get(key, default))
+    except (ValueError, TypeError): value=default
+    return min(maximum,max(minimum,value)) if math.isfinite(value) else default
+
+logger=logging.getLogger('backend.reports')
+
+
+def ensure_visible_logs():
+    # The app configures no logging, so INFO from this module would be dropped; only add a handler when nothing else did.
+    if logger.level==logging.NOTSET: logger.setLevel(logging.INFO)
+    if not logging.getLogger().handlers and not logger.handlers:
+        handler=logging.StreamHandler();handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s %(message)s'));logger.addHandler(handler)
+
+
+def background_priority():
+    if hasattr(os,'nice'): os.nice(10)
+
+
+def build_data(reader, base, previous_fingerprint=None):
+    """Picklable read/normalization job. No app, locks or request state crosses processes."""
+    raw=reader.read()
+    canonical=json.dumps({k:dict(v,records=sorted(v['records'],key=lambda r:r['record_id'])) for k,v in raw.items()},sort_keys=True,ensure_ascii=False,separators=(',',':'))
+    fingerprint=hashlib.sha256(canonical.encode()).hexdigest()
+    data=gaps=None
+    if fingerprint!=previous_fingerprint:
+        data=compute.normalize(raw,base)
+        gaps={(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress','progress/case','contacts') for dept in ('field','office','control')}
+    return dict(fingerprint=fingerprint,data=data,gaps=gaps,tables=len(raw),records=sum(len(t['records']) for t in raw.values()))
+
+class SnapshotStore:
+    def __init__(self, reader, cfg=None, *, clock=time.monotonic):
+        cfg=cfg or {}; self.reader=reader;self.clock=clock
+        self.ttl=setting(cfg,'REPORTS_TTL_SECONDS',300,1,86400)
+        self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',20,.01,60)
+        self.base=cfg.get('LARK_REPORT_BASE_TOKEN',compute.BASE_TOKEN)
+        self._lock=Lock();self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix='reports')
+        self._process=(ProcessPoolExecutor(max_workers=1,mp_context=multiprocessing.get_context('spawn'),initializer=background_priority)
+                       if str(cfg.get('REPORTS_WORKER_PROCESS','false')).lower()=='true' else None)
+        self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0;self._refresh_error=False
+
+    def _build(self):
+        started=time.monotonic()
+        logger.info('reports snapshot build started')
+        try:
+            with self._lock: previous=self._snapshot
+            prior=previous['fingerprint'] if previous else None
+            result=(self._process.submit(build_data,self.reader,self.base,prior).result() if self._process
+                    else build_data(self.reader,self.base,prior))
+            fingerprint=result['fingerprint']
+            data=previous['data'] if previous and previous['fingerprint']==fingerprint else result['data']
+            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else result['gaps']
+            current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else OrderedDict(),pending=previous['pending'] if previous and previous['fingerprint']==fingerprint else {})
+            with self._lock: self._snapshot=current;self._retry_at=0;self._refresh_error=False
+            logger.info('reports snapshot ready tables=%s records=%s duration_ms=%.0f',result['tables'],result['records'],(time.monotonic()-started)*1000)
+            return current
+        except Exception as exc:
+            logger.warning('reports snapshot failed error_class=%s duration_ms=%.0f',type(exc).__name__,(time.monotonic()-started)*1000)
+            with self._lock: self._retry_at=self.clock()+min(30,self.ttl);self._refresh_error=True
+            raise
+
+    def start(self, *, manual=False):
+        with self._lock:
+            if self._future is not None and not self._future.done(): return self._future
+            now=self.clock()
+            if manual and self._last_request is not None and now-self._last_request<60:
+                raise HTTPException(429,'每分鐘僅能重新讀取一次')
+            if not manual and now<self._retry_at: return self._future
+            if manual: self._last_request=now
+            self._future=self._executor.submit(self._build)
+            return self._future
+
+    def peek(self):
+        with self._lock: return self._snapshot
+
+    def get(self):
+        with self._lock: current=self._snapshot
+        if current is None or self.clock()-current['at']>=self.ttl:
+            future=self.start()
+            if current is None:
+                try: current=future.result(timeout=self.budget)
+                except TimeoutError:
+                    if not future.done():
+                        raise HTTPException(503,dict(detail='報表資料正在首次讀取，請稍候',warming=True,retry_after=5),headers={'Retry-After':'5'}) from None
+                    raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+                except Exception: raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+        return current
+
+    async def aget(self):
+        # Cold HTTP readers must not occupy Starlette's shared worker pool while
+        # the reports executor reads Lark. One slow build can otherwise starve
+        # unrelated synchronous routes (including case details).
+        with self._lock: current=self._snapshot
+        if current is None:
+            future=self.start()
+            try:
+                waiting=asyncio.wrap_future(future)
+                # A timed-out/disconnected reader leaves the shared build
+                # running; consume a later failure even if nobody awaits it.
+                waiting.add_done_callback(lambda done:done.exception() if not done.cancelled() else None)
+                await asyncio.wait_for(asyncio.shield(waiting),self.budget)
+            except TimeoutError:
+                if not future.done():
+                    raise HTTPException(503,dict(detail='報表資料正在首次讀取，請稍候',warming=True,retry_after=5),headers={'Retry-After':'5'}) from None
+                raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+            except Exception: raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+        # Read through the regular accessor once ready; stale reads trigger its
+        # nonblocking revalidation and share the same snapshot selection.
+        return self.get()
+
+    def meta(self, snapshot=None, endpoint='sources'):
+        if snapshot is None:
+            with self._lock: snapshot=self._snapshot
+        if snapshot is None:
+            return dict(fetched_at='',stale=True,refresh_error=self._refresh_error,snapshot='',gaps=[compute.gap('cold','報表來源正在讀取')])
+        return dict(fetched_at=snapshot['fetched_at'],refresh_error=self._refresh_error,stale=self._refresh_error or self.clock()-snapshot['at']>=self.ttl,snapshot=snapshot['fingerprint'][:12],gaps=deepcopy(snapshot['gaps'][(endpoint,'field')]))
+
+    def result(self, endpoint, params, *, snapshot=None):
+        from .routes import parameters
+        params=parameters(endpoint,params)
+        if snapshot is None: snapshot=self.get()
+        key=(endpoint,tuple(sorted(params.items())))
+        with self._lock:
+            result=snapshot['cache'].get(key)
+            if result is not None: snapshot['cache'].move_to_end(key)
+            pending=snapshot['pending'].get(key)
+            owner=result is None and pending is None
+            if owner: pending=Future();snapshot['pending'][key]=pending
+        if result is None:
+            if not owner: result=pending.result()
+            else:
+                try:
+                    if endpoint=='sources': result=compute.sources(snapshot['data'],snapshot['fetched_at'])
+                    else: result={'contacts':compute.contacts,'review':compute.review,'review/rows':compute.rows_report,'sales':compute.sales,'assets':compute.assets,'progress':compute.progress,'progress/case':compute.progress_case}[endpoint](snapshot['data'],**params)
+                    with self._lock:
+                        snapshot['cache'][key]=result
+                        if len(snapshot['cache'])>512: snapshot['cache'].popitem(last=False)
+                    pending.set_result(result)
+                except BaseException as exc:
+                    pending.set_exception(exc)
+                    raise
+                finally:
+                    with self._lock: snapshot['pending'].pop(key,None)
+        result=deepcopy(result)
+        if endpoint=='sources':
+            for table in result['tables']:
+                if table['status']=='ok': table['fetched_at']=snapshot['fetched_at']
+        meta=self.meta(snapshot,endpoint)
+        meta['gaps']=deepcopy(snapshot['gaps'][(endpoint,params.get('dept','field'))])+([] if endpoint=='contacts' else result.get('gaps',[]))
+        result.pop('gaps',None)
+        return dict(result,meta=meta)
+
+    def close(self):
+        self._executor.shutdown(wait=True)
+        if self._process: self._process.shutdown(wait=True)

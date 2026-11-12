@@ -1,0 +1,20 @@
+p2 routes: 11 tests passed
+mutant killed (1 failing): adapter drops deadline_to
+mutant killed (1 failing): adapter drops unsupported keys instead of reporting
+mutant killed (1 failing): set encoding without escapes
+mutant killed (2 failing): KPI drill drops unmappable backend keys
+mutant killed (2 failing): KPI drill ignores card filters
+mutant killed (1 failing): cursor history not bound to the query
+mutant killed (1 failing): cursor history ignores the current cursor
+mutant killed (1 failing): 403 mapped to read_failed
+mutant killed (1 failing): 404 on detail route not unlocated
+mutant killed (1 failing): 404 on list route becomes unlocated
+mutant killed (1 failing): 503 loses the retry affordance
+mutant killed (1 failing): Back does not restore the parent
+mutant killed (1 failing): contract -> confirmation guesses a case
+mutant killed (1 failing): task keys are navigable
+mutant killed (1 failing): gate accepts an invalid context
+mutant killed (1 failing): draft compare is order sensitive
+mutant killed (1 failing): draft compare counts blanks
+mutant killed (2 failing): overview sends list vocabulary as case filter
+p2 routes: 18 mutants killed

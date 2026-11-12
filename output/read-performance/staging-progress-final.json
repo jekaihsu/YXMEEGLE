@@ -1,0 +1,17 @@
+{
+  "samples": [
+    {
+      "bytes": 3842,
+      "json": true,
+      "ms": 18741.700000047684,
+      "status": 200
+    },
+    {
+      "bytes": 3842,
+      "json": true,
+      "ms": 11980.699999988079,
+      "status": 200
+    }
+  ],
+  "state": "done"
+}

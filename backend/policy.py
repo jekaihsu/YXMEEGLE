@@ -6,6 +6,8 @@ TECHNICAL = {'field', 'control', 'mapping', 'report'}
 FINANCIAL = {'pricing', 'settlement'}
 CAPABILITIES = ['manage_people','publish_sop','edit_sop','manage_sources','finance_approve','finance_edit','calendar_edit','issue_confirmation','review_mapping','manage_handover','manage_training','approve_capability']
 MANAGER_CAPABILITIES = [cap for cap in CAPABILITIES if cap != 'approve_capability']
+CAPABILITIES += ['sop_task_read', 'sop_task_read_source', 'sop_task_import', 'sop_task_work', 'sop_template_publish']
+CAPABILITIES += ['create_local_case', 'publish_local_quote']
 REQUIREMENTS = {
  'sales': [('demand','業主需求日期與佐證'),('quote','報價單、提出日期及通知紀錄'),('signed','回簽報價單或合約')],
  'pm': [('assignment','各組負責人與核定排程')],
@@ -69,7 +71,8 @@ def template():
 def defaults():
     return {'timezone':'Asia/Taipei','digest_time':'09:00','cutoff_time':None,'deadline_basis':'scheduled_shift','source_sync_seconds':300,'field_weekday':2,'indoor_weekday':3,'review_weekday':4,'monthly_workday':5,'followup_workdays':5,'daily_backup_days':30,'monthly_backup_months':12,'rpo_hours':24,'rto_hours':8,'external_enabled':False,'drive_root':'','input_base':'','input_table':'','v4_base':'H7W6b0PFWaVF1BsgqXJj3pQ9pXb','quote_base':'JoOqbggsVar0ATsVgbcjh6IIp1g','capability_base':'VwAsbezz9app3YsramgjduLYp2U','test_base':'','test_input_table':'','test_drive_root':'','test_connection_mode':'simulation'}
 
-def upgrade(ws):
+def upgrade(ws,*,generate_sop_candidate=True):
+    if getattr(ws,'already_upgraded',False): return ws
     ws.setdefault('policy_version',VERSION)
     ws.setdefault('settings',defaults())
     if 'deadline_basis' not in ws['settings']:
@@ -80,7 +83,7 @@ def upgrade(ws):
     requirements={node['key']:node['requirements'] for node in candidate['nodes']}
     ws.setdefault('sop_templates',[candidate])
     from .sop_contracts import ensure_draft_candidate
-    ensure_draft_candidate(ws,candidate)
+    if generate_sop_candidate:ensure_draft_candidate(ws,candidate)
     ws.setdefault('node_skip_requests',[])
     for k in ('delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','archived_projects','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings'):
         ws.setdefault(k,[])

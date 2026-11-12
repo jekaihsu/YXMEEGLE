@@ -1,0 +1,69 @@
+vite v6.4.3 building for production...
+
+(!) outDir /Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/dist is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+transforming...
+✓ 1822 modules transformed.
+rendering chunks...
+computing gzip size...
+../.runtime/qa/dist/index.html                                    1.77 kB │ gzip:  0.97 kB
+../.runtime/qa/dist/.vite/manifest.json                          14.33 kB │ gzip:  1.93 kB
+../.runtime/qa/dist/assets/LarkPilotPanel-Bme8Yq1l.css            0.55 kB │ gzip:  0.31 kB
+../.runtime/qa/dist/assets/MyWorkBoard-Daxf6Pud.css               4.40 kB │ gzip:  1.23 kB
+../.runtime/qa/dist/assets/DispatchPublish-DgT_FkQd.css           5.03 kB │ gzip:  1.47 kB
+../.runtime/qa/dist/assets/SettingsOverview-gPqyaPnY.css          5.09 kB │ gzip:  1.24 kB
+../.runtime/qa/dist/assets/PeopleAttendancePanel-DXZ7u3_N.css     6.48 kB │ gzip:  1.62 kB
+../.runtime/qa/dist/assets/Quotes-Bp57uQVX.css                    6.85 kB │ gzip:  1.59 kB
+../.runtime/qa/dist/assets/SopTasks-CeGdRq5y.css                  7.21 kB │ gzip:  2.01 kB
+../.runtime/qa/dist/assets/SopTasks-DyQ5eT6z.css                  7.24 kB │ gzip:  1.84 kB
+../.runtime/qa/dist/assets/TaskTimeline-CO3uT98w.css             10.12 kB │ gzip:  2.30 kB
+../.runtime/qa/dist/assets/SourceHealth-BSVBo0O_.css             11.09 kB │ gzip:  2.17 kB
+../.runtime/qa/dist/assets/MyWorkTable-D_-n9J-L.css              11.14 kB │ gzip:  2.22 kB
+../.runtime/qa/dist/assets/Operations-CRRF_cZg.css               12.88 kB │ gzip:  2.75 kB
+../.runtime/qa/dist/assets/shared-DwSjDVVo.css                   16.76 kB │ gzip:  3.63 kB
+../.runtime/qa/dist/assets/ProjectsList-BaoHQSCu.css             17.13 kB │ gzip:  3.96 kB
+../.runtime/qa/dist/assets/ProjectCalm-C2IBMcUw.css              21.36 kB │ gzip:  4.13 kB
+../.runtime/qa/dist/assets/ProjectDetail-B4K7Xrv0.css            49.17 kB │ gzip:  9.05 kB
+../.runtime/qa/dist/assets/P2Pages-D9xl60Oy.css                  90.44 kB │ gzip:  9.37 kB
+../.runtime/qa/dist/assets/index-cARVVAzU.css                   230.28 kB │ gzip: 37.94 kB
+../.runtime/qa/dist/assets/tabs-Cc_QzmRB.js                       1.11 kB │ gzip:  0.62 kB
+../.runtime/qa/dist/assets/AssignedSopTaskPage-DduzPimM.js        1.13 kB │ gzip:  0.68 kB
+../.runtime/qa/dist/assets/BarList-0cBKR_6a.js                    1.24 kB │ gzip:  0.68 kB
+../.runtime/qa/dist/assets/SourcesTab-CzVUDAem.js                 2.01 kB │ gzip:  1.07 kB
+../.runtime/qa/dist/assets/SourceHealth-D2pzJxC_.js               2.07 kB │ gzip:  1.04 kB
+../.runtime/qa/dist/assets/TrendChart-B28CnakY.js                 2.34 kB │ gzip:  1.15 kB
+../.runtime/qa/dist/assets/ReportsPage-qFTCpwY3.js                2.91 kB │ gzip:  1.53 kB
+../.runtime/qa/dist/assets/MyWorkBoard-CBdrhq1s.js                3.25 kB │ gzip:  1.49 kB
+../.runtime/qa/dist/assets/SalesTab-BscPWEqf.js                   3.38 kB │ gzip:  1.41 kB
+../.runtime/qa/dist/assets/useReport-7T-1B6ht.js                  3.90 kB │ gzip:  1.91 kB
+../.runtime/qa/dist/assets/AssetsTab-DZA0nnME.js                  4.60 kB │ gzip:  2.01 kB
+../.runtime/qa/dist/assets/SopEnrollment-Dj1zytQI.js              4.97 kB │ gzip:  2.12 kB
+../.runtime/qa/dist/assets/ProgressDetail-DlqldWnj.js             5.60 kB │ gzip:  2.38 kB
+../.runtime/qa/dist/assets/PeopleDirectoryPanel-C7f-mTiU.js       5.91 kB │ gzip:  2.87 kB
+../.runtime/qa/dist/assets/ReviewTab-nHZOfvPA.js                  6.00 kB │ gzip:  2.44 kB
+../.runtime/qa/dist/assets/shared-B8mhN4H5.js                     6.11 kB │ gzip:  2.84 kB
+../.runtime/qa/dist/assets/AttendanceWorkSchedules-DSs7PJFK.js    7.50 kB │ gzip:  3.37 kB
+../.runtime/qa/dist/assets/PeopleAttendancePanel-BjwtaMZM.js      7.59 kB │ gzip:  2.77 kB
+../.runtime/qa/dist/assets/LarkPilotPanel-DUBUGwwa.js             8.63 kB │ gzip:  3.53 kB
+../.runtime/qa/dist/assets/QuoteCreateSheet-BaDw1BRe.js           8.96 kB │ gzip:  3.51 kB
+../.runtime/qa/dist/assets/Quotes-BKmbZG8Z.js                     9.03 kB │ gzip:  3.66 kB
+../.runtime/qa/dist/assets/mock-CIPzVoGm.js                       9.58 kB │ gzip:  4.47 kB
+../.runtime/qa/dist/assets/ProgressTab-CdSmUnqK.js                9.89 kB │ gzip:  3.86 kB
+../.runtime/qa/dist/assets/SettingsOverview-gUq-dwHS.js          10.09 kB │ gzip:  3.29 kB
+../.runtime/qa/dist/assets/TaskTimeline-BuIQ7-PM.js              10.70 kB │ gzip:  4.05 kB
+../.runtime/qa/dist/assets/sopTaskApi-vIBcBKpw.js                11.11 kB │ gzip:  4.49 kB
+../.runtime/qa/dist/assets/IntegratedPages-DPSeNs5k.js           12.42 kB │ gzip:  5.19 kB
+../.runtime/qa/dist/assets/DispatchWorkflowPage-B_sdvZvn.js      13.75 kB │ gzip:  5.23 kB
+../.runtime/qa/dist/assets/MyWorkTable-BrsnK9Wa.js               16.54 kB │ gzip:  4.57 kB
+../.runtime/qa/dist/assets/SopTasks-Bv6W-ZDe.js                  18.29 kB │ gzip:  6.60 kB
+../.runtime/qa/dist/assets/ProjectsList-CbCUQOM3.js              20.43 kB │ gzip:  7.79 kB
+../.runtime/qa/dist/assets/icons-DMFh0MTH.js                     23.56 kB │ gzip:  4.50 kB
+../.runtime/qa/dist/assets/DispatchPublish-DF5OjyxY.js           41.59 kB │ gzip: 14.05 kB
+../.runtime/qa/dist/assets/SopTasks-q93C3qAD.js                  43.19 kB │ gzip: 14.39 kB
+../.runtime/qa/dist/assets/Operations-DGC21ks6.js                99.13 kB │ gzip: 30.84 kB
+../.runtime/qa/dist/assets/react-vendor-C8KqcC7x.js             142.95 kB │ gzip: 45.76 kB
+../.runtime/qa/dist/assets/P2Pages-aLRykIAT.js                  160.89 kB │ gzip: 41.33 kB
+../.runtime/qa/dist/assets/ProjectDetail-o_Kz1wB3.js            209.43 kB │ gzip: 65.50 kB
+../.runtime/qa/dist/assets/index-Cr6h5w6j.js                    261.81 kB │ gzip: 86.92 kB
+✓ built in 1.49s

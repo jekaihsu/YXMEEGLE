@@ -1,0 +1,4 @@
+Reports view-model assertions passed.
+Round 2 table fallbacks, matched-day labels, blank options and tab sort defaults passed.
+(node:99507) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)

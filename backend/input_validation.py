@@ -7,8 +7,9 @@ from urllib.parse import urlsplit
 from fastapi import HTTPException
 
 MAX_ACTION_BYTES = 256 * 1024
+MAX_ACTION_NAME = 120  # must not exceed AuditRow.action String(120)
 TEXT_LIMIT = 10000
-TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note',
+TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note', 'evidence',
                'qualification_note', 'source_url', 'reference_url', 'url',
                'department', 'role', 'direction', 'result', 'seat', 'scope',
                'classification', 'start_date', 'due_date', 'day', 'end_time',
@@ -24,6 +25,17 @@ BOOL_FIELDS = {'active', 'required', 'qualified', 'not_applicable', 'finished',
 
 def invalid(message='欄位型別或內容格式錯誤', code=422):
     raise HTTPException(code, message)
+
+
+async def json_object(request, code=422):
+    """Parse a request body that must be a JSON object; reject malformed, array, null and scalar bodies."""
+    try:
+        body = await request.json()
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        invalid('請求內容必須是有效的 JSON', code)
+    if not isinstance(body, dict):
+        invalid('請求內容必須是 JSON 物件', code)
+    return body
 
 
 def text(value, field, limit=TEXT_LIMIT, nullable=False):
@@ -122,6 +134,9 @@ def _payload_fields(payload):
 def validate_action(body):
     if not isinstance(body, dict) or not isinstance(body.get('action'), str):
         invalid('操作格式錯誤')
+    text(body['action'], 'action', MAX_ACTION_NAME)
+    if not body['action']:
+        invalid('action 不可空白')
     _bounded(body)
     if len(json.dumps(body, ensure_ascii=False, allow_nan=False).encode('utf-8')) > MAX_ACTION_BYTES:
         invalid('操作資料超過 256 KB', 413)
@@ -129,6 +144,13 @@ def validate_action(body):
     if not isinstance(payload, dict):
         invalid('payload 必須是物件')
     _payload_fields(payload)
+    if body['action'] == 'calendar_update':
+        for key in ('holidays', 'workdays'):
+            values = payload.get(key, [])
+            if not isinstance(values, list):
+                invalid(f'{key} 必須是日期清單')
+            for value in values:
+                text(value, key, 10)
     if body['action'] in ('task_add', 'task_update') and 'title' in payload and not payload['title'].strip():
         invalid('任務名稱不可空白')
     return body

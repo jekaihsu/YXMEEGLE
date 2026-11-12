@@ -1,0 +1,19 @@
+{
+  "dev": {
+    "build": null,
+    "status": "ok",
+    "mode": "demo",
+    "database": "sqlite"
+  },
+  "staged": {
+    "build": {
+      "git_sha": "7f304fab47af5e086cb3d54c4ce0b46954f4905b",
+      "dirty": true,
+      "built_at": "2026-10-26T08:59:30+00:00",
+      "branch": "t3/qa-fixes-ui"
+    },
+    "status": "ok",
+    "mode": "demo",
+    "database": "sqlite"
+  }
+}

@@ -1,0 +1,8 @@
+Daily records (api): 11 review states render explicit labels
+Daily records: project switch and shrink keep offset, label and items consistent
+Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items
+Daily records: fallback shrink persists page 0 when the API becomes available
+Daily records (workspace-fallback): 11 review states render explicit labels
+Daily records: project switch and shrink keep offset, label and items consistent
+Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items
+Daily records: fallback shrink persists page 0 when the API becomes available

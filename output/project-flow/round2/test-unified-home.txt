@@ -1,0 +1,1 @@
+Unified home: role defaults, route alias, task/case anchors, named daily leave/trips, unavailable state, hide/reorder persistence, all-hidden recovery and blocked storage passed.

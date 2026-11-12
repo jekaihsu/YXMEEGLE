@@ -1,0 +1,13 @@
+contrast ok
+light destructive boundary 7.72:1; text 9.71:1
+light positive badge 8.15:1
+light warning badge 7.31:1
+light critical badge 8.80:1
+light accent badge 7.02:1
+light secondary boundary 7.75:1; text 7.75:1
+dark destructive boundary 6.98:1; text 8.00:1
+dark positive badge 8.26:1
+dark warning badge 7.95:1
+dark critical badge 6.67:1
+dark accent badge 9.05:1
+dark secondary boundary 10.85:1; text 10.85:1

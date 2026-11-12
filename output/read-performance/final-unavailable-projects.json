@@ -1,0 +1,10 @@
+[
+  {
+    "path": "/api/projects/read-verification-missing",
+    "status": 404
+  },
+  {
+    "path": "/api/projects/read-verification-missing/sop-tasks",
+    "status": 404
+  }
+]

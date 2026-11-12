@@ -18,11 +18,15 @@ class InvalidApprovalProof(RemoteFailure):
 
 
 def creation_not_performed(binding):
+    if not isinstance(binding,dict):return False
+    rejection=binding.get('creation_rejection');payload=binding.get('payload')
+    if not isinstance(rejection,dict) or not isinstance(payload,dict):return False
+    code=rejection.get('api_code');uuid=rejection.get('uuid')
     return (binding.get('creation_outcome')=='not_created' and
             binding.get('not_created_proof')=='documented_api_rejection' and
-            binding.get('creation_rejection',{}).get('http_status')==400 and
-            binding.get('creation_rejection',{}).get('api_code') in (1390001,1390015,1390013) and
-            binding.get('creation_rejection',{}).get('uuid')==binding.get('payload',{}).get('uuid'))
+            type(rejection.get('http_status')) is int and rejection['http_status']==400 and
+            type(code) is int and code in (1390001,1390015,1390013) and
+            isinstance(uuid,str) and bool(uuid) and uuid==payload.get('uuid'))
 
 
 def remote_binding_resolved(item):
@@ -40,6 +44,14 @@ def remote_binding_resolved(item):
     return bool(not binding.get('verification_failed_at') and receipt.get('binding_verified') is True
                 and receipt.get('verified_at') and receipt.get('instance_code')==binding.get('instance_code')
                 and receipt.get('external_status') in ('APPROVED','REJECTED','CANCELED','DELETED'))
+
+
+def abandoned_not_created(item):
+    """Withdrawn request whose binding is intact and provably never created remotely."""
+    binding=item.get('native_binding') or {}
+    if item.get('status')!='withdrawn' or item.get('frozen') or not binding.get('attempted'):return False
+    immutable={k:binding.get(k) for k in ('identity','kind','definition_hash','mapping','approvers','payload')}
+    return digest(immutable)==binding.get('binding_hash') and creation_not_performed(binding)
 
 
 def digest(value):

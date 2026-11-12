@@ -1,0 +1,36 @@
+{
+  "grant": {
+    "capabilities": [
+      "sop_task_read"
+    ],
+    "requestId": "b7850f3e-2de5-4943-8d2e-0ea2608e6832",
+    "state": "done",
+    "status": 200,
+    "workspace": "lark-1aad6a938e891946"
+  },
+  "reads": {
+    "reads": [
+      {
+        "allowed": {
+          "decide_suggestions": false,
+          "import": false,
+          "manage": false,
+          "work": false
+        },
+        "bytes": 1151,
+        "endpoint": "sop-tasks",
+        "ms": 3057.2000000476837,
+        "status": 200,
+        "timing": "identity;dur=153.1, load;dur=2532.9, serialize;dur=307.5, total;dur=2993.5"
+      },
+      {
+        "bytes": 72,
+        "endpoint": "sop-assignees",
+        "ms": 2439.800000011921,
+        "status": 200,
+        "timing": "identity;dur=70.3, load;dur=2254.2, serialize;dur=58.8, total;dur=2383.3"
+      }
+    ],
+    "state": "done"
+  }
+}

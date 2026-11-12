@@ -1,0 +1,24 @@
+{
+  "date_note": "Rechecked during resumed validation on 2026-10-21; exact request timestamps not captured",
+  "origin": "https://yongxiang-projects-20260925.zeabur.app",
+  "session": {
+    "status": 200,
+    "role": "manager",
+    "active": true,
+    "capabilities": [],
+    "workspace": "lark-1aad6a938e891946",
+    "environment": "lark",
+    "features": null
+  },
+  "health": {
+    "status": 200,
+    "mode": "lark",
+    "database": "postgresql"
+  },
+  "routes": {
+    "/api/settings/overview": 404,
+    "/api/projects/src-604c50ce7422171b35dc": 404,
+    "/api/projects/src-604c50ce7422171b35dc/sop-tasks": 404
+  },
+  "not_found_detail": "API 不存在"
+}

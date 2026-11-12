@@ -1,0 +1,49 @@
+Dispatch board: 64 literal parser, selector, rendered state, route, request and retention checks passed.
+✔ F4 read_failed snapshot retains counts and retry notice (2.923041ms)
+✔ F5 inactive timed overlap counts as conflict (0.217792ms)
+✔ F9 midnight end is exclusive in day list and person grid (0.248625ms)
+✔ F9 snapshot age preserves server age (1.405ms)
+✔ F11 accessible cards include crew, status and unassigned state (11.979666ms)
+✔ F11 snapshot age stays outside status live region (11.451709ms)
+✖ F10 member navigation hides dispatch while PM company navigation shows it (3.959417ms)
+✔ F4 cold HTTP 200 read_failed board is displayed (20.093208ms)
+✔ F7 polling ignores stable partial joins, continues pending joins, caps time and cancels switches (50.486916ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112.881459
+
+✖ failing tests:
+
+test at test-dispatch-fixes.mjs:57:1
+✖ F10 member navigation hides dispatch while PM company navigation shows it (3.959417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  false !== true
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-dispatch-fixes.mjs:60:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/.dispatch-fixes-test.mjs:841:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/.dispatch-fixes-test.mjs:841:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/.dispatch-fixes-test.mjs:841:21)
+Warning: useLayoutEffect does nothing on the server, because its effect cannot be encoded into the server renderer's output format. This will lead to a mismatch between the initial, non-hydrated UI and the intended UI. To avoid this, useLayoutEffect should only be used in components that render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr for common fixes.
+    at AppShell (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/.dispatch-fixes-test.mjs:841:21)

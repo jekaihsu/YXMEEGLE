@@ -122,12 +122,16 @@ def change_lines_valid(ws,p,n,item):
 
 
 def native_business_status(ws,p,n,item,approved):
+    from .features import enabled
+    if kind_of(item) in ('change','extension') and not enabled(ws,'change_extension'):return item.get('status','pending')
     if not approved:return 'pending'
     if kind_of(item)=='change' and not change_lines_valid(ws,p,n,item):return 'pending'
     return 'applied' if item.get('status')=='applied' else 'approved'
 
 
 def receipt_valid(ws,p,n,item,require_fresh=True):
+    from .features import enabled
+    if kind_of(item) in ('change','extension') and not enabled(ws,'change_extension'):return False
     try:
         binding=item.get('native_binding') or {}; receipt=item.get('native_receipt') or {}
         identity=binding['identity']

@@ -1,0 +1,16 @@
+PASS dense table preserves duplicate case numbers and versions in server order
+PASS footer shows three distinct server totals without deriving them
+PASS unknown totals are em dash with a reason, never zero
+PASS complete authorized empty and filtered empty remain distinct
+PASS loading and unlocated short bodies never invent a loaded zero
+PASS withheld amounts expose the G-AMT reason and no supplied values or derived values
+PASS forbidden body revokes rows, selection, totals, filters and identifiers
+PASS one malformed row fails the entire body closed to unknown
+PASS each consumed nested guard rejects malformed bodies without partial trust
+PASS unresolved cases remain explicit rows with receipt_missing vocabulary
+PASS partial, stale and read failure snapshots have per-row text and distinct retrieval time
+PASS technical IDs only appear in selected source drawer and chooser stays non-default
+PASS deadline disabled with backend reason; sorting offers asc desc clear only on supported columns
+PASS next is opaque server cursor; previous only accepts same-query actual cursor history
+PASS read-only view never projects caller write actions or raw metadata
+15 named behavioral tests passed

@@ -1,0 +1,27 @@
+ok   1. round-trip is exact for every P2 route (hash and ctx)
+ok   2. back after 3-level drilldown restores each level exactly; breadcrumbs follow
+ok   3. restored context survives the hash round trip at every depth
+ok   4. tampered / oversized / unknown-version / wrong-route contexts are rejected to a safe default
+ok   5. KPI drilldown carries exactly the KPI filter set (no extra, no missing)
+ok   6. period control never leaks into case filters or other routes
+ok   7. cursor is opaque: preserved byte for byte, never decoded, not carried across routes
+ok   8. no amount / hidden-id keys are accepted anywhere in the context
+ok   9. drill edges: only declared P2 transitions; link-only targets validated
+ok   10. drill/back never alias caller objects (later edits cannot change a stored parent)
+ok   11. corrupt return frame is refused at back()
+ok   12. hash envelope: unknown or duplicated parameters reject the whole hash to the safe default
+mut ok: unknown_key_filters -> tests 4,8 fail
+mut ok: unknown_key_toplevel -> tests 4,8 fail
+mut ok: version_check -> tests 4 fail
+mut ok: period_scope -> tests 6 fail
+mut ok: kpi_drop_guard -> tests 5 fail
+mut ok: kpi_exact_set -> tests 5 fail
+mut ok: back_exact_restore -> tests 2,7 fail
+mut ok: stack_edge_chain -> tests 4,11 fail
+mut ok: stack_frame_validation -> tests 11 fail
+mut ok: drill_cursor_reset -> tests 7 fail
+mut ok: canonical_check -> tests 4 fail
+mut ok: hash_unknown_param -> tests 12 fail
+mut ok: hash_duplicate_param -> tests 12 fail
+mut ok: oversize_bound -> tests 4 fail
+drilldown-context: 12 tests, 244 checks passed

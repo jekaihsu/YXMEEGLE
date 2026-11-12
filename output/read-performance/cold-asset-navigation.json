@@ -1,0 +1,136 @@
+{
+  "assets": [
+    {
+      "decoded": 21050,
+      "duration": 6920.800000011921,
+      "encoded": 4190,
+      "path": "/assets/icons-BNZTUIFh.js",
+      "responseEnd": 6992.199999988079,
+      "responseStart": 178.39999997615814,
+      "start": 71.39999997615814,
+      "transfer": 4490
+    },
+    {
+      "decoded": 268834,
+      "duration": 25724.900000035763,
+      "encoded": 45511,
+      "path": "/assets/index-BgNP4IlZ.css",
+      "responseEnd": 25796.30000001192,
+      "responseStart": 157.30000001192093,
+      "start": 71.39999997615814,
+      "transfer": 45811
+    },
+    {
+      "decoded": 142952,
+      "duration": 25765.69999998808,
+      "encoded": 46237,
+      "path": "/assets/react-vendor-DjB5-EPc.js",
+      "responseEnd": 25837.099999964237,
+      "responseStart": 157.19999998807907,
+      "start": 71.39999997615814,
+      "transfer": 46537
+    },
+    {
+      "decoded": 414828,
+      "duration": 46535.5,
+      "encoded": 134154,
+      "path": "/assets/index-Dwf3hjvL.js",
+      "responseEnd": 46606.89999997616,
+      "responseStart": 5785.599999964237,
+      "start": 71.39999997615814,
+      "transfer": 134454
+    },
+    {
+      "decoded": 1105,
+      "duration": 62.39999997615814,
+      "encoded": 621,
+      "path": "/assets/tabs-Cc_QzmRB.js",
+      "responseEnd": 46694.39999997616,
+      "responseStart": 46693.30000001192,
+      "start": 46632,
+      "transfer": 921
+    },
+    {
+      "decoded": 5606,
+      "duration": 83.19999998807907,
+      "encoded": 2471,
+      "path": "/assets/SettingsOverview-DxfECAZJ.js",
+      "responseEnd": 46961.39999997616,
+      "responseStart": 46960.80000001192,
+      "start": 46878.19999998808,
+      "transfer": 2771
+    }
+  ],
+  "navigation": {
+    "detailMs": 47499.39999997616,
+    "started": 73283.80000001192,
+    "state": "done",
+    "usefulMs": 33233.799999952316
+  },
+  "requests": [
+    {
+      "bytes": 31322,
+      "download": 93,
+      "firstByte": 46775.30000001192,
+      "ms": 236.60000002384186,
+      "path": "/api/session",
+      "start": 46631.69999998808
+    },
+    {
+      "bytes": 3523,
+      "download": 0.6000000238418579,
+      "firstByte": 47620.09999996424,
+      "ms": 655.1999999880791,
+      "path": "/api/settings/overview",
+      "start": 46965.5
+    },
+    {
+      "bytes": 1677,
+      "download": 0.19999998807907104,
+      "firstByte": 47740.80000001192,
+      "ms": 113.90000003576279,
+      "path": "/api/admin/runtime-health",
+      "start": 47627.09999996424
+    },
+    {
+      "bytes": 31322,
+      "download": 29.80000001192093,
+      "firstByte": 73440.69999998808,
+      "ms": 185.30000001192093,
+      "path": "/api/session",
+      "start": 73285.19999998808
+    },
+    {
+      "bytes": 268474,
+      "download": 11765.5,
+      "firstByte": 73993.69999998808,
+      "ms": 12288.199999988079,
+      "path": "/api/workspace",
+      "start": 73471
+    },
+    {
+      "bytes": 1151,
+      "download": 0.19999998807907104,
+      "firstByte": 115199.89999997616,
+      "ms": 8682.899999976158,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "start": 106517.19999998808
+    },
+    {
+      "bytes": 72,
+      "download": 2.5,
+      "firstByte": 112278.39999997616,
+      "ms": 5763.599999964237,
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "start": 106517.30000001192
+    },
+    {
+      "bytes": 86051,
+      "download": 344,
+      "firstByte": 120427.39999997616,
+      "ms": 14254,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "start": 106517.39999997616
+    }
+  ]
+}

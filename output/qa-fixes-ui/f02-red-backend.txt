@@ -1,0 +1,117 @@
+....F...FFF............................................................. [ 79%]
+..................F                                                      [100%]
+=================================== FAILURES ===================================
+______ test_source_health_exposes_safe_source_reads_without_record_values ______
+
+http = (<fastapi.applications.FastAPI object at 0x109c2bfb0>, <starlette.testclient.TestClient object at 0x109bedee0>, <funct...0x109b237e0>, {'approvals': [], 'approved_leave_delegations': [], 'archived_projects': [], 'as_of': '2026-09-25', ...})
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109acc260>
+
+    def test_source_health_exposes_safe_source_reads_without_record_values(http, monkeypatch):
+        app, client, seat, signin, _ = http
+        make_fresh(app, monkeypatch)
+        seat(cache=fresh_cache()); signin('u-manager')
+        response = client.get('/api/source-health')
+        assert response.status_code == 200, response.text
+        body = response.json()
+>       row = body['sources'][0]
+              ^^^^^^^^^^^^^^^^^^
+E       IndexError: list index out of range
+
+backend/test_p1_int_routes.py:99: IndexError
+_ test_source_health_passes_the_sync_predicate_and_closed_arguments[u-manager-True] _
+
+http = (<fastapi.applications.FastAPI object at 0x109724410>, <starlette.testclient.TestClient object at 0x10a0463c0>, <funct...0x10a15d120>, {'approvals': [], 'approved_leave_delegations': [], 'archived_projects': [], 'as_of': '2026-09-25', ...})
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a1629f0>
+uid = 'u-manager', expected = True
+
+    @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+    def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monkeypatch, uid, expected):
+        _, client, seat, signin, _ = http
+        seat(cache=fresh_cache()); signin(uid)
+        seen = {}
+        from . import source_health
+
+        def spy(snapshot, freshness=None, **kwargs):
+            seen.update(kwargs); seen['snapshot'] = snapshot
+            return {'page_state': None, 'sources': []}
+        monkeypatch.setattr(source_health, 'build_source_health', spy)
+        assert client.get('/api/source-health').status_code == 200
+>       assert (seen['diagnostic'], seen['viewer_filtered'], seen['read_authorized']) == (True, None, expected)
+E       assert (False, None, True) == (True, None, True)
+E
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+backend/test_p1_int_routes.py:148: AssertionError
+_ test_source_health_passes_the_sync_predicate_and_closed_arguments[u-pm-True] _
+
+http = (<fastapi.applications.FastAPI object at 0x10a16ac90>, <starlette.testclient.TestClient object at 0x10a261df0>, <funct...0x10a2754e0>, {'approvals': [], 'approved_leave_delegations': [], 'archived_projects': [], 'as_of': '2026-09-25', ...})
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a2994f0>
+uid = 'u-pm', expected = True
+
+    @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+    def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monkeypatch, uid, expected):
+        _, client, seat, signin, _ = http
+        seat(cache=fresh_cache()); signin(uid)
+        seen = {}
+        from . import source_health
+
+        def spy(snapshot, freshness=None, **kwargs):
+            seen.update(kwargs); seen['snapshot'] = snapshot
+            return {'page_state': None, 'sources': []}
+        monkeypatch.setattr(source_health, 'build_source_health', spy)
+        assert client.get('/api/source-health').status_code == 200
+>       assert (seen['diagnostic'], seen['viewer_filtered'], seen['read_authorized']) == (True, None, expected)
+E       assert (False, None, True) == (True, None, True)
+E
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+backend/test_p1_int_routes.py:148: AssertionError
+_ test_source_health_passes_the_sync_predicate_and_closed_arguments[u-field-False] _
+
+http = (<fastapi.applications.FastAPI object at 0x10a284200>, <starlette.testclient.TestClient object at 0x10a29ae70>, <funct...0x10a39d9e0>, {'approvals': [], 'approved_leave_delegations': [], 'archived_projects': [], 'as_of': '2026-09-25', ...})
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a3f7e60>
+uid = 'u-field', expected = False
+
+    @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+    def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monkeypatch, uid, expected):
+        _, client, seat, signin, _ = http
+        seat(cache=fresh_cache()); signin(uid)
+        seen = {}
+        from . import source_health
+
+        def spy(snapshot, freshness=None, **kwargs):
+            seen.update(kwargs); seen['snapshot'] = snapshot
+            return {'page_state': None, 'sources': []}
+        monkeypatch.setattr(source_health, 'build_source_health', spy)
+        assert client.get('/api/source-health').status_code == 200
+>       assert (seen['diagnostic'], seen['viewer_filtered'], seen['read_authorized']) == (True, None, expected)
+E       assert (False, None, False) == (True, None, False)
+E
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+backend/test_p1_int_routes.py:148: AssertionError
+__________ test_per_source_failure_has_safe_summary_and_retained_time __________
+
+    def test_per_source_failure_has_safe_summary_and_retained_time():
+        result = row(snapshot(status='error'), freshness={'status': 'error', 'last_error': 'SECRET_TOKEN'})
+>       assert result['last_error_summary'] == '來源讀取失敗'
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'last_error_summary'
+
+backend/test_source_health.py:472: KeyError
+=============================== warnings summary ===============================
+../../../../Local/YXMEEGLE/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/vc/Local/YXMEEGLE/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/test_p1_int_routes.py::test_source_health_exposes_safe_source_reads_without_record_values
+FAILED backend/test_p1_int_routes.py::test_source_health_passes_the_sync_predicate_and_closed_arguments[u-manager-True]
+FAILED backend/test_p1_int_routes.py::test_source_health_passes_the_sync_predicate_and_closed_arguments[u-pm-True]
+FAILED backend/test_p1_int_routes.py::test_source_health_passes_the_sync_predicate_and_closed_arguments[u-field-False]
+FAILED backend/test_source_health.py::test_per_source_failure_has_safe_summary_and_retained_time
+5 failed, 86 passed, 1 warning in 1.12s

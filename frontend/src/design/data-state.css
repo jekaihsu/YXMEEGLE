@@ -1,0 +1,15 @@
+@layer components{
+.ds-data-state{display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-4);height:auto;min-height:0;border-radius:var(--radius-m);background:var(--status-info-bg);color:var(--status-info-fg);font-size:var(--fs-footnote)}
+.ds-data-state>svg{flex:none}.ds-data-state-copy{min-width:0;overflow-wrap:anywhere}.ds-data-state-copy strong{display:block;font-size:var(--fs-subhead);margin-bottom:var(--space-1)}
+.ds-data-state[data-kind=Partial],.ds-data-state[data-kind=Stale],.ds-data-state[data-kind=Conflict],.ds-data-state[data-kind=UnknownOutcome]{background:var(--status-warn-bg);color:var(--status-warn-fg)}
+.ds-data-state[data-kind=Error],.ds-data-state[data-kind=Denied]{background:var(--status-error-bg);color:var(--status-error-fg)}
+.ds-data-state[data-kind=Empty]{background:var(--surface-2);color:var(--label-2)}
+.ds-data-state-actions{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-3)}
+.ds-data-state-actions :is(a,button){min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+}
+
+@layer components{
+.ds-data-state[data-kind=Loading]>svg{animation:ds-state-spin 1s linear infinite}
+@keyframes ds-state-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ds-data-state[data-kind=Loading]>svg{animation:none}}
+}

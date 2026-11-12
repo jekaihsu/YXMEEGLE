@@ -1,0 +1,16 @@
+{
+  "total": 98,
+  "passed": 89,
+  "failed": [
+    "test-dev-tooling.mjs",
+    "test-home-panels.mjs",
+    "test-home-target-navigation.mjs",
+    "test-ops-sync-panel.mjs",
+    "test-plan-panel.mjs",
+    "test-reports-interactions.mjs",
+    "test-search-input.mjs",
+    "test-shell-mode.mjs",
+    "test-ux-case-detail.mjs"
+  ],
+  "additional_failures": []
+}

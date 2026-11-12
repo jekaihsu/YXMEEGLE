@@ -1,0 +1,9 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
+.lark-pilot { margin-block: 1.5rem; padding: 1rem; border: 1px solid var(--sep); border-radius: 12px; color: var(--label); }
+.lark-pilot h3 { margin-block: 1rem .5rem; }
+.lark-pilot-scroll { max-width: 100%; overflow-x: auto; }
+.lark-pilot table { width: 100%; border-collapse: collapse; }
+.lark-pilot td, .lark-pilot th { padding: .5rem; text-align: left; border-bottom: 1px solid var(--sep); overflow-wrap: anywhere; min-width: 7rem; }
+.lark-pilot-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}

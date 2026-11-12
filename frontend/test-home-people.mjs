@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+const bundle=await build({stdin:{contents:"export * from './src/homePeople'; export {parsePeopleAttendance} from './src/peopleAttendance';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
+const file=new URL('./.home-people-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
+let m;try{m=await import(file.href)}finally{await fs.unlink(file)}
+const view=m.parsePeopleAttendance({status:'ok',days:['2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16'],people:[{id:'a',name:'甲',group:'測量二組',attendance:[]},{id:'b',name:'乙',group:'測量二組',attendance:['在、請假']},{id:'c',name:'丙',group:'測量一組',attendance:[]},{id:'d',name:'丁',group:'測量二組',attendance:[]}],leaves_available:false,leaves:[{person_id:'a',start:'2026-10-11',end:'2026-10-13'}],trips:[{person_id:'a',kind:'trip',start:'2026-10-13',end:'2026-10-14'},{person_id:'b',kind:'out',start:'2026-10-13',end:'2026-10-14'},{person_id:'c',kind:'trip',start:'2026-10-16',end:'2026-10-20'},{person_id:'d',kind:'trip',start:'2026-10-12',end:'2026-10-12'}]});
+const check=(actual,expected)=>assert.deepEqual(actual,expected);
+check(m.weekDays('2026-10-18'),['2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16']);
+check(m.weekDays('2026-10-19'),['2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23']);
+check(m.weeklyPeople(view,view.people,'2026-10-14').map(row=>row.cells),[['請假','請假','出差','—','—'],['請假','—','—','—','—'],['—','—','—','—','出差'],['出差','—','—','—','—']]);
+check(m.absenceCell({...view,leaves_available:true},view.people[1],'2026-10-12'),'請假');
+check(m.scopedAttendance(view,'assign',null),{known:false,people:[]});
+check(m.scopedAttendance(view,'assign','管理部'),{known:false,people:[]});
+check(m.scopedAttendance(view,'assign','測量二組').people.map(person=>person.id),['a','b','d']);
+check(m.scopedAttendance(view,'company',null).people.map(person=>person.id),['a','b','c','d']);
+const item=(id,people,deadline,status='in_progress',overdue=false)=>({id,assignees:people.map(id=>({id})),deadline,status,overdue});
+const items=[item('1',['a'],'2026-10-12'),item('2',['a','b'],'2026-10-16'),item('3',['a'],'2026-10-11'),item('4',['a'],'2026-10-19'),item('5',['a'],'2026-10-12','done'),item('6',['b'],null),item('7',['c'],'2026-10-15'),item('8',['a'],null,'cancelled'),item('9',['a'],null,'skipped')];
+check(m.absenceImpact(m.weeklyPeople(view,view.people,'2026-10-14'),items,'2026-10-14').map(row=>({id:row.person.id,days:row.absenceDays,open:row.open,due:row.due,overdue:row.overdue})),[{id:'a',days:['2026-10-12','2026-10-13','2026-10-14'],open:4,due:2,overdue:2},{id:'b',days:['2026-10-12'],open:2,due:1,overdue:0},{id:'c',days:['2026-10-16'],open:1,due:1,overdue:0}]);
+check(m.absenceImpact(m.weeklyPeople(view,m.scopedAttendance(view,'assign',null).people,'2026-10-14'),items,'2026-10-14'),[]);
+check(m.absenceImpact(m.weeklyPeople(view,view.people,'2026-10-14'),[items[0],items[0]],'2026-10-14').map(row=>row.open),[1]);
+console.log('Home people: 11 literal week, attendance, scope and impact checks passed.');

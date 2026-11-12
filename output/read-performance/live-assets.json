@@ -1,0 +1,30 @@
+{
+  "html_status": 200,
+  "assets": [
+    {
+      "asset": "/assets/icons-BNZTUIFh.js",
+      "status": 200,
+      "bytes": 21050,
+      "matches_local_build": true
+    },
+    {
+      "asset": "/assets/index-BH5Ow6Wm.js",
+      "status": 200,
+      "bytes": 414828,
+      "matches_local_build": true
+    },
+    {
+      "asset": "/assets/index-BgNP4IlZ.css",
+      "status": 200,
+      "bytes": 268834,
+      "matches_local_build": true
+    },
+    {
+      "asset": "/assets/react-vendor-DjB5-EPc.js",
+      "status": 200,
+      "bytes": 142952,
+      "matches_local_build": true
+    }
+  ],
+  "all_match": true
+}

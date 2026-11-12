@@ -1,0 +1,48 @@
+✔ four old tabs keep node, task, completion and focus while selecting one workspace (0.541333ms)
+✔ task basis excludes cancellation and superseded work and does not use opaque progress (0.422875ms)
+✔ missing daily quantity remains unknown even with zero item counts and completed tasks (0.219875ms)
+✔ known quantities retain unit text without adding unlike quantities (0.118791ms)
+✔ legacy has one honest local-task number and source state never overwrites workflow authority (3.269084ms)
+✔ task filters compose for mine, unassigned and overdue without hiding other source identities (0.072875ms)
+✔ dispatch proposal uses stable case references and never treats the assignment row as parent obligation (0.062458ms)
+✔ round2 node state overrides task ratio and skipped nodes have no bar (0.084916ms)
+✖ round2 overall stays unknown when a counted node has unknown progress (0.464584ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6.99625
+
+✖ failing tests:
+
+test at test-project-flow-model.mjs:73:1
+✖ round2 overall stays unknown when a counted node has unknown progress (0.464584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    {
+  +   basis: 'nodes',
+  +   label: '節點完成度（略過不計）',
+  +   percent: 50
+  -   basis: 'unknown',
+  -   label: '部分節點進度未知（略過不計）',
+  -   percent: null
+    }
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-model.mjs:76:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
